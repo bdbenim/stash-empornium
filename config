@@ -1,0 +1,101 @@
+[backend]
+## name of a file in templates/ dir
+default_template = fakestash-v2
+## where torrents are placed
+torrent_directory = /home/foobar/torrents
+## port that the backend listens on
+port = 9932
+
+[stash]
+## url of your stash instance
+url = http://localhost:9999
+## only needed if you set up authentication for stash
+# api_key = 123abc.xyz
+
+[empornium]
+## comma-separated list of stash tags that are included as "sex acts" in torrent description
+sex_acts = Vaginal Sex, Missionary, Doggy Style, Cowgirl, Reverse Cowgirl, Standing Doggy Style, Blowjob, Titjob, Pussy Licking, Cumshot, Pussy to Mouth, Piledriver, Pussy Fingering, Side Fuck, Bulldog, Facial, Vaginal Creampie, Mouth Creampie, Masturbation, Self Pussy Fingering
+
+## map from stash tags to empornium tags
+## all tags in the example set below are stashdb-accepted tags
+## you don't have to include every stash tag
+## and multiple stash tags can map to the same EMP tag
+[empornium.tags]
+69 = 69
+American = american
+Asian = asian
+Asian Woman = asian
+Athletic Woman = athletic.body
+BBW = bbw
+Ball Sucking = ball.sucking
+Big Areolas = big.areolas
+Big Ass = big.ass
+Big Tits = big.tits
+Black = black
+Black Hair (Female) = black.hair
+Blond Hair (Female) = blonde
+Blowjob = blowjob
+British = british
+Brown Hair (Female) = brunette
+Couple Sex = 1.on.1
+Cowgirl = cowgirl
+Creampie = creampie
+Cum in Mouth = cum.in.mouth
+Cum on Ass = cum.on.ass
+Cum on Pussy = cum.on.pussy
+Cum on Stomach = cum.on.stomach
+Cum on Tits = cum.on.tits
+Cumshot = cumshot
+Czech = czech
+Deepthroat = deepthroat
+European = european
+Facial = facial
+Fake Tits = fake.tits
+Foursome (BGGG) = foursome
+Garter = garter.belt
+Garter Belt = garter.belt
+Hairless Pussy = shaved
+Hairy Pussy = hairy.pussy
+Hardcore = hardcore
+High Heels = high.heels
+Huge Tits = huge.tits
+Indoors = indoor
+Innie Pussy = innie.pussy
+Kissing = kissing
+Latina Woman = latina
+Lingerie = lingerie
+MILF = milf
+Male POV = pov
+Masturbation = masturbation
+Medium Tits = medium.tits
+Mixed POV = some.pov
+Natural Tits = natural.tits
+No Condom = no.condom
+Oil = oil
+Old Woman = gilf
+Older Female / Younger Male = older.female.younger.male
+Open Mouth Facial = open.mouth.facial
+Outdoors = outdoor
+Outie Pussy = outie.pussy
+Panties to the Side = panties.to.side
+Piledriver = piledriver
+Pussy Fingering = pussy.fingering
+Pussy Licking = cunnilingus
+Pussy to Mouth = pussy.to.mouth
+Red Hair (Female) = redhead
+Reverse Cowgirl = reverse.cowgirl
+Sagging Tits = saggy.tits
+Short Hair (Female) = short.hair
+Small Tits = small.tits
+Solo Female = solo
+Spooning = spooning
+Squirting = squirting
+Stockings = stockings
+Striptease = striptease
+Thong = thong
+Threesome (BGG) = threesome
+Titjob = titfuck
+Toys = toys
+Trimmed Pussy = trimmed
+Vaginal Creampie = creampie
+Vaginal Sex = vaginal.sex
