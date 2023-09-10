@@ -134,11 +134,6 @@ def generate():
         })
         return
 
-    ################################################
-    # Add prefix to path for personal Unraid setup #
-    ################################################
-    stash_file["path"] = "/mnt/unraid/data/"+stash_file["path"]
-
     ht = stash_file["height"]
     resolution = None
     # these are stash's heuristics, see pkg/models/resolution.go
