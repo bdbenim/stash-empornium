@@ -41,7 +41,15 @@ import uuid
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 conf = configparser.ConfigParser()
-conf.read("config")
+if not os.path.isfile("config/config.ini"):
+    logging.info("Config file not found, creating")
+    if not os.path.exists("config"):
+        os.makedirs("config")
+    with open("config/config.ini","w+") as configfile:
+        conf.read("default.ini")
+        conf.write(configfile)
+else:
+    conf.read("config/config.ini")
 
 STASH_URL = conf["stash"].get("url", "http://localhost:9999")
 PORT = int(conf["backend"].get("port", 9932))
@@ -234,7 +242,6 @@ def generate():
 
     # upload images and paste in description
     contact_sheet_file = tempfile.mkstemp(suffix=".jpg")
-    print(stash_file["path"])
     cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     yield json.dumps({
@@ -412,5 +419,5 @@ def templates():
     return template_names
 
 if __name__ == "__main__":
-    app.run(port=PORT)
+    app.run(host='0.0.0.0',port=PORT)
 
