@@ -1,6 +1,6 @@
 # this dockerfile is used to build the image for the emp_stash_fill service, install all the dependencies and run the service to listen to the tampermonkey script on the host browser
 
-FROM python:3.9-slim-buster
+FROM python:3.11-slim-bullseye
 
 WORKDIR /emp_stash_fill
 
@@ -11,6 +11,7 @@ RUN apt-get update && \
 
 # Copy files and install Python dependencies
 COPY . .
+RUN mv docker-default.ini default.ini
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run the Flask app when the container is executed

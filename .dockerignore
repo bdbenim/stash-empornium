@@ -4,3 +4,4 @@ emp_stash_fill.user.js
 .dockerignore
 .gitignore
 Dockerfile
+default.ini

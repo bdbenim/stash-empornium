@@ -2,28 +2,49 @@
 This script by user humbaba allows torrent files and associated presentations to be created for empornium based on scenes from a local [stash](https://github.com/stashapp/stash) instance.
 
 ## Installation
-### Dependencies
+
+### Using Docker
+
+To run the backend as a docker container, copy and paste the following commands:
+```bash
+docker pull bdbenim/stash-empornium:latest
+docker run -d \
+--name stash-empornium \
+-p 9932:9932 \
+--mount type=bind,src=/path/to/config,target=/config
+--mount type=bind,src=/path/to/save/torrents,target=/config/torrents \
+--mount type=bind,src=/media,target=/media \
+bdbenim/stash-empornium:latest
+```
+
+Make sure that the target for your `/media` mount matches what stash sees. You may have to change the target, not just the source, to achieve this.
+
+### Without Using Docker
+
+#### Dependencies
 - Python3
   - flask
   - requests
   - vcsi
 - ffmpeg
 - mktorrent
-- Tampermonkey
+- [Tampermonkey](https://www.tampermonkey.net)
+
+Run the following commands to install the backend and dependencies:
+```bash
+git clone https://github.com/bdbenim/stash-empornium.git
+cd stash-empornium
+pip install -r requirements.txt
+sudo apt-get install -y ffmpeg mktorrent
+```
 
 The userscript can be installed [here](https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js). Place the other files on the same machine as your stash server and ensure dependencies are installed.
 
-### Configuration
-1. Update userscript configuration variables to point to your local stash server and the python backend:
-```
-const BACKEND_DEFAULT = "http://localhost:9932"
-const STASH_DEFAULT = "http://localhost:9999"
-const STASH_API_KEY_DEFAULT = "123abc.xyz";
-```
-You can leave the API key as `null` if you do not use authentication.
+## Configuration
+1. Visit `upload.php` and open the Tampermonkey menu. Set the backend URL, stash URL, and API key (if you use authentication).
 
-2. Update config file:
-```
+2. Update config file located at `config/config.ini`:
+```ini
 [backend]
 ## name of a file in templates/ dir
 default_template = fakestash-v2
@@ -38,7 +59,7 @@ url = http://localhost:9999
 ## only needed if you set up authentication for stash
 # api_key = 123abc.xyz
 ```
-The port above corresponds to the `BACKEND_DEFAULT` URL in step 1, so if you change one you must change the other.
+The port above corresponds to the backend URL in step 1, so if you change one you must change the other.
 
 ## Usage
 1. Run `emp_stash_fill.py`

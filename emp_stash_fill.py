@@ -32,6 +32,7 @@ import math
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import tempfile
 import urllib.parse
@@ -40,14 +41,16 @@ import uuid
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+##########
+# CONFIG #
+##########
+
 conf = configparser.ConfigParser()
 if not os.path.isfile("config/config.ini"):
     logging.info("Config file not found, creating")
     if not os.path.exists("config"):
         os.makedirs("config")
-    with open("config/config.ini","w+") as configfile:
-        conf.read("default.ini")
-        conf.write(configfile)
+    shutil.copyfile("default.ini", "config/config.ini")
 else:
     conf.read("config/config.ini")
 
@@ -83,7 +86,7 @@ def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
         "thumb_width": 160,
         "thumb_height": 160,
         "thumb_crop": False,
-        "medium_width": 500,
+        "medium_width": 800,
         "medium_crop": "false",
         "type": "file",
         "action": "upload",
@@ -141,6 +144,7 @@ def generate():
     for f in scene["files"]:
         if f["id"] == file_id:
             # Apply remote path mappings
+            logging.debug(f"Got path {f['path']} from stash")
             for remote,local in conf.items("file.maps"):
                 if not f["path"].startswith(remote):
                     continue
@@ -150,6 +154,7 @@ def generate():
                     local += "/"
                 f["path"] = local + f["path"].removeprefix(remote)
                 break
+            logging.debug(f"Mapped to path {f['path']}")
             stash_file = f
             break
 
@@ -206,12 +211,8 @@ def generate():
     elif cover_mime_type == "image/png":
         cover_ext = "png"
     cover_file = tempfile.mkstemp(suffix="." + cover_ext)
-    cover_file_resized = tempfile.mkstemp(suffix="." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
-    with open(cover_file_resized[1], "wb") as fp:
-        fp.write(cover_response.content)
-    cmd = ["convert","-resize","800x",cover_file_resized[1],cover_file_resized[1]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     process.wait()
 
@@ -367,9 +368,8 @@ def generate():
     logging.info("Uploading cover")
     cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
     os.remove(cover_file[1])
-    logging.info("Uploading resized cover")
-    cover_resized_url = img_host_upload(img_host_token, cookies, cover_file_resized[1], cover_mime_type, cover_ext)
-    os.remove(cover_file_resized[1])
+    cover_url_parts = cover_remote_url.split(".")
+    cover_resized_url = ".".join(cover_url_parts[:-1])+".md."+cover_url_parts[-1]
     logging.info("Uploading contact sheet")
     contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
     os.remove(contact_sheet_file[1])
@@ -384,11 +384,12 @@ def generate():
 
     logging.info("Uploading screens")
     screens_urls = []
+    a = 1
+    b = len(screens)
     for screen in screens:
+        logging.info(f"Uploading screens ({a} of {b})")
         screens_urls.append(img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg"))
         os.remove(screen)
-
-    # cover_remote_url = "https://jerking.empornium.ph/images/2023/03/15/7f3b4ff47bc5b7e213a_c.jpg"
 
     ############
     # TEMPLATE #
