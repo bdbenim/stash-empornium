@@ -148,8 +148,8 @@ def generate():
                     remote += "/"
                 if local[-1] != "/":
                     local += "/"
-	        f["path"] = local + f["path"].removeprefix(remote)
-	        break
+                f["path"] = local + f["path"].removeprefix(remote)
+                break
             stash_file = f
             break
 
