@@ -129,9 +129,27 @@ def generate():
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
 
+    # Ensure that all expected string keys are present
+    str_keys = ["title", "details", "date"]
+    for key in str_keys:
+        if key not in scene:
+            scene[key] = ""
+        elif scene[key] == None:
+            scene[key] = ""
+
     stash_file = None
     for f in scene["files"]:
         if f["id"] == file_id:
+            # Apply remote path mappings
+            for remote,local in conf.items("file.maps"):
+                if not f["path"].startswith(remote):
+                    continue
+                if remote[-1] != "/":
+                    remote += "/"
+                if local[-1] != "/":
+                    local += "/"
+	        f["path"] = local + f["path"].removeprefix(remote)
+	        break
             stash_file = f
             break
 
@@ -167,10 +185,10 @@ def generate():
         resolution = "2160p"
     elif ht >= 2880 and ht < 3384:
         resolution = "2880p"
-    # elif ht >= 3384 and ht < 4320:
-    #     resolution = "6K"
-    # elif ht >= 4320 and ht < 8639:
-    #     resolution = "8K"
+    elif ht >= 3384 and ht < 4320:
+        resolution = "6K"
+    elif ht >= 4320 and ht < 8639:
+        resolution = "8K"
 
     if resolution is not None:
         tags.add(resolution)
@@ -208,7 +226,7 @@ def generate():
         performer_tag = re.sub("\s+", ".", performer_tag)
         tags.add(performer_tag)
         # also include alias tags?
-        
+
         for tag in performer["tags"]:
             emp_tag = TAGS_MAP.get(tag["name"])
             if emp_tag is not None:
@@ -376,10 +394,15 @@ def generate():
     # TEMPLATE #
     ############
 
-    # also delete local files
+    # Prevent error in case date is missing
+    date = scene["date"]
+    if date != None and len(date) > 1:
+        date = datetime.datetime.fromisoformat(date).strftime("%B %-d, %Y")
+
+
     template_context = {
         "title":         scene["title"],
-        "date":          datetime.datetime.fromisoformat(scene["date"]).strftime("%B %-d, %Y"),
+        "date":          date,
         "details":       scene["details"] if scene["details"] != "" else None,
         "sex_acts":      ", ".join(sex_acts),
         "duration":      str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),

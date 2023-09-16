@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.0.1
-// @description  try to take over the world!
+// @version      0.0.2
+// @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       You
 // @match        https://www.empornium.sx/upload.php
 // @match        https://www.empornium.is/upload.php
@@ -12,6 +12,9 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @homepageURL  https://github.com/bdbenim/stash-empornium
+// @updateURL    https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
+// @downloadURL  https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
 // ==/UserScript==
 
 const BACKEND_DEFAULT = "http://localhost:9932"
