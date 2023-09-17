@@ -64,8 +64,9 @@ TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home()))
 TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].split(",")))
 TAGS_MAP = conf["empornium.tags"]
 
-#template_names = [a for a,b in conf.items("templates")]
-template_names = conf.items("templates")
+template_names = {}
+for k,v in conf.items("templates"):
+    template_names[k] = v
 
 stash_headers = {
     "Content-type": "application/json",
@@ -116,8 +117,7 @@ def generate():
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
 
-    template_index = int(j["template"]) if "template" in j else 0
-    template = template_names[template_index][0] if template_index < len(template_names) and template_names[template_index][0] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
+    template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
 
     tags = set()
     sex_acts = []
@@ -444,7 +444,7 @@ def fill():
 
 @app.route('/templates')
 def templates():
-    return template_names
+    return json.dumps(template_names)
 
 if __name__ == "__main__":
     try:
