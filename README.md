@@ -26,6 +26,7 @@ Make sure that the target for your `/media` mount matches what stash sees. You m
   - flask
   - requests
   - vcsi
+  - waitress (optional)
 - ffmpeg
 - mktorrent
 - [Tampermonkey](https://www.tampermonkey.net)
@@ -36,6 +37,11 @@ git clone https://github.com/bdbenim/stash-empornium.git
 cd stash-empornium
 pip install -r requirements.txt
 sudo apt-get install -y ffmpeg mktorrent
+```
+
+You can optionally install waitress as a production WSGI server:
+```bash
+pip install waitress
 ```
 
 The userscript can be installed [here](https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js). Place the other files on the same machine as your stash server and ensure dependencies are installed.

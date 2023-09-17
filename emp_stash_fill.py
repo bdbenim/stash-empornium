@@ -54,6 +54,9 @@ if not os.path.isfile("config/config.ini"):
 else:
     conf.read("config/config.ini")
 
+if not os.path.exists("config/templates"):
+    shutil.copytree("default-templates","config/templates",copy_function=shutil.copyfile)
+
 STASH_URL = conf["stash"].get("url", "http://localhost:9999")
 PORT = int(conf["backend"].get("port", 9932))
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2")
@@ -61,8 +64,8 @@ TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home()))
 TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].split(",")))
 TAGS_MAP = conf["empornium.tags"]
 
-with open("templates.json") as fp:
-    template_names = json.load(fp)
+#template_names = [a for a,b in conf.items("templates")]
+template_names = conf.items("templates")
 
 stash_headers = {
     "Content-type": "application/json",
@@ -78,7 +81,9 @@ findScene(id: "{}") {{
 }}
 '''
 
-app = Flask(__name__)
+dir_path = os.path.dirname(os.path.realpath(__file__))
+template_dir = os.path.join(dir_path, "config/templates")
+app = Flask(__name__, template_folder=template_dir)
 
 def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
     files = { "source": (str(uuid.uuid4()) + "." + image_ext, open(img_path, 'rb'), img_mime_type) }
@@ -111,7 +116,8 @@ def generate():
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
 
-    template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
+    template_index = int(j["template"]) if "template" in j else 0
+    template = template_names[template_index][0] if template_index < len(template_names) and template_names[template_index][0] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
 
     tags = set()
     sex_acts = []
@@ -213,8 +219,6 @@ def generate():
     cover_file = tempfile.mkstemp(suffix="." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    process.wait()
 
 
     ##############
@@ -443,5 +447,10 @@ def templates():
     return template_names
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0',port=PORT)
+    try:
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=PORT)
+    except:
+        logging.info("Waitress not installed, using builtin server")
+        app.run(host='0.0.0.0',port=PORT)
 
