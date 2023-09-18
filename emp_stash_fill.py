@@ -24,7 +24,7 @@ import requests
 from flask import Flask, Response, jsonify, request, stream_with_context, render_template
 
 # built-in
-import configparser
+import configupdater
 import datetime
 import json
 import logging
@@ -48,7 +48,7 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 dir_path = os.path.dirname(os.path.realpath(__file__))
 template_dir = os.path.join(dir_path, "config/templates")
 
-conf = configparser.ConfigParser()
+conf = configupdater.ConfigUpdater()
 if not os.path.isfile("config/config.ini"):
     logging.info("Config file not found, creating")
     if not os.path.exists("config"):
@@ -76,25 +76,28 @@ for filename in os.listdir("default-templates"):
         else:
             shutil.copyfile(src, dst)
             logging.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
-            #TODO add template to config.ini
+            if not conf["templates"].has_option(filename):
+                tmpConf = ConfigUpdater()
+                tmpConf.read("default.ini")
+                conf["templates"].set(filename, tmpConf["templates"][filename].value)
 
-STASH_URL = conf["stash"].get("url", "http://localhost:9999")
-PORT = int(conf["backend"].get("port", 9932))
-DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2")
-TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home()))
-TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].split(",")))
-TAGS_MAP = conf["empornium.tags"]
+STASH_URL = conf["stash"].get("url", "http://localhost:9999").value
+PORT = int(conf["backend"].get("port", 9932)).value
+DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value
+TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value
+TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].value.split(",")))
+TAGS_MAP = [tag for tag in conf["empornium.tags"]]
 
 template_names = {}
 for k,v in conf.items("templates"):
-    template_names[k] = v
+    template_names[k] = v.value
 
 stash_headers = {
     "Content-type": "application/json",
 }
 
-if conf["stash"].get("api_key"):
-    stash_headers["apiKey"] = conf["stash"].get("api_key")
+if conf["stash"].has_option("api_key"):
+    stash_headers["apiKey"] = conf["stash"].get("api_key").value
 
 stash_query = '''
 findScene(id: "{}") {{

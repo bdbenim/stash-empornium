@@ -2,3 +2,4 @@ Flask
 requests
 vcsi
 waitress
+configupdater
