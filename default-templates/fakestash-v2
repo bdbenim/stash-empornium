@@ -1,10 +1,6 @@
+{# 20230917 -#}
 [bg=#202b33][color=#F5F8FA][font=Helvetica][table=nopad,nball,vat][tr][td=#202b33][/td]
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- Replace images and everything in {% raw %}{{curly brackets}}{% endraw %}
- Main bg and font color changed above, td color below is for left side panel
- The pad.png's can be removed
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [td=400px,#202b33][bg=90%][size=2]
 
@@ -25,9 +21,6 @@
 [b]Performers[/b][br]
 [table=nball,left][tr]
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- Performer table - td for each performer (and padding), just delete one if not using
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 {% for name, details in performers.items() -%}
 [td=#30404d,124px][img=123]{% if details["image_remote_url"] %}{{details["image_remote_url"]}}{% else %}https://fapping.empornium.sx/images/2023/04/06/imageR8b7P.png{% endif %}[/img][url=/torrents.php?taglist={{details["tag"]}}][size=3][/size][color=white][bg=90%]{{name}}
@@ -42,11 +35,6 @@
 
 [/size][/bg][/td]
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- Cover image in the bg below
- Make sure cover image has width at least equal to td width (set at 800px now)
- Remove br-tags to make cover less high if it repeats
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [td=vat,800px][bg=98%]
 [bg={{cover}}]
@@ -55,12 +43,9 @@
 [bg=#00000033][color=#F0EEEB][size=2]
 [table=100%,nball,vam][tr][td=16px][/td]
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- Video details in two td below
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [td]{{duration}}[/td]
-[td][align=right]{{container}}   {{codec}}   {{resolution}}   {{bitrate}}   {{framerate}}[/align][/td]
+[td][align=right]{{container}}   {{video_codec}}/{{audio_codec}}   {{resolution}}   {{bitrate}}   {{framerate}}[/align][/td]
 
 [td=16px][/td][/tr][/table]
 [/size][/color][/bg][/bg][size=2]

@@ -45,6 +45,9 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 # CONFIG #
 ##########
 
+dir_path = os.path.dirname(os.path.realpath(__file__))
+template_dir = os.path.join(dir_path, "config/templates")
+
 conf = configparser.ConfigParser()
 if not os.path.isfile("config/config.ini"):
     logging.info("Config file not found, creating")
@@ -54,8 +57,26 @@ if not os.path.isfile("config/config.ini"):
 else:
     conf.read("config/config.ini")
 
-if not os.path.exists("config/templates"):
-    shutil.copytree("default-templates","config/templates",copy_function=shutil.copyfile)
+if not os.path.exists(template_dir):
+    shutil.copytree("default-templates",template_dir,copy_function=shutil.copyfile)
+installed_templates = os.listdir(template_dir)
+for filename in os.listdir("default-templates"):
+    src = os.path.join("default-templates", filename)
+    if os.path.isfile(src):
+        dst = os.path.join(template_dir, filename)
+        if os.path.isfile(dstFile):
+            try:
+                with open(src) as srcFile, open(dst) as dstFile:
+                    srcVer = int("".join(filter(str.isdigit,"0"+srcFile.readline())))
+                    dstVer = int("".join(filter(str.isdigit,"0"+dstFile.readline())))
+                    if srcVer > dstVer:
+                        logging.info(f"Template {filename} has a new version available in the default-templates directory")
+            except:
+                logging.error(f"Couldn't compare version of {src} and {dst}")
+        else:
+            shutil.copyfile(src, dst)
+            logging.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
+            #TODO add template to config.ini
 
 STASH_URL = conf["stash"].get("url", "http://localhost:9999")
 PORT = int(conf["backend"].get("port", 9932))
@@ -64,8 +85,9 @@ TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home()))
 TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].split(",")))
 TAGS_MAP = conf["empornium.tags"]
 
-#template_names = [a for a,b in conf.items("templates")]
-template_names = conf.items("templates")
+template_names = {}
+for k,v in conf.items("templates"):
+    template_names[k] = v
 
 stash_headers = {
     "Content-type": "application/json",
@@ -81,8 +103,6 @@ findScene(id: "{}") {{
 }}
 '''
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
-template_dir = os.path.join(dir_path, "config/templates")
 app = Flask(__name__, template_folder=template_dir)
 
 def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
@@ -116,8 +136,7 @@ def generate():
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
 
-    template_index = int(j["template"]) if "template" in j else 0
-    template = template_names[template_index][0] if template_index < len(template_names) and template_names[template_index][0] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
+    template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
 
     tags = set()
     sex_acts = []
@@ -160,11 +179,10 @@ def generate():
                     local += "/"
                 f["path"] = local + f["path"].removeprefix(remote)
                 break
-            logging.debug(f"Mapped to path {f['path']}")
             stash_file = f
             break
 
-    if stash_file is None:
+    if stash_file is None or not os.path.isfile(stash_file["path"]):
         yield json.dumps({
             "status": "error",
             "message": "Couldn't find file"
@@ -300,6 +318,15 @@ def generate():
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             process.wait()
 
+    audio_bitrate = ""
+    cmd = ["ffprobe", "-v", "0", "-select_streams", "a:0", "-show_entries", "stream=bit_rate", "-of", "compact=p=0:nk=1", stash_file["path"]]
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        audio_bitrate = f"{int(proc.stdout)//1000} kbps"
+        
+    except:
+        logging.error("Unable to determine audio bitrate")
+        audio_bitrate = "UNK"
 
     ###########
     # TORRENT #
@@ -392,6 +419,7 @@ def generate():
     b = len(screens)
     for screen in screens:
         logging.info(f"Uploading screens ({a} of {b})")
+        a += 1
         screens_urls.append(img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg"))
         os.remove(screen)
 
@@ -404,7 +432,7 @@ def generate():
     if date != None and len(date) > 1:
         date = datetime.datetime.fromisoformat(date).strftime("%B %-d, %Y")
 
-
+    logging.info("Rendering template")
     template_context = {
         "title":         scene["title"],
         "date":          date,
@@ -412,14 +440,17 @@ def generate():
         "sex_acts":      ", ".join(sex_acts),
         "duration":      str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
         "container":     stash_file["format"],
-        "codec":         "{}/{}".format(stash_file["video_codec"], stash_file["audio_codec"]),
+        "video_codec":   stash_file["video_codec"], 
+        "audio_codec":   stash_file["audio_codec"],
+        "audio_bitrate": audio_bitrate,
         "resolution":    "{}×{}".format(stash_file["width"], stash_file["height"]),
         "bitrate":       "{:.2f} Mb/s".format(stash_file["bit_rate"] / 2**20),
         "framerate":     "{} fps".format(stash_file["frame_rate"]),
         "screens":       screens_urls if len(screens_urls) else None,
         "contact_sheet": contact_sheet_remote_url,
         "performers":    performers,
-        "cover":         cover_resized_url
+        "cover":         cover_resized_url,
+        "image_count":   0 #TODO
     }
     description = render_template(template, **template_context)
 
@@ -437,6 +468,7 @@ def generate():
             }
         }
     })
+    logging.info("Done")
 
 @app.route('/fill', methods=["POST"])
 def fill():
@@ -444,7 +476,7 @@ def fill():
 
 @app.route('/templates')
 def templates():
-    return template_names
+    return json.dumps(template_names)
 
 if __name__ == "__main__":
     try:
