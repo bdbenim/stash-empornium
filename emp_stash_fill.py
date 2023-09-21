@@ -443,7 +443,7 @@ def generate():
     logging.info("Rendering template")
     template_context = {
         "studio":        scene["studio"]["name"],
-        "studiotag":     studio_tag
+        "studiotag":     studio_tag,
         "director":      scene["director"],
         "title":         scene["title"],
         "date":          date,
