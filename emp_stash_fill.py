@@ -86,11 +86,9 @@ PORT = int(conf["backend"].get("port", 9932).value)
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value
 TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value
 TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].value.split(",")))
-TAGS_MAP = [tag for tag in conf["empornium.tags"]]
+TAGS_MAP = conf["empornium.tags"].to_dict()
 
-template_names = {}
-for k,v in conf.items("templates"):
-    template_names[k] = v.value
+template_names = conf["templates"].to_dict()
 
 stash_headers = {
     "Content-type": "application/json",
