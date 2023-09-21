@@ -3,8 +3,6 @@ This script by user humbaba allows torrent files and associated presentations to
 
 ## Installation
 
-### Using Docker
-
 To run the backend as a docker container, copy and paste the following commands:
 ```bash
 docker pull bdbenim/stash-empornium:latest
@@ -18,31 +16,6 @@ bdbenim/stash-empornium:latest
 ```
 
 Make sure that the target for your `/media` mount matches what stash sees. You may have to change the target, not just the source, to achieve this.
-
-### Without Using Docker
-
-#### Dependencies
-- Python3
-  - flask
-  - requests
-  - vcsi
-  - waitress (optional)
-- ffmpeg
-- mktorrent
-- [Tampermonkey](https://www.tampermonkey.net)
-
-Run the following commands to install the backend and dependencies:
-```bash
-git clone https://github.com/bdbenim/stash-empornium.git
-cd stash-empornium
-pip install -r requirements.txt
-sudo apt-get install -y ffmpeg mktorrent
-```
-
-You can optionally install waitress as a production WSGI server:
-```bash
-pip install waitress
-```
 
 The userscript can be installed [here](https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js). Place the other files on the same machine as your stash server and ensure dependencies are installed.
 
@@ -68,7 +41,7 @@ url = http://localhost:9999
 The port above corresponds to the backend URL in step 1, so if you change one you must change the other.
 
 ## Usage
-1. Run `emp_stash_fill.py`
+1. Run stash-empornium
 2. Get scene ID (it's in the url, e.g. for `http://localhost:9999/scenes/4123` the scene id is `4123`)
 3. Go to `upload.php` and enter the scene ID in the "Fill from stash" box
 4. Select the file you want if you have multiple files attached to that scene, tick/untick the generate screens box, pick template if you have defined others
