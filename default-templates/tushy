@@ -1,19 +1,19 @@
-{# 20230917 -#}
+{# 20230919 -#}
 [bg=#000000]
 [table=100%,nball]
 [tr][td] [table=95%,nball]
-[tr][td=15%] [color=#FFFFFF][size=10][font=Helvetica][b]TUSHY[/b][/font][/size][/color] [/td]
-[td][url=https://www.empornium.is/torrents.php?taglist=tushy.com][color=#FFFFFF][size=2][font=Helvetica][b]VIDEOS[/b][/font][/size][/color][/url][/td]
+[tr][td=15%] [color=#FFFFFF][size=10][font=Helvetica][b]{{studio|upper}}[/b][/font][/size][/color] [/td]
+[td][url=/torrents.php?taglist={{studiotag}}][color=#FFFFFF][size=2][font=Helvetica][b]VIDEOS[/b][/font][/size][/color][/url][/td]
 [/tr]
 [/table]
 [table=95%,nball]
 [tr][td=nopad][align=center] [img]{{cover}}[/img] [/align][/td][/tr]
 [/table]
 [table=95%,nball]
-[tr][td=nopad,10%] [img]https://jerking.empornium.ph/images/2022/08/30/bitmap.png[/img]  [/td][td=vat] [color=#FFFFFF][size=5][b][font=Impact]  TITLE[/font][/b][/size][/color]
+[tr][td=nopad,10%] [img]https://jerking.empornium.ph/images/2022/08/30/bitmap.png[/img]  [/td][td=vat] [color=#FFFFFF][size=5][b][font=Impact]  {{title|upper}}[/font][/b][/size][/color]
 [font=Impact][size=1]
 {%- for name, details in performers.items() -%}
-[color=#0099FF]   {{name.upper()}}[/color]
+[color=#0099FF][url=/torrents.php?taglist={{details["tag"]}}]   {{name.upper()}}[/url][/color]
 {%- if loop.length > 1 %}[color=#FFFFFF]
 {%- if loop.revindex0 == 0 %}
 {%- elif loop.revindex0 == 1 %} & 
@@ -25,7 +25,7 @@
 [font=Impact][size=1][color=#FFFFFF]  [b]+INFO[/b][/color][/size][/font][/td]
 [/tr][/table][table=98%,nball]
 [tr][td][hr][/td][/tr]
-[tr][td][size=1][font=Helvetica][color=#FFFFFF]DIRECTED BY: [b]DIRECTOR[/b][/color][/font][/size][/td][/tr]
+{% if director %}[tr][td][size=1][font=Helvetica][color=#FFFFFF]DIRECTED BY: [b]{{director}}[/b][/color][/font][/size][/td][/tr]{% endif %}
 [tr][td][size=1][font=Helvetica][color=#FFFFFF]{{details}}[/color][/font][/size][/td][/tr]
 [tr][td][hr][/td][/tr]
 {% if sex_acts %}[tr][td][size=1][font=Helvetica][color=#FFFFFF][b]INCLUDES:[/b] {{sex_acts}}[/color][/font][/size][/td][/tr]{% endif %}
