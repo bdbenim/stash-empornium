@@ -76,5 +76,38 @@ The port above corresponds to the backend URL in step 1, so if you change one yo
 6. You still need to load the torrent file (the location on your filesystem will be given to you) into the form, set a category, optionally check for dupes if you didn't do so manually. Also load the torrent file into your client (you can configure the torrent output directory to be a watch dir for your torrent client) and make sure the media file is visible to your torrent client
 7. When you're satisfied everything is ready, upload
 
+## Adding Templates
+To add a new template, save it in the `templates` directory alongside your `config.ini` file. Then add it to your configuration with the following format:
+```ini
+[templates]
+filename = description
+```
+
+Templates are written using Jinja syntax. The available variables are:
+- audio_bitrate
+- audio_codec
+- bitrate
+- contact_sheet
+- container
+- cover
+- date
+- details
+- duration
+- framerate
+- image_count
+- performers
+  - name
+  - details
+    - image_remote_url
+    - tag
+- resolution
+- screens
+- sex_acts
+- studio
+- title
+- video_codec
+
+Refer to the default templates for examples of how they are used.
+
 ## Disclaimer
 This tool is provided as-is. You must ensure that you have the proper rights for any files you share with other users, and always comply with applicable laws in your jurisdiction.

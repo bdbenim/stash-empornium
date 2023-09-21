@@ -64,13 +64,13 @@ for filename in os.listdir("default-templates"):
     src = os.path.join("default-templates", filename)
     if os.path.isfile(src):
         dst = os.path.join(template_dir, filename)
-        if os.path.isfile(dstFile):
+        if os.path.isfile(dst):
             try:
                 with open(src) as srcFile, open(dst) as dstFile:
                     srcVer = int("".join(filter(str.isdigit,"0"+srcFile.readline())))
                     dstVer = int("".join(filter(str.isdigit,"0"+dstFile.readline())))
                     if srcVer > dstVer:
-                        logging.info(f"Template {filename} has a new version available in the default-templates directory")
+                        logging.info(f"Template \"{filename}\" has a new version available in the default-templates directory")
             except:
                 logging.error(f"Couldn't compare version of {src} and {dst}")
         else:
@@ -101,7 +101,7 @@ if conf["stash"].has_option("api_key"):
 
 stash_query = '''
 findScene(id: "{}") {{
-  title details date studio {{ name url parent_studio {{ url }} }} tags {{ name }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot }}
+  title details director date studio {{ name url parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot }}
   files {{ id path basename width height format duration video_codec audio_codec frame_rate bit_rate size }}
 }}
 '''
@@ -145,6 +145,7 @@ def generate():
     sex_acts = []
     performers = {}
     screens = []
+    studio_tag = ""
 
 
     #################
@@ -376,9 +377,16 @@ def generate():
         emp_tag = TAGS_MAP.get(tag["name"])
         if emp_tag is not None:
             tags.add(emp_tag)
+        for parent in tag["parents"]:
+            if parent["name"] in TAGS_SEX_ACTS:
+                sex_acts.append(parent["name"])
+            emp_tag = TAGS_MAP.get(parent["name"])
+            if emp_tag is not None:
+                tags.add(emp_tag)
 
     if scene["studio"]["url"] is not None:
-        tags.add(urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www."))
+        studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
+        tags.add(studio_tag)
     if scene["studio"]["parent_studio"] is not None and scene["studio"]["parent_studio"]["url"] is not None:
         tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
 
@@ -437,6 +445,9 @@ def generate():
 
     logging.info("Rendering template")
     template_context = {
+        "studio":        scene["studio"]["name"],
+        "studiotag":     studio_tag
+        "director":      scene["director"],
         "title":         scene["title"],
         "date":          date,
         "details":       scene["details"] if scene["details"] != "" else None,
