@@ -12,7 +12,7 @@ docker run -d \
 --name stash-empornium \
 -p 9932:9932 \
 --mount type=bind,src=/path/to/config,target=/config
---mount type=bind,src=/path/to/save/torrents,target=/config/torrents \
+--mount type=bind,src=/path/to/save/torrents,target=/torrents \
 --mount type=bind,src=/media,target=/media \
 bdbenim/stash-empornium:latest
 ```
