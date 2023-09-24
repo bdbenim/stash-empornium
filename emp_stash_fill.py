@@ -98,7 +98,7 @@ if conf["stash"].get("api_key"):
 
 stash_query = '''
 findScene(id: "{}") {{
-  title details director date studio {{ name url parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot }}
+  title details director date studio {{ name url image_path parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot }}
   files {{ id path basename width height format duration video_codec audio_codec frame_rate bit_rate size }}
 }}
 '''
@@ -248,6 +248,26 @@ def generate():
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
 
+    ###############
+    # STUDIO LOGO #
+    ###############
+
+    studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
+    sudio_img_mime_type = studio_img_response.headers["Content-Type"]
+    studio_img_ext = ""
+    match sudio_img_mime_type:
+        case "image/jpeg":
+            studio_img_ext = "jpg"
+        case "image/png":
+            studio_img_ext = "png"
+        case "xml/svg":
+            studio_img_ext = "svg"
+            # TODO: convert to png for upload
+        case _:
+            logging.error("Unknown studio logo file type")
+    studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
+    with open(studio_img_file[1], "wb") as fp:
+        fp.write(studio_img_response.content)
 
     ##############
     # PERFORMERS #
@@ -437,6 +457,11 @@ def generate():
                                                                          performers[performer_name]["image_ext"])
         os.remove(performers[performer_name]["image_path"])
 
+    logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+    if sudio_img_mime_type != "xml/svg":
+        logging.info("Uploading studio logo")
+        logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
+
     logging.info("Uploading screens")
     screens_urls = []
     a = 1
@@ -459,6 +484,7 @@ def generate():
     logging.info("Rendering template")
     template_context = {
         "studio":        scene["studio"]["name"],
+        "studio_logo":   logo_url,
         "studiotag":     studio_tag,
         "director":      scene["director"],
         "title":         scene["title"],
