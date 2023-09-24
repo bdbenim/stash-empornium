@@ -4,7 +4,7 @@
 
 [td=400px,#202b33][bg=90%][size=2]
 
-[center][img=100]https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png[/img][/center]
+[center][img=100]{{ studio_logo }}[/img][/center]
 {% if date %}
 [size=4][font=Arial Black]{{title}}[/font][/size]
 [imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{date}}

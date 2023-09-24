@@ -77,6 +77,7 @@ Templates are written using Jinja syntax. The available variables are:
 - screens
 - sex_acts
 - studio
+- studio_logo
 - title
 - video_codec
 
