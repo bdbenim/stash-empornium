@@ -252,10 +252,10 @@ def generate():
     # STUDIO LOGO #
     ###############
 
+    studio_img_ext = ""
     if "default=true" not in scene["studio"]["image_path"]:
         studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
-        studio_img_ext = ""
         match sudio_img_mime_type:
             case "image/jpeg":
                 studio_img_ext = "jpg"
@@ -459,7 +459,7 @@ def generate():
         os.remove(performers[performer_name]["image_path"])
 
     logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
-    if sudio_img_mime_type != "image/svg+xml":
+    if studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
         logging.info("Uploading studio logo")
         logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
 
