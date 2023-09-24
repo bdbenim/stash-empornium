@@ -338,8 +338,11 @@ def generate():
         "data": { "message": "Making torrent" }
     })
     piece_size = int(math.log(stash_file["size"]/2**10,2))
+    tempdir = tempfile.TemporaryDirectory()
+    temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
     torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
-    cmd = ["mktorrent", "-l", str(piece_size), "-a", announce_url, "-p", "-v", "-o", torrent_path, stash_file["path"]]
+    logging.info(f"Saving torrent to {temppath}")
+    cmd = ["mktorrent", "-l", str(piece_size), "-a", announce_url, "-p", "-v", "-o", temppath, stash_file["path"]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     process.wait()
     if (process.returncode != 0):
@@ -348,7 +351,11 @@ def generate():
             "status": "error",
             "message": "Couldn't generate torrent (does it already exist?)"
         })
+        tempdir.cleanup()
         return
+    shutil.move(temppath, torrent_path)
+    tempdir.cleanup()
+    logging.info(f"Moved torrent to {torrent_path}")
 
 
     #########
