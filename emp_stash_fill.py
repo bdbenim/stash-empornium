@@ -252,22 +252,23 @@ def generate():
     # STUDIO LOGO #
     ###############
 
-    studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
-    sudio_img_mime_type = studio_img_response.headers["Content-Type"]
-    studio_img_ext = ""
-    match sudio_img_mime_type:
-        case "image/jpeg":
-            studio_img_ext = "jpg"
-        case "image/png":
-            studio_img_ext = "png"
-        case "xml/svg":
-            studio_img_ext = "svg"
-            # TODO: convert to png for upload
-        case _:
-            logging.error("Unknown studio logo file type")
-    studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
-    with open(studio_img_file[1], "wb") as fp:
-        fp.write(studio_img_response.content)
+    if "default=true" not in scene["studio"]["image_path"]:
+        studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
+        sudio_img_mime_type = studio_img_response.headers["Content-Type"]
+        studio_img_ext = ""
+        match sudio_img_mime_type:
+            case "image/jpeg":
+                studio_img_ext = "jpg"
+            case "image/png":
+                studio_img_ext = "png"
+            case "image/svg+xml":
+                studio_img_ext = "svg"
+                # TODO: convert to png for upload
+            case _:
+                logging.error(f"Unknown studio logo file type: {sudio_img_mime_type}")
+        studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
+        with open(studio_img_file[1], "wb") as fp:
+            fp.write(studio_img_response.content)
 
     ##############
     # PERFORMERS #
@@ -458,7 +459,7 @@ def generate():
         os.remove(performers[performer_name]["image_path"])
 
     logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
-    if sudio_img_mime_type != "xml/svg":
+    if sudio_img_mime_type != "image/svg+xml":
         logging.info("Uploading studio logo")
         logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
 
