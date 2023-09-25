@@ -29,6 +29,7 @@ Make sure that the target for your `/media` mount matches what stash sees. You m
   - waitress (optional)
 - ffmpeg
 - mktorrent
+- rsvg-convert (optional)
 - [Tampermonkey](https://www.tampermonkey.net)
 
 Run the following commands to install the backend and dependencies:
@@ -42,6 +43,11 @@ sudo apt-get install -y ffmpeg mktorrent
 You can optionally install waitress as a production WSGI server:
 ```bash
 pip install waitress
+```
+
+And you can also optionally install rsvg-convert to support uploading SVG studio logos:
+```bash
+sudo apt-get install -y librsvg2-bin
 ```
 
 The userscript can be installed [here](https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js). Place the other files on the same machine as your stash server and ensure dependencies are installed.
