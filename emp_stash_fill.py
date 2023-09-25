@@ -388,7 +388,7 @@ def generate():
     temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
     torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
     logging.info(f"Saving torrent to {temppath}")
-    cmd = ["mktorrent", "-l", str(piece_size), "-a", announce_url, "-p", "-v", "-o", temppath, stash_file["path"]]
+    cmd = ["mktorrent", "-l", str(piece_size), "-s", "Emp", "-a", announce_url, "-p", "-v", "-o", temppath, stash_file["path"]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     process.wait()
     if (process.returncode != 0):
