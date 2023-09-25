@@ -193,11 +193,19 @@ def generate():
             stash_file = f
             break
 
-    if stash_file is None or not os.path.isfile(stash_file["path"]):
+    if stash_file is None:
         yield json.dumps({
             "status": "error",
             "message": "Couldn't find file"
         })
+        logging.error("No file exists")
+        return
+    elif not os.path.isfile(stash_file["path"]):
+        yield json.dumps({
+            "status": "error",
+            "message": "Couldn't find file"
+        })
+        logging.error(f"Couldn't find file {stash_file['path']}")
         return
 
     ht = stash_file["height"]
@@ -270,6 +278,14 @@ def generate():
         studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
+        if studio_img_ext == "svg" and shutil.which("rsvg-convert") is not None:
+            png_file = tempfile.mkstemp(suffix=".png")
+            CMD = ['rsvg-convert','-w','200',studio_img_file[1],'-o',png_file[1]]
+            subprocess.run(CMD)
+            os.remove(studio_img_file[1])
+            studio_img_file = png_file
+            sudio_img_mime_type = "image/png"
+            studio_img_ext = "png"
 
     ##############
     # PERFORMERS #
@@ -373,7 +389,7 @@ def generate():
     temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
     torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
     logging.info(f"Saving torrent to {temppath}")
-    cmd = ["mktorrent", "-l", str(piece_size), "-a", announce_url, "-p", "-v", "-o", temppath, stash_file["path"]]
+    cmd = ["mktorrent", "-l", str(piece_size), "-s", "Emp", "-a", announce_url, "-p", "-v", "-o", temppath, stash_file["path"]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     process.wait()
     if (process.returncode != 0):
