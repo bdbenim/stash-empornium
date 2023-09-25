@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.0.2
+// @version      0.1.0
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       You
 // @match        https://www.empornium.sx/upload.php
@@ -16,6 +16,10 @@
 // @updateURL    https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
 // @downloadURL  https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
 // ==/UserScript==
+
+// Changelog:
+// v0.1.0
+//  - Display filename in place of title if title is null
 
 const BACKEND_DEFAULT = "http://localhost:9932"
 const STASH_DEFAULT = "http://localhost:9999"
@@ -191,7 +195,12 @@ if (STASH_API_KEY !== null) {
                 try {
                     let scene = JSON.parse(response.responseText).data.findScene;
                     let optionsAsString = "";
-                    this.context.titleDisplay.value = scene.title;
+                    if (scene.title.length > 0) {
+                        this.context.titleDisplay.value = scene.title;
+                    }
+                    else {
+                        this.context.titleDisplay.value = scene.files[0].basename;
+                    }
                     for(let i = 0; i < scene.files.length; i++) {
                         let file = scene.files[i];
                         let duration = new Date(file.duration * 1000).toISOString().slice(11, 19).replace(/^00:/, '');
