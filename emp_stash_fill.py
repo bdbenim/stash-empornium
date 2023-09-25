@@ -45,17 +45,16 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 # CONFIG #
 ##########
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
-template_dir = os.path.join(dir_path, "config/templates")
+template_dir = "/config/templates"
 
 conf = configupdater.ConfigUpdater()
-if not os.path.isfile("config/config.ini"):
+if not os.path.isfile("/config/config.ini"):
     logging.info("Config file not found, creating")
-    if not os.path.exists("config"):
-        os.makedirs("config")
-    shutil.copyfile("default.ini", "config/config.ini")
+    if not os.path.exists("/config"):
+        os.makedirs("/config")
+    shutil.copyfile("default.ini", "/config/config.ini")
 else:
-    conf.read("config/config.ini")
+    conf.read("/config/config.ini")
 
 if not os.path.exists(template_dir):
     shutil.copytree("default-templates",template_dir,copy_function=shutil.copyfile)
@@ -181,7 +180,8 @@ def generate():
         if f["id"] == file_id:
             # Apply remote path mappings
             logging.debug(f"Got path {f['path']} from stash")
-            for remote,local in conf.items("file.maps"):
+            for remote,localopt in conf.items("file.maps"):
+                local = localopt.value
                 if not f["path"].startswith(remote):
                     continue
                 if remote[-1] != "/":
