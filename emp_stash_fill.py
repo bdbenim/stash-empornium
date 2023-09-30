@@ -81,7 +81,7 @@ for filename in os.listdir("default-templates"):
                 conf["templates"].set(filename, tmpConf["templates"][filename].value)
 
 STASH_URL = conf["stash"].get("url", "http://localhost:9999").value
-PORT = int(conf["backend"].get("port", 9932).value)
+PORT = int(conf["backend"].get("port", "9932").value)
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value
 TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value
 TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].value.split(",")))
@@ -135,11 +135,14 @@ def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
     }
     url = "https://jerking.empornium.ph/json"
     response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
+    if "error" in response.json():
+        logging.error(f"Error uploading image: {response.json()['error']['message']}")
+        return None
     return response.json()["image"]["image"]["url"]
 
 @stream_with_context
 def generate():
-    j = request.json
+    j = request.get_json()
     scene_id = j["scene_id"]
     file_id  = j["file_id"]
     announce_url = j["announce_url"]
@@ -262,6 +265,8 @@ def generate():
     ###############
 
     studio_img_ext = ""
+    sudio_img_mime_type = ""
+    studio_img_file = None
     if "default=true" not in scene["studio"]["image_path"]:
         studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
@@ -293,8 +298,8 @@ def generate():
 
     for performer in scene["performers"]:
         # tag
-        performer_tag = re.sub("[^\w\s]", "", performer["name"]).lower()
-        performer_tag = re.sub("\s+", ".", performer_tag)
+        performer_tag = re.sub(r"[^\w\s]", "", performer["name"]).lower()
+        performer_tag = re.sub(r"\s+", ".", performer_tag)
         tags.add(performer_tag)
         # also include alias tags?
 
@@ -452,7 +457,14 @@ def generate():
     })
 
     img_host_request = requests.get("https://jerking.empornium.ph/json")
-    m = re.search("config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
+    m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
+    if m is None:
+        yield json.dumps({
+            "status": "success",
+            "data": { "message": "Uploading images" }
+        })
+        logging.error("Unable to get auth token for image host.")
+        return
     img_host_token = m.group(1)
     cookies = img_host_request.cookies
     cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
@@ -460,11 +472,23 @@ def generate():
 
     logging.info("Uploading cover")
     cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
+    if cover_remote_url is None:
+        yield json.dumps({
+            "status": "error",
+            "data": { "message": "Failed to upload cover" }
+        })
+        return
     os.remove(cover_file[1])
     cover_url_parts = cover_remote_url.split(".")
     cover_resized_url = ".".join(cover_url_parts[:-1])+".md."+cover_url_parts[-1]
     logging.info("Uploading contact sheet")
     contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
+    if contact_sheet_remote_url is None:
+        yield json.dumps({
+            "status": "error",
+            "data": { "message": "Failed to upload contact sheet" }
+        })
+        return
     os.remove(contact_sheet_file[1])
     logging.info("Uploading performer images")
     for performer_name in performers:
@@ -474,11 +498,23 @@ def generate():
                                                                          performers[performer_name]["image_mime_type"],
                                                                          performers[performer_name]["image_ext"])
         os.remove(performers[performer_name]["image_path"])
+        if performers[performer_name]["image_remote_url"] is None:
+            yield json.dumps({
+                "status": "error",
+                "data": { "message": f"Failed to upload image of {performer_name}" }
+            })
+            return
 
     logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
-    if studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
+    if studio_img_file is not None and studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
         logging.info("Uploading studio logo")
         logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
+        if logo_url is None:
+            yield json.dumps({
+                "status": "error",
+                "data": { "message": "Failed to upload studio logo" }
+            })
+            return
 
     logging.info("Uploading screens")
     screens_urls = []
@@ -487,7 +523,14 @@ def generate():
     for screen in screens:
         logging.info(f"Uploading screens ({a} of {b})")
         a += 1
-        screens_urls.append(img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg"))
+        scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
+        if scrn_url is None:
+            yield json.dumps({
+                "status": "error",
+                "data": { "message": "Failed to upload screens" }
+            })
+            return
+        screens_urls.append(scrn_url)
         os.remove(screen)
 
     ############
@@ -543,7 +586,7 @@ def generate():
 
 @app.route('/fill', methods=["POST"])
 def fill():
-    return Response(generate(), mimetype="application/json")
+    return Response(generate(), mimetype="application/json") # type: ignore
 
 @app.route('/templates')
 def templates():
