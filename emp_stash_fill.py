@@ -80,11 +80,14 @@ for filename in os.listdir("default-templates"):
                 tmpConf.read("default.ini")
                 conf["templates"].set(filename, tmpConf["templates"][filename].value)
 
-STASH_URL = conf["stash"].get("url", "http://localhost:9999").value
-PORT = int(conf["backend"].get("port", "9932").value)
-DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value
-TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value
-TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].value.split(",")))
+#TODO: better handling of unexpected values
+STASH_URL = conf["stash"].get("url", "http://localhost:9999").value # type: ignore
+assert STASH_URL is not None
+PORT = int(conf["backend"].get("port", "9932").value) # type: ignore
+DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value # type: ignore
+TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value # type: ignore
+assert TORRENT_DIR is not None
+TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].value.split(","))) # type: ignore
 TAGS_MAP = conf["empornium.tags"].to_dict()
 
 template_names = conf["templates"].to_dict()
@@ -94,7 +97,11 @@ stash_headers = {
 }
 
 if conf["stash"].has_option("api_key"):
-    stash_headers["apiKey"] = conf["stash"].get("api_key").value
+    api_key = conf["stash"].get("api_key")
+    assert api_key is not None
+    api_key = api_key.value
+    assert api_key is not None
+    stash_headers["apiKey"] = api_key
 
 stash_query = '''
 findScene(id: "{}") {{
@@ -149,6 +156,7 @@ def generate():
     gen_screens = j["screens"]
 
     template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
+    assert template is not None
 
     tags = set()
     sex_acts = []
@@ -185,6 +193,7 @@ def generate():
             logging.debug(f"Got path {f['path']} from stash")
             for remote,localopt in conf.items("file.maps"):
                 local = localopt.value
+                assert local is not None
                 if not f["path"].startswith(remote):
                     continue
                 if remote[-1] != "/":
