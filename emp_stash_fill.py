@@ -135,6 +135,9 @@ def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
     }
     url = "https://jerking.empornium.ph/json"
     response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
+    if "error" in response.json():
+        logging.error(f"Error uploading image: {response.json()['error']['message']}")
+        return None
     return response.json()["image"]["image"]["url"]
 
 @stream_with_context
@@ -459,11 +462,23 @@ def generate():
 
     logging.info("Uploading cover")
     cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
+    if cover_remote_url is None:
+        yield json.dumps({
+            "status": "error",
+            "data": { "message": "Failed to upload cover" }
+        })
+        return
     os.remove(cover_file[1])
     cover_url_parts = cover_remote_url.split(".")
     cover_resized_url = ".".join(cover_url_parts[:-1])+".md."+cover_url_parts[-1]
     logging.info("Uploading contact sheet")
     contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
+    if contact_sheet_remote_url is None:
+        yield json.dumps({
+            "status": "error",
+            "data": { "message": "Failed to upload contact sheet" }
+        })
+        return
     os.remove(contact_sheet_file[1])
     logging.info("Uploading performer images")
     for performer_name in performers:
@@ -473,11 +488,23 @@ def generate():
                                                                          performers[performer_name]["image_mime_type"],
                                                                          performers[performer_name]["image_ext"])
         os.remove(performers[performer_name]["image_path"])
+        if performers[performer_name]["image_remote_url"] is None:
+            yield json.dumps({
+                "status": "error",
+                "data": { "message": f"Failed to upload image of {performer_name}" }
+            })
+            return
 
     logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
     if studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
         logging.info("Uploading studio logo")
         logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
+        if logo_url is None:
+            yield json.dumps({
+                "status": "error",
+                "data": { "message": "Failed to upload studio logo" }
+            })
+            return
 
     logging.info("Uploading screens")
     screens_urls = []
@@ -486,7 +513,14 @@ def generate():
     for screen in screens:
         logging.info(f"Uploading screens ({a} of {b})")
         a += 1
-        screens_urls.append(img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg"))
+        scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
+        if scrn_url is None:
+            yield json.dumps({
+                "status": "error",
+                "data": { "message": "Failed to upload screens" }
+            })
+            return
+        screens_urls.append(scrn_url)
         os.remove(screen)
 
     ############
