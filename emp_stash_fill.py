@@ -79,7 +79,7 @@ for filename in os.listdir("default-templates"):
             #TODO add template to config.ini
 
 STASH_URL = conf["stash"].get("url", "http://localhost:9999")
-PORT = int(conf["backend"].get("port", 9932))
+PORT = int(conf["backend"].get("port", "9932"))
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2")
 TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home()))
 TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].split(",")))
@@ -142,7 +142,7 @@ def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
 
 @stream_with_context
 def generate():
-    j = request.json
+    j = request.get_json()
     scene_id = j["scene_id"]
     file_id  = j["file_id"]
     announce_url = j["announce_url"]
@@ -264,6 +264,8 @@ def generate():
     ###############
 
     studio_img_ext = ""
+    sudio_img_mime_type = ""
+    studio_img_file = None
     if "default=true" not in scene["studio"]["image_path"]:
         studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
@@ -295,8 +297,8 @@ def generate():
 
     for performer in scene["performers"]:
         # tag
-        performer_tag = re.sub("[^\w\s]", "", performer["name"]).lower()
-        performer_tag = re.sub("\s+", ".", performer_tag)
+        performer_tag = re.sub(r"[^\w\s]", "", performer["name"]).lower()
+        performer_tag = re.sub(r"\s+", ".", performer_tag)
         tags.add(performer_tag)
         # also include alias tags?
 
@@ -454,7 +456,14 @@ def generate():
     })
 
     img_host_request = requests.get("https://jerking.empornium.ph/json")
-    m = re.search("config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
+    m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
+    if m is None:
+        yield json.dumps({
+            "status": "success",
+            "data": { "message": "Uploading images" }
+        })
+        logging.error("Unable to get auth token for image host.")
+        return
     img_host_token = m.group(1)
     cookies = img_host_request.cookies
     cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
@@ -496,7 +505,7 @@ def generate():
             return
 
     logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
-    if studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
+    if studio_img_file is not None and studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
         logging.info("Uploading studio logo")
         logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
         if logo_url is None:
@@ -576,7 +585,7 @@ def generate():
 
 @app.route('/fill', methods=["POST"])
 def fill():
-    return Response(generate(), mimetype="application/json")
+    return Response(generate(), mimetype="application/json") # type: ignore
 
 @app.route('/templates')
 def templates():
