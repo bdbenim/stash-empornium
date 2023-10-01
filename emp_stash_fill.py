@@ -41,6 +41,14 @@ import uuid
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+################
+# DEPENDENCIES #
+################
+
+rsvg_convert = shutil.which("rsvg-convert") is not None
+magick = shutil.which("convert") is not None
+webpmux = shutil.which("webpmux") is not None
+
 ##########
 # CONFIG #
 ##########
@@ -251,10 +259,13 @@ def generate():
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     cover_ext = ""
-    if cover_mime_type == "image/jpeg":
-        cover_ext = "jpg"
-    elif cover_mime_type == "image/png":
-        cover_ext = "png"
+    match cover_mime_type:
+        case "image/jpeg":
+            cover_ext = "jpg"
+        case "image/png":
+            cover_ext = "png"
+        case "image/webp":
+            cover_ext = "webp"
     cover_file = tempfile.mkstemp(suffix="." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
@@ -282,7 +293,7 @@ def generate():
         studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
-        if studio_img_ext == "svg" and shutil.which("rsvg-convert") is not None:
+        if studio_img_ext == "svg" and rsvg_convert:
             png_file = tempfile.mkstemp(suffix=".png")
             CMD = ['rsvg-convert','-w','200',studio_img_file[1],'-o',png_file[1]]
             subprocess.run(CMD)
