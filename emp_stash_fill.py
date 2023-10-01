@@ -87,7 +87,12 @@ PORT = int(conf["backend"].get("port", "9932").value) # type: ignore
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value # type: ignore
 TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value # type: ignore
 assert TORRENT_DIR is not None
-TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].value.split(","))) # type: ignore
+TAG_LISTS = {}
+TAG_SETS = {}
+for key in conf["empornium"]:
+    TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
+    TAG_SETS[key] = set()
+assert "sex_acts" in TAG_LISTS # This is the only non-optional key because it is used by the default templates
 TAGS_MAP = conf["empornium.tags"].to_dict()
 
 template_names = conf["templates"].to_dict()
@@ -159,7 +164,7 @@ def generate():
     assert template is not None
 
     tags = set()
-    sex_acts = []
+    sex_acts = set()
     performers = {}
     screens = []
     studio_tag = ""
@@ -437,14 +442,16 @@ def generate():
     ########
 
     for tag in scene["tags"]:
-        if tag["name"] in TAGS_SEX_ACTS:
-            sex_acts.append(tag["name"])
+        for key in TAG_LISTS:
+            if tag["name"] in TAG_LISTS[key]:
+                TAG_SETS[key].add(tag["name"])
         emp_tag = TAGS_MAP.get(tag["name"])
         if emp_tag is not None:
             tags.add(emp_tag)
         for parent in tag["parents"]:
-            if parent["name"] in TAGS_SEX_ACTS:
-                sex_acts.append(parent["name"])
+            for key in TAG_LISTS:
+                if parent["name"] in TAG_LISTS[key]:
+                    TAG_SETS[key].add(parent["name"])
             emp_tag = TAGS_MAP.get(parent["name"])
             if emp_tag is not None:
                 tags.add(emp_tag)
@@ -546,6 +553,11 @@ def generate():
     # TEMPLATE #
     ############
 
+    # Sort tag sets into lists
+    for key in TAG_SETS:
+        TAG_SETS[key] = list(TAG_SETS[key])
+        TAG_SETS[key].sort()
+
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
@@ -560,7 +572,6 @@ def generate():
         "title":         scene["title"],
         "date":          date,
         "details":       scene["details"] if scene["details"] != "" else None,
-        "sex_acts":      ", ".join(sex_acts),
         "duration":      str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
         "container":     stash_file["format"],
         "video_codec":   stash_file["video_codec"], 
@@ -575,6 +586,10 @@ def generate():
         "cover":         cover_resized_url,
         "image_count":   0 #TODO
     }
+
+    for key in TAG_SETS:
+        template_context[key] = ", ".join(TAG_SETS[key])
+
     description = render_template(template, **template_context)
 
     yield json.dumps({
