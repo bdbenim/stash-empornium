@@ -82,7 +82,10 @@ The port above corresponds to the backend URL in step 1, so if you change one yo
 6. You still need to load the torrent file (the location on your filesystem will be given to you) into the form, set a category, optionally check for dupes if you didn't do so manually. Also load the torrent file into your client (you can configure the torrent output directory to be a watch dir for your torrent client) and make sure the media file is visible to your torrent client
 7. When you're satisfied everything is ready, upload
 
-## Adding Templates
+## Templates
+This repository includes default templates which can be used to fill in the presentation based on data from stash. Currently there are two, however more may be added in the future.
+
+### Adding Templates
 To add a new template, save it in the `templates` directory alongside your `config.ini` file. Then add it to your configuration with the following format:
 ```ini
 [templates]
@@ -115,6 +118,9 @@ Templates are written using Jinja syntax. The available variables are:
 - video_codec
 
 Refer to the default templates for examples of how they are used.
+
+#### Custom Lists
+In addition to the template variables described above, additional tag lists may be added to the `empornium` config section by following the format of the `sex_acts` variable. These will automatically be parsed and made available to any custom templates as comma-separated lists. For instance, you may wish to add a section called `performer_attributes` to describe characteristics of performers in the scene.
 
 ## Disclaimer
 This tool is provided as-is. You must ensure that you have the proper rights for any files you share with other users, and always comply with applicable laws in your jurisdiction.
