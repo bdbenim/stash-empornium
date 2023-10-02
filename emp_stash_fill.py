@@ -90,7 +90,12 @@ STASH_URL = conf["stash"].get("url", "http://localhost:9999")
 PORT = int(conf["backend"].get("port", "9932"))
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2")
 TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home()))
-TAGS_SEX_ACTS = list(map(lambda x: x.strip(), conf["empornium"]["sex_acts"].split(",")))
+TAG_LISTS = {}
+TAG_SETS = {}
+for key in conf["empornium"]:
+    TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].split(",")))
+    TAG_SETS[key] = set()
+assert "sex_acts" in TAG_LISTS # This is the only non-optional key because it is used by the default templates
 TAGS_MAP = conf["empornium.tags"]
 
 template_names = {}
@@ -118,7 +123,7 @@ def isWebpAnimated(src):
         data = f.read()
         return data.startswith(b'RIFF') and (b'ANIM' in data or b'ANMF' in data)
 
-def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
+def img_host_upload(token: str, cookies: requests.models.cookies.RequestsCookieJar, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
@@ -179,7 +184,6 @@ def generate():
     template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
 
     tags = set()
-    sex_acts = []
     performers = {}
     screens = []
     studio_tag = ""
@@ -458,14 +462,16 @@ def generate():
     ########
 
     for tag in scene["tags"]:
-        if tag["name"] in TAGS_SEX_ACTS:
-            sex_acts.append(tag["name"])
+        for key in TAG_LISTS:
+            if tag["name"] in TAG_LISTS[key]:
+                TAG_SETS[key].add(tag["name"])
         emp_tag = TAGS_MAP.get(tag["name"])
         if emp_tag is not None:
             tags.add(emp_tag)
         for parent in tag["parents"]:
-            if parent["name"] in TAGS_SEX_ACTS:
-                sex_acts.append(parent["name"])
+            for key in TAG_LISTS:
+                if parent["name"] in TAG_LISTS[key]:
+                    TAG_SETS[key].add(parent["name"])
             emp_tag = TAGS_MAP.get(parent["name"])
             if emp_tag is not None:
                 tags.add(emp_tag)
@@ -567,6 +573,11 @@ def generate():
     # TEMPLATE #
     ############
 
+    # Sort tag sets into lists
+    for key in TAG_SETS:
+        TAG_SETS[key] = list(TAG_SETS[key])
+        TAG_SETS[key].sort()
+
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
@@ -581,7 +592,6 @@ def generate():
         "title":         scene["title"],
         "date":          date,
         "details":       scene["details"] if scene["details"] != "" else None,
-        "sex_acts":      ", ".join(sex_acts),
         "duration":      str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
         "container":     stash_file["format"],
         "video_codec":   stash_file["video_codec"], 
@@ -596,6 +606,10 @@ def generate():
         "cover":         cover_resized_url,
         "image_count":   0 #TODO
     }
+
+    for key in TAG_SETS:
+        template_context[key] = ", ".join(TAG_SETS[key])
+
     description = render_template(template, **template_context)
 
     yield json.dumps({
