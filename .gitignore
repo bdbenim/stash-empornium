@@ -1,2 +1,3 @@
 config/
 .vscode/
+__pycache__/
