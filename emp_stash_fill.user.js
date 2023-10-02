@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.1.0
+// @version      0.1.1
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       You
 // @match        https://www.empornium.sx/upload.php
@@ -18,6 +18,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v0.1.1
+//  - Fixed default values in settings menu
 // v0.1.0
 //  - Display filename in place of title if title is null
 
@@ -35,8 +37,8 @@ function store(key, prompt_text, default_value) {
 }
 
 GM_registerMenuCommand("Set backend URL", () => {store("backend_url","backend url? (e.g. http://localhost:9932)",BACKEND_DEFAULT);});
-GM_registerMenuCommand("Set stash URL", () => {store("stash_url","stash URL? (e.g. http://localhost:9999)",BACKEND_DEFAULT);});
-GM_registerMenuCommand("Set stash API key", () => {store("stash_api_key","stash API key?",BACKEND_DEFAULT);});
+GM_registerMenuCommand("Set stash URL", () => {store("stash_url","stash URL? (e.g. http://localhost:9999)",STASH_DEFAULT);});
+GM_registerMenuCommand("Set stash API key", () => {store("stash_api_key","stash API key?",STASH_API_KEY_DEFAULT);});
 
 GM_addStyle("#stash_statusarea { font-weight: bold; font-size: 16pt; padding-top: 12pt; text-align: center; }");
 GM_addStyle("#stash_statusarea:empty { padding: 0; }");
@@ -68,7 +70,7 @@ if (STASH_API_KEY !== null) {
     head.innerHTML = "Fill from Stash";
 
     let body = document.createElement("div");
-    body.classList.add("box");
+    body.classList.add("box", "pad");
     body.classList.add("pad");
 
     let fileSelect = document.createElement("select");
