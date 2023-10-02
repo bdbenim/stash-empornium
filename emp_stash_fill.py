@@ -152,6 +152,7 @@ def generate():
     file_id  = j["file_id"]
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
+    include_gallery = j["gallery"]
 
     template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
 

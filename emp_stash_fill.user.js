@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      0.1.0
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
-// @author       You
+// @author       bdbenim
 // @match        https://www.empornium.sx/upload.php
 // @match        https://www.empornium.is/upload.php
 // @icon         data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAAAABMLAAATCwAAAAAAAAAAAABrPxj/az8Y/2s/GP9rPxj/cUMV/3tKFf+DUBP/gk8S/4BOEf9/TA//dkcR/29CE/9rPxj/az8Y/2s/GP9rPxj/az8Y/2s/GP9rPxf/gU8U/5FbF/+OWRf/jFcX/3FGEv9FKwv/RCoK/0MpCf9iPAz/eEcQ/2s/F/9rPxj/az8Y/2s/GP9rPxf/iFUU/5dgFv+UXhb/iVYW/zYoF/+BgYH/wMDA///////AwMD/gYGB/yshFP96ShD/az8X/2s/GP9rPxj/hlMU/5xkFv+aYxb/j1sV/y4kFv/Q0ND//////+Dg3//Q0ND///////////+RkZD/ZD0O/3hIEf9rPxj/dEUV/6JpF/+gZxb/nmYW/08zDP/AwMD///////////80LiT/HhQG////////////wMDA/2Y/EP+GUhP/cEIU/4dUFf+mbBj/pGoX/6FoFv9GPzT////////////g4N//QysL/0tIQ////////////5GRkP9pQRH/iVQV/3lJE/+dZRj/qm8b/6dtGf+HWBT/cXFx////////////kZGQ/0UtC/9iYmH/wMDA/8DAwP9SUlH/hlQW/4xXF/+EURT/oGga/65yHf+rcBz/YEAQ/8DAwP///////////1JSUf8WDwT/AwMC/wMDAv8fFAb/SzAM/5JcF/+QWhf/hlMU/6NqHP+ydiH/sHQf/0g1Gv//////////////////////////////////////4ODf/00yDP+WXxb/k10X/4lVFP+mbR//tnkk/7N3Iv9SUlH///////////+hoaD/oaGg/////////////////6GhoP9iPw7/mWIW/5dgFv+MVxP/j1sc/7p9J/+LXR3/gYGB////////////KCEV/1JSUf////////////////9SUlH/lWAV/51lFv+bYxb/gE8U/3dIF/++gCv/jl8f/8DAwP///////////xkRBv+hoaD////////////AwMD/QCoK/6NpF/+gaBb/nmYW/3NFFf9rPxj/l2Ef/5xqJP+BgYH///////////+hoaD////////////Q0ND/KCAV/55oGf+mbBj/pGoX/4dVFP9rPxj/az8Y/2s/F/+iayP/PysQ/4GBgf/Q0ND/7+/v/8DAwP9xcXH/PzAa/6VtHf+tcR3/qm8b/5JcFv9rPxf/az8Y/2s/GP9rPxj/az8X/5ljIP+HXCH/YkMY/2FCFv9fQRb/l2Ug/7Z5JP+zdyL/sXUg/41ZF/9rPxf/az8Y/2s/GP9rPxj/az8Y/2s/GP9rPxj/d0gY/5NeH/+tciT/q3Ej/6lvIf+nbiD/jVka/3ZHFv9rPxj/az8Y/2s/GP9rPxj/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//AAD//w==
@@ -116,6 +116,19 @@ if (STASH_API_KEY !== null) {
     moreOptions.appendChild(screensToggle);
     moreOptions.appendChild(templateSelect);
 
+    let galleryToggleLabel = document.createElement("label");
+    galleryToggleLabel.setAttribute("for", "gallerytoggle");
+    galleryToggleLabel.innerText = "Includ gallery?";
+    galleryToggleLabel.style.marginRight = "6pt";
+    let galleryToggle = document.createElement("input");
+    galleryToggle.setAttribute("type", "checkbox");
+    galleryToggle.setAttribute("name", "gallerytoggle");
+    galleryToggle.setAttribute("id", "gallery_toggle");
+    galleryToggle.setAttribute("checked", false);
+    moreOptions.appendChild(document.createElement("br"));
+    moreOptions.appendChild(galleryToggleLabel);
+    moreOptions.appendChild(galleryToggle);
+
     let statusArea = document.createElement("div");
     statusArea.setAttribute("id", "stash_statusarea");
 
@@ -138,7 +151,7 @@ if (STASH_API_KEY !== null) {
             headers: { "Content-Type": "application/json" },
             url: new URL("/fill", BACKEND).href,
             responseType: "stream",
-            data: JSON.stringify({ scene_id: idInput.value, file_id: fileSelect.value, announce_url: announceURL, template: templateSelect.value, screens: screensToggle.checked }),
+            data: JSON.stringify({ scene_id: idInput.value, file_id: fileSelect.value, announce_url: announceURL, template: templateSelect.value, screens: screensToggle.checked, gallery: galleryToggle.checked }),
             context: {
                 statusArea: statusArea,
                 description: document.getElementById("desc"),
@@ -188,9 +201,9 @@ if (STASH_API_KEY !== null) {
     idInput.addEventListener("input", function(event) {
         GM_xmlhttpRequest(Object.assign({}, graphql, {
             data: JSON.stringify({
-                "query": '{ findScene(id: "' + idInput.value + '") { id title performers { id name image_path } files { id basename path format width height video_codec audio_codec duration bit_rate frame_rate } } }',
+                "query": '{ findScene(id: "' + idInput.value + '") { id title performers { id name image_path } files { id basename path format width height video_codec audio_codec duration bit_rate frame_rate } galleries { id } } }',
             }),
-            context: { fileSelect: fileSelect, titleDisplay: titleDisplay },
+            context: { fileSelect: fileSelect, titleDisplay: titleDisplay, screensToggle: screensToggle },
             onload: function(response) {
                 try {
                     let scene = JSON.parse(response.responseText).data.findScene;
@@ -207,6 +220,13 @@ if (STASH_API_KEY !== null) {
                         optionsAsString += "<option value='" + file.id + "'>" + file.width + "×" + file.height + ", " + file.format + ", " + file.video_codec + "/" + file.audio_codec + ", " + duration + "</option>";
                     }
                     this.context.fileSelect.innerHTML = optionsAsString;
+                    if (scene.galleries.length == 0) {
+                        this.context.screensToggle.setAttribute("checked", false);
+                        this.context.screensToggle.disabled = true;
+                    }
+                    else {
+                        this.context.screensToggle.disabled = false;
+                    }
                 }
                 catch(err) {
                     this.context.titleDisplay.value = "";
