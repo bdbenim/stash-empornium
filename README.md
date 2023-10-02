@@ -30,6 +30,8 @@ Make sure that the target for your `/media` mount matches what stash sees. You m
 - ffmpeg
 - mktorrent
 - rsvg-convert (optional)
+- webp (optional, for handling animated webp files)
+- imagemagick (optional, for handling animated webp files)
 - [Tampermonkey](https://www.tampermonkey.net)
 
 Run the following commands to install the backend and dependencies:

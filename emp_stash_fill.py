@@ -113,15 +113,33 @@ findScene(id: "{}") {{
 
 app = Flask(__name__, template_folder=template_dir)
 
+def isWebpAnimated(src):
+    with open(src, 'rb') as f:
+        data = f.read()
+        return data.startswith(b'RIFF') and (b'ANIM' in data or b'ANMF' in data)
+
 def img_host_upload(token, cookies, img_path, img_mime_type, image_ext):
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
-        process = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         while os.path.getsize(img_path) > 5000000:
             CMD = ['ffmpeg','-i',img_path,'-vf','scale="-1:ih*0.95"','-y',img_path]
-            process = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         logging.info(f"Resized {img_path}")
+
+    if img_mime_type == "image/webp" and isWebpAnimated(img_path):
+        if not webpmux:
+            logging.error("Can't decode animated webp for conversion. Please install webp package")
+            return None
+        if not magick:
+            logging.error("Can't convert animated webp to gif. Please install imagemagick package")
+            return None
+        CMD = ['/bin/bash', 'webp2gif.sh', img_path]
+        process = subprocess.run(CMD, stdout=subprocess.PIPE)
+        img_path = process.stdout.decode().strip('\n')
+        img_mime_type = "image/gif"
+        image_ext = "gif"
 
     files = { "source": (str(uuid.uuid4()) + "." + image_ext, open(img_path, 'rb'), img_mime_type) }
     request_body = {
@@ -155,6 +173,8 @@ def generate():
     file_id  = j["file_id"]
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
+
+    logging.info(f"Generating submission for scened ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
     template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
 
