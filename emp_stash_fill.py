@@ -42,11 +42,6 @@ import uuid
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-################
-# DEPENDENCIES #
-################
-
-rsvg_convert = shutil.which("rsvg-convert") is not None
 
 ##########
 # CONFIG #
@@ -122,21 +117,23 @@ def isWebpAnimated(path: str):
         return img.n_frames > 1
 
 def img_host_upload(token: str, cookies: requests.models.cookies.RequestsCookieJar, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
-    # Quick and dirty resize for images above max filesize
-    if os.path.getsize(img_path) > 5000000:
-        CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
-        subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        while os.path.getsize(img_path) > 5000000:
-            CMD = ['ffmpeg','-i',img_path,'-vf','scale="-1:ih*0.95"','-y',img_path]
-            subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        logging.info(f"Resized {img_path}")
-
+    # Convert animated webp to gif
     if img_mime_type == "image/webp" and isWebpAnimated(img_path):
         with Image.open(img_path) as img:
             img_path = img_path.strip(image_ext)+"gif"
             img.save(img_path, save_all=True)
         img_mime_type = "image/gif"
         image_ext = "gif"
+    
+    # Quick and dirty resize for images above max filesize
+    if os.path.getsize(img_path) > 5000000:
+        CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
+        subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        while os.path.getsize(img_path) > 5000000:
+            with Image.open(img_path) as img:
+                img = img.resize((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
+                img.save(img_path)
+        logging.info(f"Resized {img_path}")
 
     files = { "source": (str(uuid.uuid4()) + "." + image_ext, open(img_path, 'rb'), img_mime_type) }
     request_body = {
@@ -147,7 +144,7 @@ def img_host_upload(token: str, cookies: requests.models.cookies.RequestsCookieJ
         "medium_crop": "false",
         "type": "file",
         "action": "upload",
-        "timestamp": int(time.time() * 1e3), # ??
+        "timestamp": int(time.time() * 1e3), # Time in milliseconds
         "auth_token": token,
         "nsfw": 0
     }
@@ -309,10 +306,10 @@ def generate():
         studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
-        if studio_img_ext == "svg" and rsvg_convert:
+        if studio_img_ext == "svg":
             png_file = tempfile.mkstemp(suffix=".png")
-            CMD = ['rsvg-convert','-w','200',studio_img_file[1],'-o',png_file[1]]
-            subprocess.run(CMD)
+            with Image.open(studio_img_file[1]) as img:
+                img.save(png_file[1])
             os.remove(studio_img_file[1])
             studio_img_file = png_file
             sudio_img_mime_type = "image/png"
