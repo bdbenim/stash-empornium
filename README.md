@@ -19,10 +19,12 @@ docker run -d \
 bdbenim/stash-empornium:latest
 ```
 
-You can configure additional mount points by copying the same syntax as above. This may be useful if your stash library uses multiple directory locations.
-
 > [!NOTE]
 > Make sure that the target for your `/media` mount matches what stash sees. You may have to change the target, not just the source, to achieve this.
+
+You can configure additional mount points by copying the same syntax as above. This may be useful if your stash library uses multiple directory locations. When in doubt, refer to the File Info tab of the scene in stash to get the file path as stash sees it:
+
+![Screenshot illustrating the file info tab of a scene in stash](https://github.com/bdbenim/stash-empornium/assets/97994155/2491dfee-fbbf-405f-96cc-0759a8bd0062)
 
 ### Without Using Docker
 
