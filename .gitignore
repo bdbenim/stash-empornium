@@ -1,3 +1,4 @@
 config/
 .vscode/
 emp_stash_fill.user.js
+__pycache__/
