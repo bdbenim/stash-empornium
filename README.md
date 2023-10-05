@@ -37,7 +37,6 @@ You can configure additional mount points by copying the same syntax as above. T
   - waitress (optional)
 - ffmpeg
 - mktorrent
-- rsvg-convert (optional)
 - [Tampermonkey](https://www.tampermonkey.net)
 
 Run the following commands to install the backend and dependencies:
@@ -49,18 +48,10 @@ pip install -r requirements.txt
 sudo apt-get install -y ffmpeg mktorrent
 ```
 
-##### Optional Dependencies
-
 You can optionally install waitress as a production WSGI server:
 
 ```bash
 pip install waitress
-```
-
-And you can also optionally install rsvg-convert to support uploading SVG studio logos:
-
-```bash
-sudo apt-get install -y librsvg2-bin
 ```
 
 The userscript can be installed [here](https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js). Place the other files on the same machine as your stash server and ensure dependencies are installed.
