@@ -21,7 +21,7 @@ __version__   = "0.1.0"
 
 # external
 import requests
-from flask import Flask, Response, jsonify, request, stream_with_context, render_template
+from flask import Flask, Response, request, stream_with_context, render_template
 from PIL import Image
 
 # built-in

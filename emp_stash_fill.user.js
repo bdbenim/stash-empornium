@@ -71,7 +71,6 @@ if (STASH_API_KEY !== null) {
 
     let body = document.createElement("div");
     body.classList.add("box", "pad");
-    body.classList.add("pad");
 
     let fileSelect = document.createElement("select");
     fileSelect.style.marginLeft = "12pt";

@@ -1,6 +1,8 @@
 # stash-empornium
 
-This script by user humbaba allows torrent files and associated presentations to be created for empornium based on scenes from a local [stash](https://github.com/stashapp/stash) instance.
+This script by user humbaba allows torrent files and associated presentations to be created for empornium based on scenes from a local [stash][1] instance.
+
+[1]: https://github.com/stashapp/stash
 
 ## Installation
 
@@ -13,7 +15,7 @@ docker pull bdbenim/stash-empornium:latest
 docker run -d \
 --name stash-empornium \
 -p 9932:9932 \
---mount type=bind,src=/path/to/config,target=/config
+--mount type=bind,src=/path/to/config,target=/config \
 --mount type=bind,src=/path/to/save/torrents,target=/torrents \
 --mount type=bind,src=/media,target=/media \
 bdbenim/stash-empornium:latest
@@ -39,7 +41,9 @@ You can configure additional mount points by copying the same syntax as above. T
 - mktorrent
 - [Tampermonkey](https://www.tampermonkey.net)
 
-Run the following commands to install the backend and dependencies:
+Currently the script does not work with other userscript managers, though this may change in the future.
+
+Run the following commands to install the backend and dependencies (may vary slightly by OS):
 
 ```bash
 git clone https://github.com/bdbenim/stash-empornium.git
@@ -54,7 +58,9 @@ You can optionally install waitress as a production WSGI server:
 pip install waitress
 ```
 
-The userscript can be installed [here](https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js). Place the other files on the same machine as your stash server and ensure dependencies are installed.
+The userscript can be installed [here][2]. Place the other files on the same machine as your stash server and ensure dependencies are installed.
+
+[2]: https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
 
 ## Configuration
 
