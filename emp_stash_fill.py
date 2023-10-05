@@ -91,8 +91,12 @@ assert "sex_acts" in TAG_LISTS # This is the only non-optional key because it is
 TAGS_MAP = conf["empornium.tags"]
 
 template_names = {}
+template_files = os.listdir(template_dir)
 for k,v in conf.items("templates"):
-    template_names[k] = v
+    if k in template_files:
+        template_names[k] = v
+    else:
+        logging.warning(f"Template {k} from config.ini is not present in {template_dir}")
 
 stash_headers = {
     "Content-type": "application/json",
