@@ -22,6 +22,7 @@ __version__   = "0.1.0"
 # external
 import requests
 from flask import Flask, Response, jsonify, request, stream_with_context, render_template
+from PIL import Image
 
 # built-in
 import configparser
@@ -40,6 +41,7 @@ import time
 import uuid
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+
 
 ##########
 # CONFIG #
@@ -110,14 +112,27 @@ findScene(id: "{}") {{
 
 app = Flask(__name__, template_folder=template_dir)
 
+def isWebpAnimated(path: str):
+    with Image.open(path) as img:
+        return img.n_frames > 1
+
 def img_host_upload(token: str, cookies: requests.models.cookies.RequestsCookieJar, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
+    # Convert animated webp to gif
+    if img_mime_type == "image/webp" and isWebpAnimated(img_path):
+        with Image.open(img_path) as img:
+            img_path = img_path.strip(image_ext)+"gif"
+            img.save(img_path, save_all=True)
+        img_mime_type = "image/gif"
+        image_ext = "gif"
+    
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
         subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         while os.path.getsize(img_path) > 5000000:
-            CMD = ['ffmpeg','-i',img_path,'-vf','scale="-1:ih*0.95"','-y',img_path]
-            subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            with Image.open(img_path) as img:
+                img = img.resize((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
+                img.save(img_path)
         logging.info(f"Resized {img_path}")
 
     files = { "source": (str(uuid.uuid4()) + "." + image_ext, open(img_path, 'rb'), img_mime_type) }
@@ -129,7 +144,7 @@ def img_host_upload(token: str, cookies: requests.models.cookies.RequestsCookieJ
         "medium_crop": "false",
         "type": "file",
         "action": "upload",
-        "timestamp": int(time.time() * 1e3), # ??
+        "timestamp": int(time.time() * 1e3), # Time in milliseconds
         "auth_token": token,
         "nsfw": 0
     }
@@ -152,6 +167,8 @@ def generate():
     file_id  = j["file_id"]
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
+
+    logging.info(f"Generating submission for scened ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
     template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
 
@@ -255,10 +272,13 @@ def generate():
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     cover_ext = ""
-    if cover_mime_type == "image/jpeg":
-        cover_ext = "jpg"
-    elif cover_mime_type == "image/png":
-        cover_ext = "png"
+    match cover_mime_type:
+        case "image/jpeg":
+            cover_ext = "jpg"
+        case "image/png":
+            cover_ext = "png"
+        case "image/webp":
+            cover_ext = "webp"
     cover_file = tempfile.mkstemp(suffix="." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
@@ -286,10 +306,10 @@ def generate():
         studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
-        if studio_img_ext == "svg" and shutil.which("rsvg-convert") is not None:
+        if studio_img_ext == "svg":
             png_file = tempfile.mkstemp(suffix=".png")
-            CMD = ['rsvg-convert','-w','200',studio_img_file[1],'-o',png_file[1]]
-            subprocess.run(CMD)
+            with Image.open(studio_img_file[1]) as img:
+                img.save(png_file[1])
             os.remove(studio_img_file[1])
             studio_img_file = png_file
             sudio_img_mime_type = "image/png"
