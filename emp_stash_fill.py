@@ -21,7 +21,7 @@ __version__   = "0.1.0"
 
 # external
 import requests
-from flask import Flask, Response, jsonify, request, stream_with_context, render_template
+from flask import Flask, Response, request, stream_with_context, render_template
 from PIL import Image
 
 # built-in
@@ -118,7 +118,7 @@ if conf["stash"].has_option("api_key"):
 
 stash_query = '''
 findScene(id: "{}") {{
-  title details director date studio {{ name url image_path parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot }}
+  title details director date studio {{ name url image_path parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot preview webp}}
   files {{ id path basename width height format duration video_codec audio_codec frame_rate bit_rate size }}
 }}
 '''
@@ -129,7 +129,7 @@ def isWebpAnimated(path: str):
     with Image.open(path) as img:
         return img.n_frames > 1
 
-def img_host_upload(token: str, cookies: requests.models.cookies.RequestsCookieJar, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
+def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
     # Convert animated webp to gif
     if img_mime_type == "image/webp" and isWebpAnimated(img_path):
         with Image.open(img_path) as img:
