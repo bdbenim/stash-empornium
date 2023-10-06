@@ -99,9 +99,9 @@ TAGS_MAP = conf["empornium.tags"].to_dict()
 
 template_names = {}
 template_files = os.listdir(template_dir)
-for k,v in conf["templates"].to_dict():
+for k in conf["templates"].to_dict():
     if k in template_files:
-        template_names[k] = v
+        template_names[k] = conf["templates"][k].value
     else:
         logging.warning(f"Template {k} from config.ini is not present in {template_dir}")
 
