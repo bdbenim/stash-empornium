@@ -6,7 +6,9 @@ This script by user humbaba allows torrent files and associated presentations to
 
 ## Installation
 
-To run the backend as a docker container, copy and paste the following commands:
+### Using Docker
+
+The docker version is recommended as it comes bundled with all required and recommended backend dependencies. To run the backend as a docker container, copy and paste the following commands:
 
 ```bash
 docker pull bdbenim/stash-empornium:latest
@@ -19,13 +21,50 @@ docker run -d \
 bdbenim/stash-empornium:latest
 ```
 
-Make sure that the target for your `/media` mount matches what stash sees. You may have to change the target, not just the source, to achieve this.
 > [!NOTE]
 > Make sure that the target for your `/media` mount matches what stash sees. You may have to change the target, not just the source, to achieve this.
 
 You can configure additional mount points by copying the same syntax as above. This may be useful if your stash library uses multiple directory locations. When in doubt, refer to the File Info tab of the scene in stash to get the file path as stash sees it:
 
 ![Screenshot illustrating the file info tab of a scene in stash](https://github.com/bdbenim/stash-empornium/assets/97994155/2491dfee-fbbf-405f-96cc-0759a8bd0062)
+
+### Without Using Docker
+
+The backend can also be run directly by intalling its dependencies and running the python script.
+
+#### Backend Dependencies
+
+- Python3
+  - flask
+  - requests
+  - vcsi
+  - configupdater
+  - waitress (optional)
+- ffmpeg
+- mktorrent
+
+Run the following commands to install the backend and dependencies (may vary slightly by OS):
+
+```bash
+git clone https://github.com/bdbenim/stash-empornium.git
+cd stash-empornium
+pip install -r requirements.txt
+sudo apt-get install -y ffmpeg mktorrent
+```
+
+You can optionally install waitress as a production WSGI server:
+
+```bash
+pip install waitress
+```
+
+### Userscript
+
+#### Dependencies
+
+- [Tampermonkey](https://www.tampermonkey.net)
+
+Currently the script does not work with other userscript managers, though this may change in the future.
 
 The userscript can be installed [here][2]. Place the other files on the same machine as your stash server and ensure dependencies are installed.
 
@@ -57,7 +96,7 @@ The port above corresponds to the backend URL in step 1, so if you change one yo
 
 ## Usage
 
-1. Run stash-empornium
+1. Run `emp_stash_fill.py`
 2. Get scene ID (it's in the url, e.g. for `http://localhost:9999/scenes/4123` the scene id is `4123`)
 3. Go to `upload.php` and enter the scene ID in the "Fill from stash" box
 4. Select the file you want if you have multiple files attached to that scene, tick/untick the generate screens box, pick template if you have defined others

@@ -1,6 +1,9 @@
 config/
-*.md
-emp_stash_fill.user.js
-.dockerignore
-.gitignore
 Dockerfile
+.dockerignore
+emp_stash_fill.user.js
+.git/
+.gitignore
+*.md
+__pycache__/
+.vscode/
