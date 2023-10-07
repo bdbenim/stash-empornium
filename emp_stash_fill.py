@@ -18,7 +18,7 @@ vcsi
 
 __author__    = "An EMP user"
 __license__   = "unlicense"
-__version__   = "0.5.1"
+__version__   = "0.5.2"
 
 # external
 import requests
@@ -40,6 +40,7 @@ import tempfile
 import urllib.parse
 import time
 import uuid
+import sys
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -48,16 +49,25 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 # CONFIG #
 ##########
 
-template_dir = "/config/templates"
-
 conf = configupdater.ConfigUpdater()
-if not os.path.isfile("/config/config.ini"):
-    logging.info("Config file not found, creating")
-    if not os.path.exists("/config"):
-        os.makedirs("/config")
-    shutil.copyfile("default.ini", "/config/config.ini")
+
+if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
+    config_dir = sys.argv[-1]
 else:
-    conf.read("/config/config.ini")
+    work_dir = os.getcwd()
+    config_dir = os.path.join(work_dir, "config")
+
+template_dir = os.path.join(config_dir, "templates")
+config_file = os.path.join(config_dir, "config.ini")
+
+if not os.path.isfile(config_file):
+    logging.info(f"Config file not found at {config_file}, creating")
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+    shutil.copyfile("default.ini", config_file)
+
+logging.info(f"Reading config from {config_file}")
+conf.read(config_file)
 
 if not os.path.exists(template_dir):
     shutil.copytree("default-templates",template_dir,copy_function=shutil.copyfile)
