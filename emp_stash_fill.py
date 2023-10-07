@@ -89,6 +89,7 @@ assert STASH_URL is not None
 PORT = int(conf["backend"].get("port", "9932").value) # type: ignore
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value # type: ignore
 TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value # type: ignore
+TITLE_DEFAULT = conf["backend"].get("title_default", "[{studio}] {performers} - {title} ({date}){resolution}").value # type: ignore
 assert TORRENT_DIR is not None
 TAG_LISTS = {}
 TAG_SETS = {}
@@ -267,16 +268,18 @@ def generate():
         resolution = "1080p"
     elif ht >= 1440 and ht < 1920:
         resolution = "1440p"
-    elif ht >= 1920 and ht < 2160:
-        resolution = "1920p"
-    elif ht >= 2160 and ht < 2880:
-        resolution = "2160p"
-    elif ht >= 2880 and ht < 3384:
-        resolution = "2880p"
-    elif ht >= 3384 and ht < 4320:
+    elif ht >= 1920 and ht < 2560:
+        resolution = "4K"
+    elif ht >= 2560 and ht < 3000:
+        resolution = "5K"
+    elif ht >= 3000 and ht < 3584:
         resolution = "6K"
-    elif ht >= 4320 and ht < 8639:
+    elif ht >= 3584 and ht < 3840:
+        resolution = "7K"
+    elif ht >= 3840 and ht < 6143:
         resolution = "8K"
+    elif ht >= 6143:
+        resolution = "8K+"
 
     if resolution is not None:
         tags.add(resolution)
@@ -356,7 +359,7 @@ def generate():
             performer_image_ext = "jpg"
         elif performer_image_mime_type == "image/png":
             performer_image_ext = "png"
-        performer_image_file = tempfile.mkstemp(suffix=performer_image_ext)
+        performer_image_file = tempfile.mkstemp(suffix="." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
 
@@ -454,7 +457,7 @@ def generate():
     # TITLE #
     #########
 
-    title = "[{studio}] {performers} - {title} ({date}){resolution}".format(
+    title = TITLE_DEFAULT.format(
         studio = scene["studio"]["name"],
         performers = ", ".join([p["name"] for p in scene["performers"]]),
         title = scene["title"],
@@ -470,6 +473,8 @@ def generate():
     for tag in scene["tags"]:
         for key in TAG_LISTS:
             if tag["name"] in TAG_LISTS[key]:
+                if not isinstance(TAG_SETS[key], set):
+                    TAG_SETS[key] = set()  # Ensure TAG_SETS[key] is a set
                 TAG_SETS[key].add(tag["name"])
         emp_tag = TAGS_MAP.get(tag["name"])
         if emp_tag is not None:
@@ -477,6 +482,8 @@ def generate():
         for parent in tag["parents"]:
             for key in TAG_LISTS:
                 if parent["name"] in TAG_LISTS[key]:
+                    if not isinstance(TAG_SETS[key], set):
+                        TAG_SETS[key] = set()  # Ensure TAG_SETS[key] is a set
                     TAG_SETS[key].add(parent["name"])
             emp_tag = TAGS_MAP.get(parent["name"])
             if emp_tag is not None:
