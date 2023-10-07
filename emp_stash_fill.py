@@ -124,6 +124,8 @@ TORRENT_DIR = getConfigOption(conf, "backend", "torrent_directory", str(pathlib.
 assert TORRENT_DIR is not None
 TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {performers} - {title} ({date}){resolution}")
 assert TITLE_DEFAULT is not None
+DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
+assert DATE_DEFAULT is not None
 TAG_LISTS: dict[str, str] = {}
 TAG_SETS: dict[str,set] = {}
 for key in conf["empornium"]:
@@ -626,7 +628,7 @@ def generate():
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
-        date = datetime.datetime.fromisoformat(date).strftime("%B %-d, %Y")
+        date = datetime.datetime.fromisoformat(date).strftime(DATE_DEFAULT)
 
     logging.info("Rendering template")
     template_context = {
