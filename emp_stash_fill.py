@@ -99,10 +99,11 @@ assert STASH_URL is not None
 PORT = int(conf["backend"].get("port", "9932").value) # type: ignore
 DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value # type: ignore
 TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value # type: ignore
-TITLE_DEFAULT = conf["backend"].get("title_default", "[{studio}] {performers} - {title} ({date}){resolution}").value # type: ignore
 assert TORRENT_DIR is not None
-TAG_LISTS = {}
-TAG_SETS = {}
+TITLE_DEFAULT = conf["backend"].get("title_default", "[{studio}] {performers} - {title} ({date}){resolution}").value # type: ignore
+assert TITLE_DEFAULT is not None
+TAG_LISTS: dict[str, str] = {}
+TAG_SETS: dict[str,set] = {}
 for key in conf["empornium"]:
     TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
     TAG_SETS[key] = set()
@@ -203,6 +204,8 @@ def generate():
     screens = []
     studio_tag = ""
 
+    for tagset in TAG_SETS:
+        TAG_SETS[tagset].clear()
 
     #################
     # STASH REQUEST #
@@ -483,8 +486,6 @@ def generate():
     for tag in scene["tags"]:
         for key in TAG_LISTS:
             if tag["name"] in TAG_LISTS[key]:
-                if not isinstance(TAG_SETS[key], set):
-                    TAG_SETS[key] = set()  # Ensure TAG_SETS[key] is a set
                 TAG_SETS[key].add(tag["name"])
         emp_tag = TAGS_MAP.get(tag["name"])
         if emp_tag is not None:
@@ -492,8 +493,6 @@ def generate():
         for parent in tag["parents"]:
             for key in TAG_LISTS:
                 if parent["name"] in TAG_LISTS[key]:
-                    if not isinstance(TAG_SETS[key], set):
-                        TAG_SETS[key] = set()  # Ensure TAG_SETS[key] is a set
                     TAG_SETS[key].add(parent["name"])
             emp_tag = TAGS_MAP.get(parent["name"])
             if emp_tag is not None:
@@ -597,9 +596,10 @@ def generate():
     ############
 
     # Sort tag sets into lists
+    tmpTagLists: dict[str, list[str]] = {}
     for key in TAG_SETS:
-        TAG_SETS[key] = list(TAG_SETS[key])
-        TAG_SETS[key].sort()
+        tmpTagLists[key] = list(TAG_SETS[key])
+        tmpTagLists[key].sort()
 
     # Prevent error in case date is missing
     date = scene["date"]
@@ -630,8 +630,8 @@ def generate():
         "image_count":   0 #TODO
     }
 
-    for key in TAG_SETS:
-        template_context[key] = ", ".join(TAG_SETS[key])
+    for key in tmpTagLists:
+        template_context[key] = ", ".join(tmpTagLists[key])
 
     description = render_template(template, **template_context)
 
