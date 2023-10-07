@@ -51,6 +51,7 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 ##########
 
 conf = configupdater.ConfigUpdater()
+default_conf = configupdater.ConfigUpdater()
 
 if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
     config_dir = sys.argv[-1]
@@ -69,6 +70,22 @@ if not os.path.isfile(config_file):
 
 logging.info(f"Reading config from {config_file}")
 conf.read(config_file)
+default_conf.read("default.ini")
+skip_sections = ["empornium", "empornium.tags"]
+for section in default_conf.sections():
+    if not conf.has_section(section):
+        conf.add_section(section)
+    if section not in skip_sections:
+        for option in default_conf[section].options():
+                if not conf[section].has_option(option):
+                    value = default_conf[section][option].value
+                    conf[section].insert_at(-1).comment("Value imported automatically:")
+                    conf[section].insert_at(-1).option(option, value)
+                    logging.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
+try:
+    conf.update_file()
+except:
+    logging.error("Unable to save updated config")
 
 if not os.path.exists(template_dir):
     shutil.copytree("default-templates",template_dir,copy_function=shutil.copyfile)
@@ -94,14 +111,18 @@ for filename in os.listdir("default-templates"):
                 tmpConf.read("default.ini")
                 conf["templates"].set(filename, tmpConf["templates"][filename].value)
 
+def getConfigOption(config: configupdater.ConfigUpdater, section: str, option: str, default: str = ""):
+    config[section].setdefault(option, default) # type: ignore
+    return config[section][option].value
+
 #TODO: better handling of unexpected values
-STASH_URL = conf["stash"].get("url", "http://localhost:9999").value # type: ignore
+STASH_URL = getConfigOption(conf, "stash", "url", "http://localhost:9999")
 assert STASH_URL is not None
-PORT = int(conf["backend"].get("port", "9932").value) # type: ignore
-DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2").value # type: ignore
-TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home())).value # type: ignore
+PORT = int(getConfigOption(conf, "backend", "port", "9932")) # type: ignore
+DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakestash-v2")
+TORRENT_DIR = getConfigOption(conf, "backend", "torrent_directory", str(pathlib.Path.home()))
 assert TORRENT_DIR is not None
-TITLE_DEFAULT = conf["backend"].get("title_default", "[{studio}] {performers} - {title} ({date}){resolution}").value # type: ignore
+TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {performers} - {title} ({date}){resolution}")
 assert TITLE_DEFAULT is not None
 TAG_LISTS: dict[str, str] = {}
 TAG_SETS: dict[str,set] = {}
