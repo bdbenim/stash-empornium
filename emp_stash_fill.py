@@ -123,8 +123,9 @@ DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakesta
 TORRENT_DIR = getConfigOption(conf, "backend", "torrent_directory", str(pathlib.Path.home()))
 assert TORRENT_DIR is not None
 TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {performers} - {title} ({date}){resolution}")
-DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
 assert TITLE_DEFAULT is not None
+DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
+assert DATE_DEFAULT is not None
 TAG_LISTS: dict[str, str] = {}
 TAG_SETS: dict[str,set] = {}
 for key in conf["empornium"]:
