@@ -51,6 +51,7 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 ##########
 
 conf = configupdater.ConfigUpdater()
+default_conf = configupdater.ConfigUpdater()
 
 if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
     config_dir = sys.argv[-1]
@@ -69,6 +70,22 @@ if not os.path.isfile(config_file):
 
 logging.info(f"Reading config from {config_file}")
 conf.read(config_file)
+default_conf.read("default.ini")
+skip_sections = ["empornium", "empornium.tags"]
+for section in default_conf.sections():
+    if not conf.has_section(section):
+        conf.add_section(section)
+    if section not in skip_sections:
+        for option in default_conf[section].options():
+            if not conf.has_option(section, option):
+                opt = default_conf[section][option].detach()
+                conf[section].insert_at(-1).comment("Value imported automatically:")
+                conf[section].insert_at(-1).option(opt.key, opt.value)
+                logging.info(f"Automatically added option '{opt.value}' to section [{section}] with value '{opt.value}'")
+try:
+    conf.update_file()
+except:
+    logging.error("Unable to save updated config")
 
 if not os.path.exists(template_dir):
     shutil.copytree("default-templates",template_dir,copy_function=shutil.copyfile)
