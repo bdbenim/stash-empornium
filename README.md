@@ -39,6 +39,7 @@ The backend can also be run directly by intalling its dependencies and running t
   - requests
   - vcsi
   - configupdater
+  - cairosvg
   - waitress (optional)
 - ffmpeg
 - mktorrent
