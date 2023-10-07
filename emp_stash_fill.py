@@ -25,6 +25,7 @@ import requests
 from flask import Flask, Response, request, stream_with_context, render_template
 from PIL import Image
 import configupdater
+from cairosvg import svg2png
 
 # built-in
 import datetime
@@ -140,7 +141,9 @@ app = Flask(__name__, template_folder=template_dir)
 
 def isWebpAnimated(path: str):
     with Image.open(path) as img:
-        return img.n_frames > 1
+        if hasattr(img, "n_frames"):
+            return img.n_frames > 1
+        return False
 
 def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
     # Convert animated webp to gif
@@ -333,7 +336,6 @@ def generate():
                 studio_img_ext = "png"
             case "image/svg+xml":
                 studio_img_ext = "svg"
-                # TODO: convert to png for upload
             case _:
                 logging.error(f"Unknown studio logo file type: {sudio_img_mime_type}")
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
@@ -341,8 +343,7 @@ def generate():
             fp.write(studio_img_response.content)
         if studio_img_ext == "svg":
             png_file = tempfile.mkstemp(suffix="-studio.png")
-            with Image.open(studio_img_file[1]) as img:
-                img.save(png_file[1])
+            svg2png(url=studio_img_file[1], write_to=png_file[1])
             os.remove(studio_img_file[1])
             studio_img_file = png_file
             sudio_img_mime_type = "image/png"
@@ -564,7 +565,7 @@ def generate():
             return
 
     logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
-    if studio_img_file is not None and studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
+    if studio_img_file is not None and studio_img_ext != "":
         logging.info("Uploading studio logo")
         logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
         if logo_url is None:

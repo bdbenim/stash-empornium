@@ -3,3 +3,4 @@ requests
 vcsi
 waitress
 configupdater
+cairosvg
