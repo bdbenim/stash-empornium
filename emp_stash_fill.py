@@ -7,25 +7,26 @@ the EMP upload form.
 
 Required external utilities:
 ffmpeg
-vcsi
 mktorrent
 
 Required Python modules:
+configupdater
 Flask
 requests
+vcsi
 """
 
 __author__    = "An EMP user"
 __license__   = "unlicense"
-__version__   = "0.1.0"
+__version__   = "0.5.1"
 
 # external
 import requests
 from flask import Flask, Response, request, stream_with_context, render_template
 from PIL import Image
+import configupdater
 
 # built-in
-import configupdater
 import datetime
 import json
 import logging
