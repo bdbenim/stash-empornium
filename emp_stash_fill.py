@@ -312,7 +312,7 @@ def generate():
             cover_ext = "png"
         case "image/webp":
             cover_ext = "webp"
-    cover_file = tempfile.mkstemp(suffix="." + cover_ext)
+    cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
 
@@ -336,11 +336,11 @@ def generate():
                 # TODO: convert to png for upload
             case _:
                 logging.error(f"Unknown studio logo file type: {sudio_img_mime_type}")
-        studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
+        studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
         if studio_img_ext == "svg":
-            png_file = tempfile.mkstemp(suffix=".png")
+            png_file = tempfile.mkstemp(suffix="-studio.png")
             with Image.open(studio_img_file[1]) as img:
                 img.save(png_file[1])
             os.remove(studio_img_file[1])
@@ -372,7 +372,7 @@ def generate():
             performer_image_ext = "jpg"
         elif performer_image_mime_type == "image/png":
             performer_image_ext = "png"
-        performer_image_file = tempfile.mkstemp(suffix="." + performer_image_ext)
+        performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
 
@@ -391,7 +391,7 @@ def generate():
     #################
 
     # upload images and paste in description
-    contact_sheet_file = tempfile.mkstemp(suffix=".jpg")
+    contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
     cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     yield json.dumps({
@@ -421,7 +421,7 @@ def generate():
         })
 
         for seek in map(lambda i: stash_file["duration"]*(0.05 + i/(num_frames-1)*0.9), range(num_frames)):
-            screen_file = tempfile.mkstemp(suffix=".jpg")
+            screen_file = tempfile.mkstemp(suffix="-screen.jpg")
             screens.append(screen_file[1])
             cmd = ["ffmpeg","-v","error","-y","-ss",str(seek),"-i",stash_file["path"],"-frames:v","1","-vf","scale=960:-2",screen_file[1]]
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
