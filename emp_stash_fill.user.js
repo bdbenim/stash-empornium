@@ -192,7 +192,7 @@ if (STASH_API_KEY !== null) {
     });
 
     stashButton.addEventListener("click", function() {
-    window.open(STASH_DEFAULT, '_blank');
+    window.open(STASH, '_blank');
     });
 
     idInput.addEventListener("input", function(event) {
