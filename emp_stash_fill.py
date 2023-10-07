@@ -487,14 +487,14 @@ def generate():
         for key in TAG_LISTS:
             if tag["name"] in TAG_LISTS[key]:
                 TAG_SETS[key].add(tag["name"])
-        emp_tag = TAGS_MAP.get(tag["name"])
+        emp_tag = TAGS_MAP.get(tag["name"].lower())
         if emp_tag is not None:
             tags.add(emp_tag)
         for parent in tag["parents"]:
             for key in TAG_LISTS:
                 if parent["name"] in TAG_LISTS[key]:
                     TAG_SETS[key].add(parent["name"])
-            emp_tag = TAGS_MAP.get(parent["name"])
+            emp_tag = TAGS_MAP.get(parent["name"].lower())
             if emp_tag is not None:
                 tags.add(emp_tag)
 
