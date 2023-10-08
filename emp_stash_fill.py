@@ -23,7 +23,7 @@ __version__   = "0.5.3"
 # external
 import requests
 from flask import Flask, Response, request, stream_with_context, render_template
-from PIL import Image
+from PIL import Image, ImageSequence
 import configupdater
 from cairosvg import svg2png
 
@@ -164,9 +164,10 @@ app = Flask(__name__, template_folder=template_dir)
 
 def isWebpAnimated(path: str):
     with Image.open(path) as img:
-        if hasattr(img, "n_frames"):
-            return img.n_frames > 1
-        return False
+        count = 0
+        for frame in ImageSequence.Iterator(img):
+            count += 1
+        return count > 1
 
 def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
     # Convert animated webp to gif
