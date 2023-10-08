@@ -43,6 +43,8 @@ import time
 import uuid
 import sys
 
+from utils import taghandler
+
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
@@ -126,13 +128,8 @@ TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {p
 assert TITLE_DEFAULT is not None
 DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
 assert DATE_DEFAULT is not None
-TAG_LISTS: dict[str, str] = {}
-TAG_SETS: dict[str,set] = {}
-for key in conf["empornium"]:
-    TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
-    TAG_SETS[key] = set()
-assert "sex_acts" in TAG_LISTS # This is the only non-optional key because it is used by the default templates
-TAGS_MAP = conf["empornium.tags"].to_dict()
+
+tags = taghandler.TagHandler(conf)
 
 template_names = {}
 template_files = os.listdir(template_dir)
@@ -225,13 +222,11 @@ def generate():
     template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
     assert template is not None
 
-    tags = set()
     performers = {}
     screens = []
     studio_tag = ""
 
-    for tagset in TAG_SETS:
-        TAG_SETS[tagset].clear()
+    tags.clear()
 
     #################
     # STASH REQUEST #
@@ -377,16 +372,11 @@ def generate():
     ##############
 
     for performer in scene["performers"]:
-        # tag
-        performer_tag = re.sub(r"[^\w\s]", "", performer["name"]).lower()
-        performer_tag = re.sub(r"\s+", ".", performer_tag)
-        tags.add(performer_tag)
+        performer_tag = tags.add(performer["name"])
         # also include alias tags?
 
         for tag in performer["tags"]:
-            emp_tag = TAGS_MAP.get(tag["name"])
-            if emp_tag is not None:
-                tags.add(emp_tag)
+            tags.processTag(tag["name"])
 
         # image
         performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
@@ -508,19 +498,9 @@ def generate():
     ########
 
     for tag in scene["tags"]:
-        for key in TAG_LISTS:
-            if tag["name"] in TAG_LISTS[key]:
-                TAG_SETS[key].add(tag["name"])
-        emp_tag = TAGS_MAP.get(tag["name"].lower())
-        if emp_tag is not None:
-            tags.add(emp_tag)
+        tags.processTag(tag["name"])
         for parent in tag["parents"]:
-            for key in TAG_LISTS:
-                if parent["name"] in TAG_LISTS[key]:
-                    TAG_SETS[key].add(parent["name"])
-            emp_tag = TAGS_MAP.get(parent["name"].lower())
-            if emp_tag is not None:
-                tags.add(emp_tag)
+            tags.processTag(parent["name"])
 
     if scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
@@ -619,11 +599,7 @@ def generate():
     # TEMPLATE #
     ############
 
-    # Sort tag sets into lists
-    tmpTagLists: dict[str, list[str]] = {}
-    for key in TAG_SETS:
-        tmpTagLists[key] = list(TAG_SETS[key])
-        tmpTagLists[key].sort()
+    tmpTagLists = tags.sortTagLists()
 
     # Prevent error in case date is missing
     date = scene["date"]
@@ -666,7 +642,7 @@ def generate():
             "fill": {
                 "title": title,
                 "cover": cover_remote_url,
-                "tags": " ".join(tags),
+                "tags": " ".join(tags.tags),
                 "description": description,
                 "torrent_path": torrent_path,
                 "file_path": stash_file["path"]
