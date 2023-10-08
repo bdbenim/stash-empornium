@@ -122,7 +122,7 @@ PORT = int(getConfigOption(conf, "backend", "port", "9932")) # type: ignore
 DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakestash-v2")
 TORRENT_DIR = getConfigOption(conf, "backend", "torrent_directory", str(pathlib.Path.home()))
 assert TORRENT_DIR is not None
-TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {performers} - {title} ({date}){resolution}")
+TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {performers} - {title} ({date})[{resolution}]")
 assert TITLE_DEFAULT is not None
 DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
 assert DATE_DEFAULT is not None
@@ -253,6 +253,12 @@ def generate():
 
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
+    if scene is None:
+        logging.error(f"Scene {scene_id} does not exist")
+        return json.dumps({
+            "status": "error",
+            "message": f"Scene {scene_id} does not exist"
+        })
 
     # Ensure that all expected string keys are present
     str_keys = ["title", "details", "date"]
@@ -507,7 +513,10 @@ def generate():
         performers = ", ".join([p["name"] for p in scene["performers"]]),
         title = scene["title"],
         date = scene["date"],
-        resolution = f" [{resolution}]" if resolution is not None else ""
+        resolution = resolution if resolution is not None else "",
+        codec = stash_file["video_codec"],
+        duration = str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+        framerate = "{} fps".format(stash_file["frame_rate"])
     )
 
 
