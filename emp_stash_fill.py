@@ -514,7 +514,9 @@ def generate():
         title = scene["title"],
         date = scene["date"],
         resolution = resolution if resolution is not None else "",
-        codec = stash_file["video_codec"]
+        codec = stash_file["video_codec"],
+        duration = str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+        framerate = "{} fps".format(stash_file["frame_rate"])
     )
 
 
