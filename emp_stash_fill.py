@@ -220,7 +220,7 @@ def generate():
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
 
-    logging.info(f"Generating submission for scened ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
+    logging.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
     template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
     assert template is not None
