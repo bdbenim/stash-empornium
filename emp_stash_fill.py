@@ -171,12 +171,19 @@ def isWebpAnimated(path: str):
 
 def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
     # Convert animated webp to gif
-    if img_mime_type == "image/webp" and isWebpAnimated(img_path):
-        with Image.open(img_path) as img:
-            img_path = img_path.strip(image_ext)+"gif"
-            img.save(img_path, save_all=True)
-        img_mime_type = "image/gif"
-        image_ext = "gif"
+    if img_mime_type == "image/webp":
+        if isWebpAnimated(img_path):
+            with Image.open(img_path) as img:
+                img_path = img_path.strip(image_ext)+"gif"
+                img.save(img_path, save_all=True)
+            img_mime_type = "image/gif"
+            image_ext = "gif"
+        else:
+            with Image.open(img_path) as img:
+                img_path = img_path.strip(image_ext)+"png"
+                img.save(img_path)
+            img_mime_type = "image/png"
+            image_ext = "png"
     
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
