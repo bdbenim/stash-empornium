@@ -18,7 +18,7 @@ vcsi
 
 __author__    = "An EMP user"
 __license__   = "unlicense"
-__version__   = "0.5.3"
+__version__   = "0.5.5"
 
 # external
 import requests
