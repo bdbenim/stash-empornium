@@ -169,7 +169,9 @@ def isWebpAnimated(path: str):
             count += 1
         return count > 1
 
-def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
+def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str, width: int = 0) -> str | None:
+    """Upload an image and return the URL, or None if there is an error. Optionally takes
+    a width, and scales the image down to that width if it is larger."""
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
         if isWebpAnimated(img_path):
@@ -185,13 +187,18 @@ def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, imag
             img_mime_type = "image/png"
             image_ext = "png"
     
+    if width > 0:
+        with Image.open(img_path) as img:
+            img.thumbnail((width, img.height))
+            img.save(img_path)
+
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
         subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         while os.path.getsize(img_path) > 5000000:
             with Image.open(img_path) as img:
-                img = img.resize((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
+                img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
                 img.save(img_path)
         logging.info(f"Resized {img_path}")
 
@@ -577,9 +584,8 @@ def generate():
             "data": { "message": "Failed to upload cover" }
         })
         return
+    cover_resized_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext, width=800)
     os.remove(cover_file[1])
-    cover_url_parts = cover_remote_url.split(".")
-    cover_resized_url = ".".join(cover_url_parts[:-1])+".md."+cover_url_parts[-1]
     logging.info("Uploading contact sheet")
     contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
     if contact_sheet_remote_url is None:
