@@ -28,6 +28,7 @@ import configupdater
 from cairosvg import svg2png
 
 # built-in
+import argparse
 import datetime
 import json
 import logging
@@ -45,6 +46,14 @@ import sys
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+#############
+# ARGUMENTS #
+#############
+
+parser = argparse.ArgumentParser()
+parser.add_argument("config_dir", default=os.path.join(os.getcwd(), "config"), help="specify the directory containing configuration files")
+
+args = parser.parse_args()
 
 ##########
 # CONFIG #
@@ -53,11 +62,13 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 conf = configupdater.ConfigUpdater()
 default_conf = configupdater.ConfigUpdater()
 
-if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
-    config_dir = sys.argv[-1]
-else:
-    work_dir = os.getcwd()
-    config_dir = os.path.join(work_dir, "config")
+# if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
+#     config_dir = sys.argv[-1]
+# else:
+#     work_dir = os.getcwd()
+#     config_dir = os.path.join(work_dir, "config")
+
+config_dir = args.config_dir
 
 template_dir = os.path.join(config_dir, "templates")
 config_file = os.path.join(config_dir, "config.ini")
