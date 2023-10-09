@@ -18,7 +18,7 @@ vcsi
 
 __author__    = "An EMP user"
 __license__   = "unlicense"
-__version__   = "0.5.3"
+__version__   = "0.5.7-alpha"
 
 # external
 import requests
@@ -43,7 +43,8 @@ import time
 import uuid
 import sys
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+logging.info(f"stash-empornium version {__version__}")
 
 
 ##########
@@ -122,7 +123,7 @@ PORT = int(getConfigOption(conf, "backend", "port", "9932")) # type: ignore
 DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakestash-v2")
 TORRENT_DIR = getConfigOption(conf, "backend", "torrent_directory", str(pathlib.Path.home()))
 assert TORRENT_DIR is not None
-TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {performers} - {title} ({date}){resolution}")
+TITLE_DEFAULT = getConfigOption(conf, "backend", "title_default", "[{studio}] {performers} - {title} ({date})[{resolution}]")
 assert TITLE_DEFAULT is not None
 DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
 assert DATE_DEFAULT is not None
@@ -169,22 +170,39 @@ def isWebpAnimated(path: str):
             count += 1
         return count > 1
 
-def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
+def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str, width: int = 0) -> str | None:
+    """Upload an image and return the URL, or None if there is an error. Optionally takes
+    a width, and scales the image down to that width if it is larger."""
+    logging.debug(f"Uploading image from {img_path}")
     # Convert animated webp to gif
-    if img_mime_type == "image/webp" and isWebpAnimated(img_path):
-        with Image.open(img_path) as img:
-            img_path = img_path.strip(image_ext)+"gif"
-            img.save(img_path, save_all=True)
-        img_mime_type = "image/gif"
-        image_ext = "gif"
+    if img_mime_type == "image/webp":
+        logging.debug("Image is webp")
+        if isWebpAnimated(img_path):
+            with Image.open(img_path) as img:
+                img_path = img_path.strip(image_ext)+"gif"
+                img.save(img_path, save_all=True)
+            img_mime_type = "image/gif"
+            image_ext = "gif"
+        else:
+            with Image.open(img_path) as img:
+                img_path = img_path.strip(image_ext)+"png"
+                img.save(img_path)
+            img_mime_type = "image/png"
+            image_ext = "png"
+        logging.debug(f"Saved image as {img_path}")
     
+    if width > 0:
+        with Image.open(img_path) as img:
+            img.thumbnail((width, img.height))
+            img.save(img_path)
+
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
         subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         while os.path.getsize(img_path) > 5000000:
             with Image.open(img_path) as img:
-                img = img.resize((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
+                img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
                 img.save(img_path)
         logging.info(f"Resized {img_path}")
 
@@ -246,6 +264,12 @@ def generate():
 
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
+    if scene is None:
+        logging.error(f"Scene {scene_id} does not exist")
+        return json.dumps({
+            "status": "error",
+            "message": f"Scene {scene_id} does not exist"
+        })
 
     # Ensure that all expected string keys are present
     str_keys = ["title", "details", "date"]
@@ -329,6 +353,7 @@ def generate():
     # COVER #
     #########
 
+    logging.debug(f'Downloading cover from {scene["paths"]["screenshot"]}')
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     cover_ext = ""
@@ -500,7 +525,10 @@ def generate():
         performers = ", ".join([p["name"] for p in scene["performers"]]),
         title = scene["title"],
         date = scene["date"],
-        resolution = f" [{resolution}]" if resolution is not None else ""
+        resolution = resolution if resolution is not None else "",
+        codec = stash_file["video_codec"],
+        duration = str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+        framerate = "{} fps".format(stash_file["frame_rate"])
     )
 
 
@@ -561,9 +589,8 @@ def generate():
             "data": { "message": "Failed to upload cover" }
         })
         return
+    cover_resized_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext, width=800)
     os.remove(cover_file[1])
-    cover_url_parts = cover_remote_url.split(".")
-    cover_resized_url = ".".join(cover_url_parts[:-1])+".md."+cover_url_parts[-1]
     logging.info("Uploading contact sheet")
     contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
     if contact_sheet_remote_url is None:
