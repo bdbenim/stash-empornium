@@ -329,7 +329,7 @@ def generate():
     elif ht >= 1440 and ht < 1920:
         resolution = "1440p"
     elif ht >= 1920 and ht < 2560:
-        resolution = "4K"
+        resolution = "2160p"
     elif ht >= 2560 and ht < 3000:
         resolution = "5K"
     elif ht >= 3000 and ht < 3584:
