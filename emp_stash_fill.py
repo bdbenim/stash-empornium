@@ -52,8 +52,17 @@ logging.basicConfig(
 # ARGUMENTS #
 #############
 
-parser = argparse.ArgumentParser()
-parser.add_argument("config_dir", default=os.path.join(os.getcwd(), "config"), help="specify the directory containing configuration files")
+parser = argparse.ArgumentParser(description="backend server for EMP Stash upload helper userscript")
+parser.add_argument(
+    "-c",
+    "--configdir",
+    default=[os.path.join(os.getcwd(), "config")],
+    help="specify the directory containing configuration files",
+    nargs=1
+)
+parser.add_argument("-t", "--torrentdir", help="specify the directory where .torrent files should be saved", nargs=1)
+parser.add_argument("-p", "--port", nargs=1, help="port to listen on", type=int)
+parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
 args = parser.parse_args()
 
@@ -70,7 +79,7 @@ default_conf = configupdater.ConfigUpdater()
 #     work_dir = os.getcwd()
 #     config_dir = os.path.join(work_dir, "config")
 
-config_dir = args.config_dir
+config_dir = args.configdir[0]
 
 template_dir = os.path.join(config_dir, "templates")
 config_file = os.path.join(config_dir, "config.ini")
@@ -141,12 +150,18 @@ def getConfigOption(
 # TODO: better handling of unexpected values
 STASH_URL = getConfigOption(conf, "stash", "url", "http://localhost:9999")
 assert STASH_URL is not None
-PORT = int(getConfigOption(conf, "backend", "port", "9932"))  # type: ignore
+PORT = args.port[0] if args.port else int(getConfigOption(conf, "backend", "port", "9932"))  # type: ignore
 DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakestash-v2")
-TORRENT_DIR = getConfigOption(
+TORRENT_DIR = args.torrentdir[0] if args.torrentdir else getConfigOption(
     conf, "backend", "torrent_directory", str(pathlib.Path.home())
 )
 assert TORRENT_DIR is not None
+if not os.path.isdir(TORRENT_DIR):
+    if os.path.isfile(TORRENT_DIR):
+        logging.error(f"Cannot use {TORRENT_DIR} for torrents, path is a file")
+        exit(1)
+    logging.info(f"Creating directory {TORRENT_DIR}")
+    os.makedirs(TORRENT_DIR)
 TITLE_DEFAULT = getConfigOption(
     conf,
     "backend",
@@ -154,8 +169,8 @@ TITLE_DEFAULT = getConfigOption(
     "[{studio}] {performers} - {title} ({date})[{resolution}]",
 )
 assert TITLE_DEFAULT is not None
-DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
-assert DATE_DEFAULT is not None
+DATE_FORMAT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
+assert DATE_FORMAT is not None
 TAG_LISTS: dict[str, str] = {}
 TAG_SETS: dict[str, set] = {}
 for key in conf["empornium"]:
@@ -766,7 +781,7 @@ def generate():
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
-        date = datetime.datetime.fromisoformat(date).strftime(DATE_DEFAULT)
+        date = datetime.datetime.fromisoformat(date).strftime(DATE_FORMAT)
 
     logging.info("Rendering template")
     template_context = {
