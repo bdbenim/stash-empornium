@@ -18,7 +18,7 @@ vcsi
 
 __author__    = "An EMP user"
 __license__   = "unlicense"
-__version__   = "0.5.7-alpha"
+__version__   = "0.5.5"
 
 # external
 import requests
@@ -43,8 +43,7 @@ import time
 import uuid
 import sys
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-logging.info(f"stash-empornium version {__version__}")
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
 ##########
@@ -173,10 +172,8 @@ def isWebpAnimated(path: str):
 def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, image_ext: str, width: int = 0) -> str | None:
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
-    logging.debug(f"Uploading image from {img_path}")
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
-        logging.debug("Image is webp")
         if isWebpAnimated(img_path):
             with Image.open(img_path) as img:
                 img_path = img_path.strip(image_ext)+"gif"
@@ -189,7 +186,6 @@ def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, imag
                 img.save(img_path)
             img_mime_type = "image/png"
             image_ext = "png"
-        logging.debug(f"Saved image as {img_path}")
     
     if width > 0:
         with Image.open(img_path) as img:
@@ -353,7 +349,6 @@ def generate():
     # COVER #
     #########
 
-    logging.debug(f'Downloading cover from {scene["paths"]["screenshot"]}')
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     cover_ext = ""
@@ -718,4 +713,3 @@ if __name__ == "__main__":
     except:
         logging.info("Waitress not installed, using builtin server")
         app.run(host='0.0.0.0',port=PORT)
-
