@@ -18,7 +18,7 @@ vcsi
 
 __author__  = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.5.8"
+__version__ = "0.6.0"
 
 # external
 import requests
@@ -28,6 +28,7 @@ import configupdater
 from cairosvg import svg2png
 
 # built-in
+import argparse
 import datetime
 import json
 import logging
@@ -46,7 +47,6 @@ import sys
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
-logging.info(f"stash-empornium version {__version__}")
 
 #############
 # CONSTANTS #
@@ -56,6 +56,36 @@ PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.
 STUDIO_DEFAULT_LOGO = (
     "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
 )
+#############
+# ARGUMENTS #
+#############
+
+parser = argparse.ArgumentParser(
+    description="backend server for EMP Stash upload helper userscript"
+)
+parser.add_argument(
+    "--configdir",
+    default=[os.path.join(os.getcwd(), "config")],
+    help="specify the directory containing configuration files",
+    nargs=1,
+)
+parser.add_argument(
+    "-t",
+    "--torrentdir",
+    help="specify the directory where .torrent files should be saved",
+    nargs=1,
+)
+parser.add_argument("-p", "--port", nargs=1, help="port to listen on", type=int)
+flags = parser.add_argument_group("Tags", "optional tag settings")
+flags.add_argument("-c", action="store_true", help="include codec as tag")
+flags.add_argument("-d", action="store_true", help="include date as tag")
+flags.add_argument("-f", action="store_true", help="include framerate as tag")
+flags.add_argument("-r", action="store_true", help="include resolution as tag")
+parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
+
+args = parser.parse_args()
+
+logging.info(f"stash-empornium version {__version__}")
 
 ##########
 # CONFIG #
@@ -64,11 +94,13 @@ STUDIO_DEFAULT_LOGO = (
 conf = configupdater.ConfigUpdater()
 default_conf = configupdater.ConfigUpdater()
 
-if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
-    config_dir = sys.argv[-1]
-else:
-    work_dir = os.getcwd()
-    config_dir = os.path.join(work_dir, "config")
+# if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
+#     config_dir = sys.argv[-1]
+# else:
+#     work_dir = os.getcwd()
+#     config_dir = os.path.join(work_dir, "config")
+
+config_dir = args.configdir[0]
 
 template_dir = os.path.join(config_dir, "templates")
 config_file = os.path.join(config_dir, "config.ini")
@@ -140,12 +172,20 @@ def getConfigOption(
 # TODO: better handling of unexpected values
 STASH_URL = getConfigOption(conf, "stash", "url", "http://localhost:9999")
 assert STASH_URL is not None
-PORT = int(getConfigOption(conf, "backend", "port", "9932"))  # type: ignore
+PORT = args.port[0] if args.port else int(getConfigOption(conf, "backend", "port", "9932"))  # type: ignore
 DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakestash-v2")
-TORRENT_DIR = getConfigOption(
-    conf, "backend", "torrent_directory", str(pathlib.Path.home())
+TORRENT_DIR = (
+    args.torrentdir[0]
+    if args.torrentdir
+    else getConfigOption(conf, "backend", "torrent_directory", str(pathlib.Path.home()))
 )
 assert TORRENT_DIR is not None
+if not os.path.isdir(TORRENT_DIR):
+    if os.path.isfile(TORRENT_DIR):
+        logging.error(f"Cannot use {TORRENT_DIR} for torrents, path is a file")
+        exit(1)
+    logging.info(f"Creating directory {TORRENT_DIR}")
+    os.makedirs(TORRENT_DIR)
 TITLE_FORMAT = getConfigOption(
     conf,
     "backend",
@@ -155,12 +195,16 @@ TITLE_FORMAT = getConfigOption(
 assert TITLE_FORMAT is not None
 DATE_FORMAT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
 assert DATE_FORMAT is not None
-TAG_CODEC = getConfigOption(conf, "metadata", "tag_codec", "false").lower() == "true"
-TAG_DATE = getConfigOption(conf, "metadata", "tag_date", "false").lower() == "true"
-TAG_FRAMERATE = (
+TAG_CODEC = (
+    args.c or getConfigOption(conf, "metadata", "tag_codec", "false").lower() == "true"
+)
+TAG_DATE = (
+    args.d or getConfigOption(conf, "metadata", "tag_date", "false").lower() == "true"
+)
+TAG_FRAMERATE = args.f or (
     getConfigOption(conf, "metadata", "tag_framerate", "false").lower() == "true"
 )
-TAG_RESOLUTION = (
+TAG_RESOLUTION = args.r or (
     getConfigOption(conf, "metadata", "tag_resolution", "false").lower() == "true"
 )
 TAG_LISTS: dict[str, str] = {}
@@ -690,9 +734,9 @@ def generate():
         tags.add(year)
         tags.add(f"{year}.{month}")
         tags.add(f"{year}.{month}.{day}")
-    
+
     if TAG_FRAMERATE:
-        tags.add(stash_file["frame_rate"]+"fps")
+        tags.add(stash_file["frame_rate"] + "fps")
 
     if scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix(
