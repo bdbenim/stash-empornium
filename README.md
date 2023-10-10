@@ -149,3 +149,26 @@ Refer to the default templates for examples of how they are used.
 #### Custom Lists
 
 In addition to the template variables described above, additional tag lists may be added to the `empornium` config section by following the format of the `sex_acts` variable. These will automatically be parsed and made available to any custom templates as comma-separated lists. For instance, you may wish to add a section called `performer_attributes` to describe characteristics of performers in the scene.
+
+## Titles
+
+Similarly to templates, the title has a few options for formatting. This uses python's builtin string formatter, so variable names are enclosed in braces (`{}`) within the string. The default title format is:
+
+```python
+[{studio}] {performers} - {title} ({date})[{resolution}]
+```
+
+This would result in something like this:
+
+> [Blender Institute] Big Buck Bunny, Frank, Rinky, Gimera - Big Buck Bunny \(2008-05-10)[1080p]
+
+The available variables that can be used are:
+
+- codec
+- date
+- duration
+- framerate
+- performers
+- resolution
+- studio
+- title
