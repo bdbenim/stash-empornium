@@ -43,7 +43,7 @@ import time
 import uuid
 import sys
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.info(f"stash-empornium version {__version__}")
 
 #############
