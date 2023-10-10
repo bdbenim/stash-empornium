@@ -18,7 +18,7 @@ vcsi
 
 __author__    = "An EMP user"
 __license__   = "unlicense"
-__version__   = "0.5.7-alpha"
+__version__   = "0.5.8"
 
 # external
 import requests
@@ -46,6 +46,12 @@ import sys
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logging.info(f"stash-empornium version {__version__}")
 
+#############
+# CONSTANTS #
+#############
+
+PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
+STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
 
 ##########
 # CONFIG #
@@ -175,7 +181,7 @@ def img_host_upload(token: str, cookies, img_path: str, img_mime_type: str, imag
     a width, and scales the image down to that width if it is larger."""
     logging.debug(f"Uploading image from {img_path}")
     # Convert animated webp to gif
-    if img_mime_type == "image/webp":
+    if img_mime_type == "image/webp" or image_ext == "webp":
         logging.debug("Image is webp")
         if isWebpAnimated(img_path):
             with Image.open(img_path) as img:
@@ -364,6 +370,12 @@ def generate():
             cover_ext = "png"
         case "image/webp":
             cover_ext = "webp"
+        case _:
+            logging.error(f"Unrecognized mime type {cover_mime_type}")
+            return json.dumps({
+                "status": "error",
+                "message": "Unrecognized cover format"
+            })
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
@@ -376,6 +388,7 @@ def generate():
     sudio_img_mime_type = ""
     studio_img_file = None
     if "default=true" not in scene["studio"]["image_path"]:
+        logging.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
         studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
         match sudio_img_mime_type:
@@ -387,6 +400,10 @@ def generate():
                 studio_img_ext = "svg"
             case _:
                 logging.error(f"Unknown studio logo file type: {sudio_img_mime_type}")
+                return json.dumps({
+                    "status": "error",
+                    "message": "Unrecognized studio image file type"
+                })
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
@@ -415,13 +432,24 @@ def generate():
                 tags.add(emp_tag)
 
         # image
+        logging.debug(f'Downloading performer image from {performer["image_path"]}')
         performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
-        performer_image_mime_type = cover_response.headers["Content-Type"]
+        performer_image_mime_type = performer_image_response.headers["Content-Type"]
+        logging.debug(f"Got image with mime type {performer_image_mime_type}")
         performer_image_ext = ""
-        if performer_image_mime_type == "image/jpeg":
-            performer_image_ext = "jpg"
-        elif performer_image_mime_type == "image/png":
-            performer_image_ext = "png"
+        match performer_image_mime_type:
+            case "image/jpeg":
+                performer_image_ext = "jpg"
+            case "image/png":
+                performer_image_ext = "png"
+            case "image/webp":
+                performer_image_ext = "webp"
+            case _:
+                logging.error(f"Unrecognized performer image mime type: {performer_image_mime_type}")
+                return json.dumps({
+                    "status": "error",
+                    "message": "Unrecognized performer image format"
+                })
         performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
@@ -609,22 +637,16 @@ def generate():
                                                                          performers[performer_name]["image_ext"])
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            yield json.dumps({
-                "status": "error",
-                "data": { "message": f"Failed to upload image of {performer_name}" }
-            })
-            return
+            performers[performer_name]["image_remote_url"] = PERFORMER_DEFAULT_IMAGE
+            logging.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+    logo_url = STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
         logging.info("Uploading studio logo")
         logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
         if logo_url is None:
-            yield json.dumps({
-                "status": "error",
-                "data": { "message": "Failed to upload studio logo" }
-            })
-            return
+            logo_url = STUDIO_DEFAULT_LOGO
+            logging.warning("Unable to upload studio image")
 
     logging.info("Uploading screens")
     screens_urls = []
