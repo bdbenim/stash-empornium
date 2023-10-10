@@ -16,9 +16,9 @@ requests
 vcsi
 """
 
-__author__    = "An EMP user"
-__license__   = "unlicense"
-__version__   = "0.5.8"
+__author__  = "An EMP user"
+__license__ = "unlicense"
+__version__ = "0.5.8"
 
 # external
 import requests
@@ -53,7 +53,9 @@ logging.info(f"stash-empornium version {__version__}")
 #############
 
 PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+STUDIO_DEFAULT_LOGO = (
+    "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+)
 
 ##########
 # CONFIG #
@@ -129,9 +131,10 @@ for filename in os.listdir("default-templates"):
 
 def getConfigOption(
     config: configupdater.ConfigUpdater, section: str, option: str, default: str = ""
-):
+) -> str:
     config[section].setdefault(option, default)  # type: ignore
-    return config[section][option].value
+    value = config[section][option].value
+    return value if value else ""
 
 
 # TODO: better handling of unexpected values
@@ -143,15 +146,23 @@ TORRENT_DIR = getConfigOption(
     conf, "backend", "torrent_directory", str(pathlib.Path.home())
 )
 assert TORRENT_DIR is not None
-TITLE_DEFAULT = getConfigOption(
+TITLE_FORMAT = getConfigOption(
     conf,
     "backend",
     "title_default",
     "[{studio}] {performers} - {title} ({date})[{resolution}]",
 )
-assert TITLE_DEFAULT is not None
-DATE_DEFAULT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
-assert DATE_DEFAULT is not None
+assert TITLE_FORMAT is not None
+DATE_FORMAT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
+assert DATE_FORMAT is not None
+TAG_CODEC = getConfigOption(conf, "metadata", "tag_codec", "false").lower() == "true"
+TAG_DATE = getConfigOption(conf, "metadata", "tag_date", "false").lower() == "true"
+TAG_FRAMERATE = (
+    getConfigOption(conf, "metadata", "tag_framerate", "false").lower() == "true"
+)
+TAG_RESOLUTION = (
+    getConfigOption(conf, "metadata", "tag_resolution", "false").lower() == "true"
+)
 TAG_LISTS: dict[str, str] = {}
 TAG_SETS: dict[str, set] = {}
 for key in conf["empornium"]:
@@ -199,6 +210,7 @@ def isWebpAnimated(path: str):
         for frame in ImageSequence.Iterator(img):
             count += 1
         return count > 1
+
 
 def img_host_upload(
     token: str,
@@ -323,10 +335,9 @@ def generate():
     scene = stash_response_body["data"]["findScene"]
     if scene is None:
         logging.error(f"Scene {scene_id} does not exist")
-        return json.dumps({
-            "status": "error",
-            "message": f"Scene {scene_id} does not exist"
-        })
+        return json.dumps(
+            {"status": "error", "message": f"Scene {scene_id} does not exist"}
+        )
 
     # Ensure that all expected string keys are present
     str_keys = ["title", "details", "date"]
@@ -396,7 +407,7 @@ def generate():
     elif ht >= 6143:
         resolution = "8K+"
 
-    if resolution is not None:
+    if resolution is not None and TAG_RESOLUTION:
         tags.add(resolution)
 
     #########
@@ -416,10 +427,9 @@ def generate():
             cover_ext = "webp"
         case _:
             logging.error(f"Unrecognized mime type {cover_mime_type}")
-            return json.dumps({
-                "status": "error",
-                "message": "Unrecognized cover format"
-            })
+            return json.dumps(
+                {"status": "error", "message": "Unrecognized cover format"}
+            )
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
@@ -446,10 +456,12 @@ def generate():
                 studio_img_ext = "svg"
             case _:
                 logging.error(f"Unknown studio logo file type: {sudio_img_mime_type}")
-                return json.dumps({
-                    "status": "error",
-                    "message": "Unrecognized studio image file type"
-                })
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": "Unrecognized studio image file type",
+                    }
+                )
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
@@ -479,7 +491,9 @@ def generate():
 
         # image
         logging.debug(f'Downloading performer image from {performer["image_path"]}')
-        performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
+        performer_image_response = requests.get(
+            performer["image_path"], headers=stash_headers
+        )
         performer_image_mime_type = performer_image_response.headers["Content-Type"]
         logging.debug(f"Got image with mime type {performer_image_mime_type}")
         performer_image_ext = ""
@@ -491,12 +505,18 @@ def generate():
             case "image/webp":
                 performer_image_ext = "webp"
             case _:
-                logging.error(f"Unrecognized performer image mime type: {performer_image_mime_type}")
-                return json.dumps({
-                    "status": "error",
-                    "message": "Unrecognized performer image format"
-                })
-        performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
+                logging.error(
+                    f"Unrecognized performer image mime type: {performer_image_mime_type}"
+                )
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": "Unrecognized performer image format",
+                    }
+                )
+        performer_image_file = tempfile.mkstemp(
+            suffix="-performer." + performer_image_ext
+        )
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
 
@@ -630,7 +650,7 @@ def generate():
     # TITLE #
     #########
 
-    title = TITLE_DEFAULT.format(
+    title = TITLE_FORMAT.format(
         studio=scene["studio"]["name"],
         performers=", ".join([p["name"] for p in scene["performers"]]),
         title=scene["title"],
@@ -661,6 +681,18 @@ def generate():
             emp_tag = TAGS_MAP.get(parent["name"].lower())
             if emp_tag is not None:
                 tags.add(emp_tag)
+
+    if TAG_CODEC and stash_file["video_codec"] is not None:
+        tags.add(stash_file["video_codec"])
+
+    if TAG_DATE and scene["date"] is not None and len(scene["date"]) > 0:
+        year, month, day = scene["date"].split("-")
+        tags.add(year)
+        tags.add(f"{year}.{month}")
+        tags.add(f"{year}.{month}.{day}")
+    
+    if TAG_FRAMERATE:
+        tags.add(stash_file["frame_rate"]+"fps")
 
     if scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix(
@@ -774,7 +806,7 @@ def generate():
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
-        date = datetime.datetime.fromisoformat(date).strftime(DATE_DEFAULT)
+        date = datetime.datetime.fromisoformat(date).strftime(DATE_FORMAT)
 
     logging.info("Rendering template")
     template_context = {
