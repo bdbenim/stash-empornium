@@ -393,6 +393,7 @@ def generate():
 
     stash_file = None
     for f in scene["files"]:
+        logging.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
             # Apply remote path mappings
             logging.debug(f"Got path {f['path']} from stash")
@@ -485,7 +486,7 @@ def generate():
     studio_img_ext = ""
     sudio_img_mime_type = ""
     studio_img_file = None
-    if "default=true" not in scene["studio"]["image_path"]:
+    if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
         logging.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
         studio_img_response = requests.get(
             scene["studio"]["image_path"], headers=stash_headers
@@ -690,12 +691,22 @@ def generate():
     tempdir.cleanup()
     logging.info(f"Moved torrent to {torrent_path}")
 
+    #############
+    # MEDIAINFO #
+    #############
+
+    mediainfo = ""
+    if shutil.which("mediainfo"):
+        CMD = ["mediainfo", stash_file["path"]]
+        mediainfo = subprocess.check_output(CMD)
+        logging.info(f"mediainfo:\n{mediainfo}")
+
     #########
     # TITLE #
     #########
 
     title = TITLE_FORMAT.format(
-        studio=scene["studio"]["name"],
+        studio=scene["studio"]["name"] if scene["studio"] else "",
         performers=", ".join([p["name"] for p in scene["performers"]]),
         title=scene["title"],
         date=scene["date"],
@@ -854,7 +865,7 @@ def generate():
 
     logging.info("Rendering template")
     template_context = {
-        "studio": scene["studio"]["name"],
+        "studio": scene["studio"]["name"] if scene["studio"] else "",
         "studio_logo": logo_url,
         "studiotag": studio_tag,
         "director": scene["director"],
@@ -876,6 +887,7 @@ def generate():
         "performers": performers,
         "cover": cover_resized_url,
         "image_count": 0,  # TODO
+        "media_info": mediainfo
     }
 
     for key in tmpTagLists:
