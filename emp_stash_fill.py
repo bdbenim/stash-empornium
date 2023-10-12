@@ -14,6 +14,12 @@ configupdater
 Flask
 requests
 vcsi
+
+Optional external utilities:
+mediainfo
+
+Optional Python modules:
+waitress
 """
 
 __author__ = "An EMP user"
