@@ -48,7 +48,6 @@ import tempfile
 import urllib.parse
 import time
 import uuid
-import sys
 
 #############
 # CONSTANTS #
@@ -168,6 +167,16 @@ for filename in os.listdir("default-templates"):
                 conf["templates"].set(filename, tmpConf["templates"][filename].value)
 
 
+def error(message: str, altMessage: str | None = None) -> str:
+    logging.error(message)
+    return json.dumps({"status": "error", "message": altMessage if altMessage else message})
+
+
+def info(message: str, altMessage: str | None = None) -> str:
+    logging.info(message)
+    return json.dumps({"status": "success", "data": {"message": altMessage if altMessage else message}})
+
+
 def getConfigOption(config: configupdater.ConfigUpdater, section: str, option: str, default: str = "") -> str:
     config[section].setdefault(option, default)  # type: ignore
     value = config[section][option].value
@@ -187,7 +196,7 @@ TORRENT_DIR = (
 assert TORRENT_DIR is not None
 if not os.path.isdir(TORRENT_DIR):
     if os.path.isfile(TORRENT_DIR):
-        logging.error(f"Cannot use {TORRENT_DIR} for torrents, path is a file")
+        logging.critical(f"Cannot use {TORRENT_DIR} for torrents, path is a file")
         exit(1)
     logging.info(f"Creating directory {TORRENT_DIR}")
     os.makedirs(TORRENT_DIR)
@@ -289,7 +298,7 @@ def img_host_upload(
             with Image.open(img_path) as img:
                 img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
                 img.save(img_path)
-        logging.info(f"Resized {img_path}")
+        logging.debug(f"Resized {img_path}")
 
     files = {
         "source": (
@@ -363,8 +372,7 @@ def generate():
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
     if scene is None:
-        logging.error(f"Scene {scene_id} does not exist")
-        return json.dumps({"status": "error", "message": f"Scene {scene_id} does not exist"})
+        return error(f"Scene {scene_id} does not exist")
 
     # Ensure that all expected string keys are present
     str_keys = ["title", "details", "date"]
@@ -395,11 +403,9 @@ def generate():
             break
 
     if stash_file is None:
-        logging.error("No file exists")
-        return json.dumps({"status": "error", "message": "Couldn't find file"})
+        return error("No file exists")
     elif not os.path.isfile(stash_file["path"]):
-        logging.error(f"Couldn't find file {stash_file['path']}")
-        return json.dumps({"status": "error", "message": "Couldn't find file"})
+        return error(f"Couldn't find file {stash_file['path']}")
 
     ht = stash_file["height"]
     resolution = None
@@ -452,8 +458,7 @@ def generate():
         case "image/webp":
             cover_ext = "webp"
         case _:
-            logging.error(f"Unrecognized mime type {cover_mime_type}")
-            return json.dumps({"status": "error", "message": "Unrecognized cover format"})
+            return error(f"Unrecognized mime type {cover_mime_type}", "Unrecognized cover format")
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
@@ -477,12 +482,8 @@ def generate():
             case "image/svg+xml":
                 studio_img_ext = "svg"
             case _:
-                logging.error(f"Unknown studio logo file type: {sudio_img_mime_type}")
-                return json.dumps(
-                    {
-                        "status": "error",
-                        "message": "Unrecognized studio image file type",
-                    }
+                return error(
+                    f"Unknown studio logo file type: {sudio_img_mime_type}", "Unrecognized studio image file type"
                 )
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
@@ -525,12 +526,9 @@ def generate():
             case "image/webp":
                 performer_image_ext = "webp"
             case _:
-                logging.error(f"Unrecognized performer image mime type: {performer_image_mime_type}")
-                return json.dumps(
-                    {
-                        "status": "error",
-                        "message": "Unrecognized performer image format",
-                    }
+                return error(
+                    f"Unrecognized performer image mime type: {performer_image_mime_type}",
+                    "Unrecognized performer image format",
                 )
         performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
@@ -556,8 +554,7 @@ def generate():
     yield json.dumps({"status": "success", "data": {"message": "Generating contact sheet"}})
     process.wait()
     if process.returncode != 0:
-        logging.error("vcsi failed")
-        return json.dumps({"status": "error", "message": "Couldn't generate contact sheet"})
+        return error("vcsi failed", "Couldn't generate contact sheet")
 
     ###########
     # SCREENS #
@@ -565,8 +562,7 @@ def generate():
 
     num_frames = 10
     if gen_screens:
-        logging.info(f"Generating screens for {stash_file['path']}")
-        yield json.dumps({"status": "success", "data": {"message": "Generating screenshots"}})
+        yield info(f"Generating screens for {stash_file['path']}", "Generating screenshots")
 
         for seek in map(
             lambda i: stash_file["duration"] * (0.05 + i / (num_frames - 1) * 0.9),
@@ -610,19 +606,19 @@ def generate():
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
 
     except:
-        logging.error("Unable to determine audio bitrate")
+        logging.warning("Unable to determine audio bitrate")
         audio_bitrate = "UNK"
 
     ###########
     # TORRENT #
     ###########
 
-    yield json.dumps({"status": "success", "data": {"message": "Making torrent"}})
+    yield info("Making torrent")
     piece_size = int(math.log(stash_file["size"] / 2**10, 2))
     tempdir = tempfile.TemporaryDirectory()
     temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
     torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
-    logging.info(f"Saving torrent to {temppath}")
+    logging.debug(f"Saving torrent to {temppath}")
     cmd = [
         "mktorrent",
         "-l",
@@ -640,17 +636,11 @@ def generate():
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     process.wait()
     if process.returncode != 0:
-        logging.error("mktorrent failed, command: " + " ".join(cmd))
         tempdir.cleanup()
-        return json.dumps(
-            {
-                "status": "error",
-                "message": "Couldn't generate torrent (does it already exist?)",
-            }
-        )
+        return error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
     shutil.move(temppath, torrent_path)
     tempdir.cleanup()
-    logging.info(f"Moved torrent to {torrent_path}")
+    logging.debug(f"Moved torrent to {torrent_path}")
 
     #############
     # MEDIAINFO #
@@ -658,6 +648,7 @@ def generate():
 
     mediainfo = ""
     if shutil.which("mediainfo"):
+        yield info("Generating media info")
         CMD = ["mediainfo", stash_file["path"]]
         mediainfo = subprocess.check_output(CMD).decode()
 
@@ -726,25 +717,24 @@ def generate():
     img_host_request = requests.get("https://jerking.empornium.ph/json")
     m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
     if m is None:
-        logging.error("Unable to get auth token for image host.")
-        return json.dumps({"status": "success", "data": {"message": "Uploading images"}})
+        return error("Unable to get auth token for image host.")
     img_host_token = m.group(1)
     cookies = img_host_request.cookies
     cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
     cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
 
-    logging.info("Uploading cover")
+    yield info("Uploading cover")
     cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
     if cover_remote_url is None:
-        return json.dumps({"status": "error", "data": {"message": "Failed to upload cover"}})
+        return error("Failed to upload cover")
     cover_resized_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext, width=800)
     os.remove(cover_file[1])
-    logging.info("Uploading contact sheet")
+    yield info("Uploading contact sheet")
     contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
     if contact_sheet_remote_url is None:
-        return json.dumps({"status": "error", "data": {"message": "Failed to upload contact sheet"}})
+        return error("Failed to upload contact sheet")
     os.remove(contact_sheet_file[1])
-    logging.info("Uploading performer images")
+    yield info("Uploading performer images")
     for performer_name in performers:
         performers[performer_name]["image_remote_url"] = img_host_upload(
             img_host_token,
@@ -760,7 +750,7 @@ def generate():
 
     logo_url = STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
-        logging.info("Uploading studio logo")
+        yield info("Uploading studio logo")
         logo_url = img_host_upload(
             img_host_token,
             cookies,
@@ -772,16 +762,16 @@ def generate():
             logo_url = STUDIO_DEFAULT_LOGO
             logging.warning("Unable to upload studio image")
 
-    logging.info("Uploading screens")
+    yield info("Uploading screens")
     screens_urls = []
     a = 1
     b = len(screens)
     for screen in screens:
-        logging.info(f"Uploading screens ({a} of {b})")
+        logging.debug(f"Uploading screens ({a} of {b})")
         a += 1
         scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
         if scrn_url is None:
-            return json.dumps({"status": "error", "data": {"message": "Failed to upload screens"}})
+            return error("Failed to upload screens")
         screens_urls.append(scrn_url)
         os.remove(screen)
 
@@ -800,7 +790,7 @@ def generate():
     if date != None and len(date) > 1:
         date = datetime.datetime.fromisoformat(date).strftime(DATE_FORMAT)
 
-    logging.info("Rendering template")
+    yield info("Rendering template")
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
         "studio_logo": logo_url,
@@ -830,7 +820,8 @@ def generate():
 
     description = render_template(template, **template_context)
 
-    yield json.dumps(
+    logging.info("Done")
+    return json.dumps(
         {
             "status": "success",
             "data": {
@@ -846,7 +837,6 @@ def generate():
             },
         }
     )
-    logging.info("Done")
 
 
 @app.route("/fill", methods=["POST"])
