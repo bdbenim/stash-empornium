@@ -663,12 +663,7 @@ def generate():
     for tag in scene["tags"]:
         tags.processTag(tag["name"])
         for parent in tag["parents"]:
-            for key in TAG_LISTS:
-                if parent["name"] in TAG_LISTS[key]:
-                    TAG_SETS[key].add(parent["name"])
-            emp_tag = TAGS_MAP.get(parent["name"].lower())
-            if emp_tag is not None:
-                tags.add(emp_tag)
+            tags.processTag(parent)
 
     if TAG_CODEC and stash_file["video_codec"] is not None:
         tags.add(stash_file["video_codec"])
