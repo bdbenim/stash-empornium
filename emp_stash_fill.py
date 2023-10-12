@@ -16,7 +16,7 @@ requests
 vcsi
 """
 
-__author__  = "An EMP user"
+__author__ = "An EMP user"
 __license__ = "unlicense"
 __version__ = "0.6.0"
 
@@ -44,25 +44,19 @@ import time
 import uuid
 import sys
 
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 #############
 # CONSTANTS #
 #############
 
 PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-STUDIO_DEFAULT_LOGO = (
-    "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
-)
+STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
 #############
 # ARGUMENTS #
 #############
 
-parser = argparse.ArgumentParser(
-    description="backend server for EMP Stash upload helper userscript"
-)
+parser = argparse.ArgumentParser(description="backend server for EMP Stash upload helper userscript")
 parser.add_argument(
     "--configdir",
     default=[os.path.join(os.getcwd(), "config")],
@@ -124,9 +118,7 @@ for section in default_conf.sections():
                 value = default_conf[section][option].value
                 conf[section].insert_at(-1).comment("Value imported automatically:")
                 conf[section].insert_at(-1).option(option, value)
-                logging.info(
-                    f"Automatically added option '{option}' to section [{section}] with value '{value}'"
-                )
+                logging.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
 try:
     conf.update_file()
 except:
@@ -152,18 +144,14 @@ for filename in os.listdir("default-templates"):
                 logging.error(f"Couldn't compare version of {src} and {dst}")
         else:
             shutil.copyfile(src, dst)
-            logging.info(
-                f"Template {filename} has a been added. To use it, add it to config.ini under [templates]"
-            )
+            logging.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
             if not conf["templates"].has_option(filename):
                 tmpConf = configupdater.ConfigUpdater()
                 tmpConf.read("default.ini")
                 conf["templates"].set(filename, tmpConf["templates"][filename].value)
 
 
-def getConfigOption(
-    config: configupdater.ConfigUpdater, section: str, option: str, default: str = ""
-) -> str:
+def getConfigOption(config: configupdater.ConfigUpdater, section: str, option: str, default: str = "") -> str:
     config[section].setdefault(option, default)  # type: ignore
     value = config[section][option].value
     return value if value else ""
@@ -195,26 +183,16 @@ TITLE_FORMAT = getConfigOption(
 assert TITLE_FORMAT is not None
 DATE_FORMAT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
 assert DATE_FORMAT is not None
-TAG_CODEC = (
-    args.c or getConfigOption(conf, "metadata", "tag_codec", "false").lower() == "true"
-)
-TAG_DATE = (
-    args.d or getConfigOption(conf, "metadata", "tag_date", "false").lower() == "true"
-)
-TAG_FRAMERATE = args.f or (
-    getConfigOption(conf, "metadata", "tag_framerate", "false").lower() == "true"
-)
-TAG_RESOLUTION = args.r or (
-    getConfigOption(conf, "metadata", "tag_resolution", "false").lower() == "true"
-)
+TAG_CODEC = args.c or getConfigOption(conf, "metadata", "tag_codec", "false").lower() == "true"
+TAG_DATE = args.d or getConfigOption(conf, "metadata", "tag_date", "false").lower() == "true"
+TAG_FRAMERATE = args.f or (getConfigOption(conf, "metadata", "tag_framerate", "false").lower() == "true")
+TAG_RESOLUTION = args.r or (getConfigOption(conf, "metadata", "tag_resolution", "false").lower() == "true")
 TAG_LISTS: dict[str, str] = {}
 TAG_SETS: dict[str, set] = {}
 for key in conf["empornium"]:
     TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(",")))  # type: ignore
     TAG_SETS[key] = set()
-assert (
-    "sex_acts" in TAG_LISTS
-)  # This is the only non-optional key because it is used by the default templates
+assert "sex_acts" in TAG_LISTS  # This is the only non-optional key because it is used by the default templates
 TAGS_MAP = conf["empornium.tags"].to_dict()
 
 template_names = {}
@@ -223,9 +201,7 @@ for k in conf["templates"].to_dict():
     if k in template_files:
         template_names[k] = conf["templates"][k].value
     else:
-        logging.warning(
-            f"Template {k} from config.ini is not present in {template_dir}"
-        )
+        logging.warning(f"Template {k} from config.ini is not present in {template_dir}")
 
 stash_headers = {
     "Content-type": "application/json",
@@ -294,9 +270,7 @@ def img_host_upload(
         subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         while os.path.getsize(img_path) > 5000000:
             with Image.open(img_path) as img:
-                img.thumbnail(
-                    (int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS
-                )
+                img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
                 img.save(img_path)
         logging.info(f"Resized {img_path}")
 
@@ -325,9 +299,7 @@ def img_host_upload(
         "referer": "https://jerking.empornium.ph/",
     }
     url = "https://jerking.empornium.ph/json"
-    response = requests.post(
-        url, files=files, data=request_body, cookies=cookies, headers=headers
-    )
+    response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
     if "error" in response.json():
         logging.error(f"Error uploading image: {response.json()['error']['message']}")
         return None
@@ -342,14 +314,10 @@ def generate():
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
 
-    logging.info(
-        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens."
-    )
+    logging.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
     template = (
-        j["template"]
-        if "template" in j and j["template"] in os.listdir(app.template_folder)
-        else DEFAULT_TEMPLATE
+        j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
     )
     assert template is not None
 
@@ -379,9 +347,7 @@ def generate():
     scene = stash_response_body["data"]["findScene"]
     if scene is None:
         logging.error(f"Scene {scene_id} does not exist")
-        return json.dumps(
-            {"status": "error", "message": f"Scene {scene_id} does not exist"}
-        )
+        return json.dumps({"status": "error", "message": f"Scene {scene_id} does not exist"})
 
     # Ensure that all expected string keys are present
     str_keys = ["title", "details", "date"]
@@ -472,9 +438,7 @@ def generate():
             cover_ext = "webp"
         case _:
             logging.error(f"Unrecognized mime type {cover_mime_type}")
-            return json.dumps(
-                {"status": "error", "message": "Unrecognized cover format"}
-            )
+            return json.dumps({"status": "error", "message": "Unrecognized cover format"})
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     with open(cover_file[1], "wb") as fp:
         fp.write(cover_response.content)
@@ -488,9 +452,7 @@ def generate():
     studio_img_file = None
     if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
         logging.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
-        studio_img_response = requests.get(
-            scene["studio"]["image_path"], headers=stash_headers
-        )
+        studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
         match sudio_img_mime_type:
             case "image/jpeg":
@@ -536,9 +498,7 @@ def generate():
 
         # image
         logging.debug(f'Downloading performer image from {performer["image_path"]}')
-        performer_image_response = requests.get(
-            performer["image_path"], headers=stash_headers
-        )
+        performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
         performer_image_mime_type = performer_image_response.headers["Content-Type"]
         logging.debug(f"Got image with mime type {performer_image_mime_type}")
         performer_image_ext = ""
@@ -550,18 +510,14 @@ def generate():
             case "image/webp":
                 performer_image_ext = "webp"
             case _:
-                logging.error(
-                    f"Unrecognized performer image mime type: {performer_image_mime_type}"
-                )
+                logging.error(f"Unrecognized performer image mime type: {performer_image_mime_type}")
                 return json.dumps(
                     {
                         "status": "error",
                         "message": "Unrecognized performer image format",
                     }
                 )
-        performer_image_file = tempfile.mkstemp(
-            suffix="-performer." + performer_image_ext
-        )
+        performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
 
@@ -582,15 +538,11 @@ def generate():
     contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
     cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    yield json.dumps(
-        {"status": "success", "data": {"message": "Generating contact sheet"}}
-    )
+    yield json.dumps({"status": "success", "data": {"message": "Generating contact sheet"}})
     process.wait()
     if process.returncode != 0:
         logging.error("vcsi failed")
-        yield json.dumps(
-            {"status": "error", "message": "Couldn't generate contact sheet"}
-        )
+        yield json.dumps({"status": "error", "message": "Couldn't generate contact sheet"})
         return
 
     ###########
@@ -600,9 +552,7 @@ def generate():
     num_frames = 10
     if gen_screens:
         logging.info(f"Generating screens for {stash_file['path']}")
-        yield json.dumps(
-            {"status": "success", "data": {"message": "Generating screenshots"}}
-        )
+        yield json.dumps({"status": "success", "data": {"message": "Generating screenshots"}})
 
         for seek in map(
             lambda i: stash_file["duration"] * (0.05 + i / (num_frames - 1) * 0.9),
@@ -625,9 +575,7 @@ def generate():
                 "scale=960:-2",
                 screen_file[1],
             ]
-            process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-            )
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             process.wait()
 
     audio_bitrate = ""
@@ -698,8 +646,7 @@ def generate():
     mediainfo = ""
     if shutil.which("mediainfo"):
         CMD = ["mediainfo", stash_file["path"]]
-        mediainfo = subprocess.check_output(CMD)
-        logging.info(f"mediainfo:\n{mediainfo}")
+        mediainfo = subprocess.check_output(CMD).decode()
 
     #########
     # TITLE #
@@ -712,9 +659,7 @@ def generate():
         date=scene["date"],
         resolution=resolution if resolution is not None else "",
         codec=stash_file["video_codec"],
-        duration=str(
-            datetime.timedelta(seconds=int(stash_file["duration"]))
-        ).removeprefix("0:"),
+        duration=str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
         framerate="{} fps".format(stash_file["frame_rate"]),
     )
 
@@ -749,20 +694,15 @@ def generate():
     if TAG_FRAMERATE:
         tags.add(str(stash_file["frame_rate"]) + "fps")
 
-    if scene["studio"]["url"] is not None:
-        studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix(
-            "www."
-        )
+    if scene["studio"] and scene["studio"]["url"] is not None:
+        studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
         tags.add(studio_tag)
     if (
-        scene["studio"]["parent_studio"] is not None
+        scene["studio"] is not None
+        and scene["studio"]["parent_studio"] is not None
         and scene["studio"]["parent_studio"]["url"] is not None
     ):
-        tags.add(
-            urllib.parse.urlparse(
-                scene["studio"]["parent_studio"]["url"]
-            ).netloc.removeprefix("www.")
-        )
+        tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
 
     ##########
     # UPLOAD #
@@ -782,26 +722,16 @@ def generate():
     cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
 
     logging.info("Uploading cover")
-    cover_remote_url = img_host_upload(
-        img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext
-    )
+    cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
     if cover_remote_url is None:
-        yield json.dumps(
-            {"status": "error", "data": {"message": "Failed to upload cover"}}
-        )
+        yield json.dumps({"status": "error", "data": {"message": "Failed to upload cover"}})
         return
-    cover_resized_url = img_host_upload(
-        img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext, width=800
-    )
+    cover_resized_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext, width=800)
     os.remove(cover_file[1])
     logging.info("Uploading contact sheet")
-    contact_sheet_remote_url = img_host_upload(
-        img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg"
-    )
+    contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
     if contact_sheet_remote_url is None:
-        yield json.dumps(
-            {"status": "error", "data": {"message": "Failed to upload contact sheet"}}
-        )
+        yield json.dumps({"status": "error", "data": {"message": "Failed to upload contact sheet"}})
         return
     os.remove(contact_sheet_file[1])
     logging.info("Uploading performer images")
@@ -841,9 +771,7 @@ def generate():
         a += 1
         scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
         if scrn_url is None:
-            yield json.dumps(
-                {"status": "error", "data": {"message": "Failed to upload screens"}}
-            )
+            yield json.dumps({"status": "error", "data": {"message": "Failed to upload screens"}})
             return
         screens_urls.append(scrn_url)
         os.remove(screen)
@@ -872,9 +800,7 @@ def generate():
         "title": scene["title"],
         "date": date,
         "details": scene["details"] if scene["details"] != "" else None,
-        "duration": str(
-            datetime.timedelta(seconds=int(stash_file["duration"]))
-        ).removeprefix("0:"),
+        "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
         "container": stash_file["format"],
         "video_codec": stash_file["video_codec"],
         "audio_codec": stash_file["audio_codec"],
@@ -887,7 +813,7 @@ def generate():
         "performers": performers,
         "cover": cover_resized_url,
         "image_count": 0,  # TODO
-        "media_info": mediainfo
+        "media_info": mediainfo,
     }
 
     for key in tmpTagLists:
