@@ -6,7 +6,7 @@ WORKDIR /emp_stash_fill
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y ffmpeg mktorrent && \
+    apt-get install -y ffmpeg mktorrent mediainfo && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy files and install Python dependencies

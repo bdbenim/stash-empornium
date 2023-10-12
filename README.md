@@ -43,6 +43,7 @@ The backend can also be run directly by intalling its dependencies and running t
   - waitress (optional)
 - ffmpeg
 - mktorrent
+- mediainfo (optional)
 
 Run the following commands to install the backend and dependencies (may vary slightly by OS):
 
@@ -131,6 +132,7 @@ Templates are written using Jinja syntax. The available variables are:
 - duration
 - framerate
 - image_count
+- media_info (if `mediainfo` is installed)
 - performers
   - name
   - details
