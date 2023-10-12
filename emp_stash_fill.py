@@ -395,13 +395,11 @@ def generate():
             break
 
     if stash_file is None:
-        yield json.dumps({"status": "error", "message": "Couldn't find file"})
         logging.error("No file exists")
-        return
+        return json.dumps({"status": "error", "message": "Couldn't find file"})
     elif not os.path.isfile(stash_file["path"]):
-        yield json.dumps({"status": "error", "message": "Couldn't find file"})
         logging.error(f"Couldn't find file {stash_file['path']}")
-        return
+        return json.dumps({"status": "error", "message": "Couldn't find file"})
 
     ht = stash_file["height"]
     resolution = None
@@ -559,8 +557,7 @@ def generate():
     process.wait()
     if process.returncode != 0:
         logging.error("vcsi failed")
-        yield json.dumps({"status": "error", "message": "Couldn't generate contact sheet"})
-        return
+        return json.dumps({"status": "error", "message": "Couldn't generate contact sheet"})
 
     ###########
     # SCREENS #
@@ -644,14 +641,13 @@ def generate():
     process.wait()
     if process.returncode != 0:
         logging.error("mktorrent failed, command: " + " ".join(cmd))
-        yield json.dumps(
+        tempdir.cleanup()
+        return json.dumps(
             {
                 "status": "error",
                 "message": "Couldn't generate torrent (does it already exist?)",
             }
         )
-        tempdir.cleanup()
-        return
     shutil.move(temppath, torrent_path)
     tempdir.cleanup()
     logging.info(f"Moved torrent to {torrent_path}")
@@ -730,9 +726,8 @@ def generate():
     img_host_request = requests.get("https://jerking.empornium.ph/json")
     m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
     if m is None:
-        yield json.dumps({"status": "success", "data": {"message": "Uploading images"}})
         logging.error("Unable to get auth token for image host.")
-        return
+        return json.dumps({"status": "success", "data": {"message": "Uploading images"}})
     img_host_token = m.group(1)
     cookies = img_host_request.cookies
     cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
@@ -741,15 +736,13 @@ def generate():
     logging.info("Uploading cover")
     cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
     if cover_remote_url is None:
-        yield json.dumps({"status": "error", "data": {"message": "Failed to upload cover"}})
-        return
+        return json.dumps({"status": "error", "data": {"message": "Failed to upload cover"}})
     cover_resized_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext, width=800)
     os.remove(cover_file[1])
     logging.info("Uploading contact sheet")
     contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
     if contact_sheet_remote_url is None:
-        yield json.dumps({"status": "error", "data": {"message": "Failed to upload contact sheet"}})
-        return
+        return json.dumps({"status": "error", "data": {"message": "Failed to upload contact sheet"}})
     os.remove(contact_sheet_file[1])
     logging.info("Uploading performer images")
     for performer_name in performers:
@@ -788,8 +781,7 @@ def generate():
         a += 1
         scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
         if scrn_url is None:
-            yield json.dumps({"status": "error", "data": {"message": "Failed to upload screens"}})
-            return
+            return json.dumps({"status": "error", "data": {"message": "Failed to upload screens"}})
         screens_urls.append(scrn_url)
         os.remove(screen)
 
