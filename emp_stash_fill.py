@@ -50,8 +50,6 @@ import time
 import uuid
 import sys
 
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
-
 #############
 # CONSTANTS #
 #############
@@ -82,9 +80,22 @@ flags.add_argument("-d", action="store_true", help="include date as tag")
 flags.add_argument("-f", action="store_true", help="include framerate as tag")
 flags.add_argument("-r", action="store_true", help="include resolution as tag")
 parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
+mutex = parser.add_mutually_exclusive_group()
+mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
+mutex.add_argument("-v", "--verbose", "--debug", dest="level", action="store_const", const=1, help="output more")
+mutex.add_argument(
+    "-l",
+    "--log",
+    choices=["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL", "FATAL"],
+    metavar="LEVEL",
+    help="log level",
+    type=str.upper,
+)
 
 args = parser.parse_args()
 
+log_level = getattr(logging, args.log) if args.log else min(10 * args.level, 50)
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=log_level)
 logging.info(f"stash-empornium version {__version__}")
 
 ##########
