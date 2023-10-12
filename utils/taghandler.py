@@ -3,8 +3,10 @@ for uploading to empornium."""
 
 import configupdater
 import re
+import logging
 
 class TagHandler:
+    logger: logging.Logger
     conf: configupdater.ConfigUpdater
     TAGS_MAP: dict[str,str] = {}
     TAG_LISTS: dict[str, list[str]] = {}
@@ -18,6 +20,7 @@ class TagHandler:
     
     def __init__(self, conf: configupdater.ConfigUpdater) -> None:
         """Initialize a TagHandler object from a config object."""
+        self.logger = logging.getLogger(__name__)
         assert conf._filename is not None
         self.conf = conf
         self.TAGS_MAP = conf["empornium.tags"].to_dict()
@@ -67,9 +70,10 @@ class TagHandler:
         '.' and strips out all other characters that are 
         not alphanumeric before finally converting the full 
         string to lowercase."""
-        tag = re.sub(r"[^\w\s]", "", tag).lower()
-        tag = re.sub(r"\s+", ".", tag)
-        return tag
+        newtag = re.sub(r"[^\w\s]", "", tag).lower()
+        newtag = re.sub(r"\s+", ".", tag)
+        self.logger.debug(f"Reformatted tag '{tag}' to '{newtag}'")
+        return newtag
 
     def add(self, tag: str) -> str:
         """Convert a tag to en EMP-compatible
@@ -85,25 +89,36 @@ class TagHandler:
         try:
             self.conf.update_file()
             updated = True
+            self.logger.debug("Saved configuration")
         except:
             pass
         return updated
     
-    def acceptSuggestion(self, stashTag: str, empTag: str) -> bool:
-        """Updates the tag mapping to match stashTag to empTag and
-        attempts to update the config file. Returns True if
+    def acceptSuggestions(self, tags: dict[str,str]) -> bool:
+        """Adds the provided tag mappings to the working config
+        and attempts to update the config file. Returns True if
         update is successful and False otherwise."""
-        self.conf["empornium.tags"].set(stashTag, empTag)
-        tag = stashTag.lower()
-        self.TAGS_MAP[tag] = empTag
-        if tag in self.tag_suggestions:
-            self.tag_suggestions.pop(tag)
+        self.logger.info("Saving tag mappings")
+        self.logger.debug(f"Tags: {tags}")
+        for tag in tags:
+            self.conf["empornium.tags"].set(tag, tags[tag])
+            tag = tag.lower()
+            self.TAGS_MAP[tag] = tags[tag]
+            if tag in self.tag_suggestions:
+                self.tag_suggestions.pop(tag)
         return self.update_file()
-    
-    def rejectSuggestion(self, tag: str) -> bool:
+
+    def rejectSuggestions(self, tags: list[str]) -> bool:
+        """Adds all supplied tags to the list of ignored
+        tags and attempts to update the config file. Returns 
+        True if update is successful and False otherwise."""
+        self.logger.debug(f"Ignoring tags: {tags}")
         if "ignored_tags" not in self.TAG_LISTS:
             self.TAG_LISTS["ignored_tags"] = []
-        self.TAG_LISTS["ignored_tags"].append(tag)
+        for tag in tags:
+            self.TAG_LISTS["ignored_tags"].append(tag)
+            if tag in self.tag_suggestions:
+                self.tag_suggestions.pop(tag)
         self.TAG_LISTS["ignored_tags"].sort()
         self.conf.set("empornium", "ignored_tags", ", ".join(self.TAG_LISTS["ignored_tags"]))
         return self.update_file()

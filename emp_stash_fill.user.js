@@ -23,8 +23,8 @@
 // v0.1.0
 //  - Display filename in place of title if title is null
 
-const BACKEND_DEFAULT = "http://localhost:9932"
-const STASH_DEFAULT = "http://localhost:9999"
+const BACKEND_DEFAULT = "http://localhost:9932";
+const STASH_DEFAULT = "http://localhost:9999";
 const STASH_API_KEY_DEFAULT = null;
 
 var BACKEND = GM_getValue("backend_url", BACKEND_DEFAULT);
@@ -32,216 +32,304 @@ var STASH = GM_getValue("stash_url", STASH_DEFAULT);
 var STASH_API_KEY = GM_getValue("stash_api_key", STASH_API_KEY_DEFAULT);
 
 function store(key, prompt_text, default_value) {
-    let oldvalue = GM_getValue(key, default_value);
-    GM_setValue(key, prompt(prompt_text, oldvalue) || oldvalue);
+  let oldvalue = GM_getValue(key, default_value);
+  GM_setValue(key, prompt(prompt_text, oldvalue) || oldvalue);
 }
 
-GM_registerMenuCommand("Set backend URL", () => {store("backend_url","backend url? (e.g. http://localhost:9932)",BACKEND_DEFAULT);});
-GM_registerMenuCommand("Set stash URL", () => {store("stash_url","stash URL? (e.g. http://localhost:9999)",STASH_DEFAULT);});
-GM_registerMenuCommand("Set stash API key", () => {store("stash_api_key","stash API key?",STASH_API_KEY_DEFAULT);});
+GM_registerMenuCommand("Set backend URL", () => {
+  store(
+    "backend_url",
+    "backend url? (e.g. http://localhost:9932)",
+    BACKEND_DEFAULT
+  );
+});
+GM_registerMenuCommand("Set stash URL", () => {
+  store("stash_url", "stash URL? (e.g. http://localhost:9999)", STASH_DEFAULT);
+});
+GM_registerMenuCommand("Set stash API key", () => {
+  store("stash_api_key", "stash API key?", STASH_API_KEY_DEFAULT);
+});
 
-GM_addStyle("#stash_statusarea { font-weight: bold; font-size: 16pt; padding-top: 12pt; text-align: center; }");
+GM_addStyle(
+  "#stash_statusarea { font-weight: bold; font-size: 16pt; padding-top: 12pt; text-align: center; }"
+);
 GM_addStyle("#stash_statusarea:empty { padding: 0; }");
-GM_addStyle("#stash_instructions { font-size: 12pt; padding: 12pt 0; margin-left: auto; margin-right: auto; max-width: 600px; }");
+GM_addStyle(
+  "#stash_instructions { font-size: 12pt; padding: 12pt 0; margin-left: auto; margin-right: auto; max-width: 600px; }"
+);
 GM_addStyle("#stash_instructions:empty { padding: 0; }");
 GM_addStyle("#stash_instructions li + li { padding-top: 12pt; }");
 GM_addStyle("#stash_instructions > ol { padding-top: 12pt; }");
-GM_addStyle("#stash_instructions input { width: 100%; font-family: monospace; font-size: 10pt; }");
+GM_addStyle(
+  "#stash_instructions input { width: 100%; font-family: monospace; font-size: 10pt; }"
+);
 
 var graphql = {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json"
-    },
-    url: new URL("/graphql", STASH).href,
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  url: new URL("/graphql", STASH).href,
 };
 
 if (STASH_API_KEY !== null) {
-    graphql.headers.apiKey = STASH_API_KEY;
+  graphql.headers.apiKey = STASH_API_KEY;
 }
 
-(function() {
-    'use strict';
+(function () {
+  "use strict";
 
-    let parent = document.getElementsByClassName("thin")[0];
+  let parent = document.getElementsByClassName("thin")[0];
 
-    let head = document.createElement("div");
-    head.classList.add("head");
-    head.innerHTML = "Fill from Stash";
+  let head = document.createElement("div");
+  head.classList.add("head");
+  head.innerHTML = "Fill from Stash";
 
-    let body = document.createElement("div");
-    body.classList.add("box", "pad");
+  let body = document.createElement("div");
+  body.classList.add("box", "pad");
 
-    let fileSelect = document.createElement("select");
-    fileSelect.style.marginLeft = "12pt";
-    fileSelect.style.width = "auto";
+  let fileSelect = document.createElement("select");
+  fileSelect.style.marginLeft = "12pt";
+  fileSelect.style.width = "auto";
 
-    let titleDisplay = document.createElement("input");
-    titleDisplay.setAttribute("disabled", true);
-    titleDisplay.style.marginLeft = "12pt";
-    titleDisplay.setAttribute("size", 60);
+  let titleDisplay = document.createElement("input");
+  titleDisplay.setAttribute("disabled", true);
+  titleDisplay.style.marginLeft = "12pt";
+  titleDisplay.setAttribute("size", 60);
 
-    let templateSelect = document.createElement("select");
-    templateSelect.style.marginLeft = "12pt";
+  let templateSelect = document.createElement("select");
+  templateSelect.style.marginLeft = "12pt";
+  GM_xmlhttpRequest({
+    method: "GET",
+    url: new URL("/templates", BACKEND).href,
+    context: { templateSelect: templateSelect },
+    responseType: "json",
+    onload: function (response) {
+      let optionsAsString = "";
+      for (let key in response.response) {
+        optionsAsString +=
+          "<option value='" + key + "'>" + response.response[key] + "</option>";
+      }
+      this.context.templateSelect.innerHTML = optionsAsString;
+    },
+  });
+
+  let fillButton = document.createElement("input");
+  fillButton.setAttribute("type", "submit");
+  fillButton.setAttribute("value", "fill from");
+  fillButton.style.marginLeft = "12pt";
+
+  let stashButton = document.createElement("input");
+  stashButton.setAttribute("type", "submit");
+  stashButton.setAttribute("value", "Open Stash");
+  stashButton.style.marginLeft = "12pt";
+
+  let moreOptions = document.createElement("div");
+  moreOptions.style.marginTop = "12pt";
+  let screensToggleLabel = document.createElement("label");
+  screensToggleLabel.setAttribute("for", "screenstoggle");
+  screensToggleLabel.innerText =
+    "Generate screens? (contact sheet is always generated)";
+  screensToggleLabel.style.marginRight = "6pt";
+  let screensToggle = document.createElement("input");
+  screensToggle.setAttribute("type", "checkbox");
+  screensToggle.setAttribute("name", "screenstoggle");
+  screensToggle.setAttribute("id", "screenstoggle");
+  screensToggle.setAttribute("checked", true);
+  moreOptions.appendChild(screensToggleLabel);
+  moreOptions.appendChild(screensToggle);
+  moreOptions.appendChild(templateSelect);
+
+  let statusArea = document.createElement("div");
+  statusArea.setAttribute("id", "stash_statusarea");
+
+  let instructions = document.createElement("div");
+  instructions.setAttribute("id", "stash_instructions");
+
+  let idInput = document.createElement("input");
+  idInput.setAttribute("size", 8);
+  idInput.setAttribute("type", "text");
+  idInput.setAttribute("id", "stash_id");
+  idInput.setAttribute("placeholder", "Stash ID");
+
+  const announceURL = document.evaluate(
+    "//input[contains(@value,'/announce')]",
+    document,
+    null,
+    XPathResult.ANY_UNORDERED_NODE_TYPE,
+    null
+  ).singleNodeValue.value;
+
+  fillButton.addEventListener("click", () => {
+    statusArea.innerHTML = "";
+    instructions.innerHTML = "";
     GM_xmlhttpRequest({
-        method: "GET",
-        url: new URL("/templates", BACKEND).href,
-        context: { templateSelect: templateSelect },
-        responseType: "json",
-        onload: function(response) {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      url: new URL("/fill", BACKEND).href,
+      responseType: "stream",
+      data: JSON.stringify({
+        scene_id: idInput.value,
+        file_id: fileSelect.value,
+        announce_url: announceURL,
+        template: templateSelect.value,
+        screens: screensToggle.checked,
+      }),
+      context: {
+        statusArea: statusArea,
+        description: document.getElementById("desc"),
+        tags: document.getElementById("taginput"),
+        cover: document.getElementById("image"),
+        title: document.getElementById("title"),
+        instructions: instructions,
+      },
+      onreadystatechange: async function (response) {
+        if (response.readyState == 2 && response.status == 200) {
+          const reader = response.response.getReader();
+          while (true) {
+            const { done, value } = await reader.read(); // value is Uint8Array
+            if (value) {
+              let text = new TextDecoder().decode(value);
+              let j = JSON.parse(text);
+              if (j.status === "success") {
+                if ("message" in j.data) {
+                  this.context.statusArea.innerText = j.data.message;
+                }
+                if ("fill" in j.data) {
+                  this.context.description.value = j.data.fill.description;
+                  this.context.tags.value = j.data.fill.tags;
+                  this.context.cover.value = j.data.fill.cover;
+                  this.context.title.value = j.data.fill.title;
+                  let instructions = "";
+                  instructions += "Instructions:<ol>";
+                  instructions +=
+                    "<li>Set a category for the upload and double-check everything for correctness</li>";
+                  instructions +=
+                    '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' +
+                    j.data.fill.torrent_path +
+                    '" disabled></div></li>';
+                  instructions +=
+                    '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' +
+                    j.data.fill.file_path +
+                    '" disabled></div></li>';
+                  instructions += "</ol>";
+                  this.context.instructions.innerHTML = instructions;
+                }
+                if ("suggestions" in j.data) {
+                  let parent = document.getElementsByClassName("thin")[0];
+
+                  let head = document.createElement("div");
+                  head.classList.add("head");
+                  head.innerHTML = "Tag Suggestions";
+
+                  let body = document.createElement("div");
+                  body.classList.add("box", "pad");
+
+                  for (var key in j.data.suggestions) {
+                    if (j.data.suggestions.hasOwnProperty(key)) {
+                      let tagDisplay = document.createElement("input");
+                      tagDisplay.setAttribute("disabled", true);
+                      tagDisplay.style.marginLeft = "12pt";
+                      tagDisplay.setAttribute("size", 60);
+                      tagDisplay.value = key;
+
+                      let tagInput = document.createElement("input");
+                      tagInput.setAttribute("id", "taginput");
+                      tagInput.setAttribute("size", 8);
+                      tagInput.setAttribute("type", "text");
+                      tagInput.autocomplete = "on";
+                      tagInput.value = j.data.suggestions[key];
+                      unsafeWindow.AutoComplete.addInput(tagInput, "/tags.php");
+                    }
+                  }
+
+                  parent.insertBefore(body, parent.children[5]);
+                  parent.insertBefore(head, body);
+                }
+              } else if (j.status === "error") {
+                this.context.statusArea.innerHTML =
+                  "<span style='color: red;'>" + j.message + "</span>";
+                break;
+              }
+            }
+            if (done) break;
+          }
+        }
+      },
+    });
+  });
+
+  stashButton.addEventListener("click", function () {
+    window.open(STASH, "_blank");
+  });
+
+  idInput.addEventListener("input", function (event) {
+    GM_xmlhttpRequest(
+      Object.assign({}, graphql, {
+        data: JSON.stringify({
+          query:
+            '{ findScene(id: "' +
+            idInput.value +
+            '") { id title performers { id name image_path } files { id basename path format width height video_codec audio_codec duration bit_rate frame_rate } } }',
+        }),
+        context: { fileSelect: fileSelect, titleDisplay: titleDisplay },
+        onload: function (response) {
+          try {
+            let scene = JSON.parse(response.responseText).data.findScene;
             let optionsAsString = "";
-            for(let key in response.response) {
-                optionsAsString += "<option value='" + key + "'>" + response.response[key] + "</option>";
+            if (scene.title.length > 0) {
+              this.context.titleDisplay.value = scene.title;
+            } else {
+              this.context.titleDisplay.value = scene.files[0].basename;
             }
-            this.context.templateSelect.innerHTML = optionsAsString;
-        }
-    });
-
-    let fillButton = document.createElement("input");
-    fillButton.setAttribute("type", "submit");
-    fillButton.setAttribute("value", "fill from");
-    fillButton.style.marginLeft = "12pt";
-
-    let stashButton = document.createElement("input");
-    stashButton.setAttribute("type", "submit");
-    stashButton.setAttribute("value", "Open Stash");
-    stashButton.style.marginLeft = "12pt";
-
-    let moreOptions = document.createElement("div");
-    moreOptions.style.marginTop = "12pt";
-    let screensToggleLabel = document.createElement("label");
-    screensToggleLabel.setAttribute("for", "screenstoggle");
-    screensToggleLabel.innerText = "Generate screens? (contact sheet is always generated)";
-    screensToggleLabel.style.marginRight = "6pt";
-    let screensToggle = document.createElement("input");
-    screensToggle.setAttribute("type", "checkbox");
-    screensToggle.setAttribute("name", "screenstoggle");
-    screensToggle.setAttribute("id", "screenstoggle");
-    screensToggle.setAttribute("checked", true);
-    moreOptions.appendChild(screensToggleLabel);
-    moreOptions.appendChild(screensToggle);
-    moreOptions.appendChild(templateSelect);
-
-    let statusArea = document.createElement("div");
-    statusArea.setAttribute("id", "stash_statusarea");
-
-    let instructions = document.createElement("div");
-    instructions.setAttribute("id", "stash_instructions");
-
-    let idInput = document.createElement("input");
-    idInput.setAttribute("size", 8);
-    idInput.setAttribute("type", "text");
-    idInput.setAttribute("id", "stash_id");
-    idInput.setAttribute("placeholder", "Stash ID");
-
-    const announceURL = document.evaluate("//input[contains(@value,'/announce')]", document, null, XPathResult.ANY_UNORDERED_NODE_TYPE, null).singleNodeValue.value;
-
-    fillButton.addEventListener("click", () => {
-        statusArea.innerHTML = "";
-        instructions.innerHTML = "";
-        GM_xmlhttpRequest({
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            url: new URL("/fill", BACKEND).href,
-            responseType: "stream",
-            data: JSON.stringify({ scene_id: idInput.value, file_id: fileSelect.value, announce_url: announceURL, template: templateSelect.value, screens: screensToggle.checked }),
-            context: {
-                statusArea: statusArea,
-                description: document.getElementById("desc"),
-                tags: document.getElementById("taginput"),
-                cover: document.getElementById("image"),
-                title: document.getElementById("title"),
-                instructions: instructions
-            },
-            onreadystatechange: async function(response) {
-                if (response.readyState == 2 && response.status == 200) {
-                    const reader = response.response.getReader();
-                    while (true) {
-                        const { done, value } = await reader.read(); // value is Uint8Array
-                        if (value) {
-                            let text = new TextDecoder().decode(value);
-                            let j = JSON.parse(text);
-                            if (j.status === "success") {
-                                if ("message" in j.data) {
-                                    this.context.statusArea.innerText = j.data.message;
-                                }
-                                if ("fill" in j.data) {
-                                    this.context.description.value = j.data.fill.description;
-                                    this.context.tags.value = j.data.fill.tags;
-                                    this.context.cover.value = j.data.fill.cover;
-                                    this.context.title.value = j.data.fill.title;
-                                    let instructions = "";
-                                    instructions += "Instructions:<ol>";
-                                    instructions += '<li>Set a category for the upload and double-check everything for correctness</li>';
-                                    instructions += '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' + j.data.fill.torrent_path + '" disabled></div></li>';
-                                    instructions += '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' + j.data.fill.file_path + '" disabled></div></li>';
-                                    instructions += "</ol>";
-                                    this.context.instructions.innerHTML = instructions;
-                                }
-                            }
-                            else if (j.status === "error") {
-                                this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
-                                break;
-                            }
-                        }
-                        if (done) break;
-                    }
-                }
+            for (let i = 0; i < scene.files.length; i++) {
+              let file = scene.files[i];
+              let duration = new Date(file.duration * 1000)
+                .toISOString()
+                .slice(11, 19)
+                .replace(/^00:/, "");
+              optionsAsString +=
+                "<option value='" +
+                file.id +
+                "'>" +
+                file.width +
+                "×" +
+                file.height +
+                ", " +
+                file.format +
+                ", " +
+                file.video_codec +
+                "/" +
+                file.audio_codec +
+                ", " +
+                duration +
+                "</option>";
             }
-        });
-    });
+            this.context.fileSelect.innerHTML = optionsAsString;
+          } catch (err) {
+            this.context.titleDisplay.value = "";
+            this.context.fileSelect.innerHTML = "";
+          }
+        },
+      })
+    );
+    if (event.target.value === "") {
+      titleDisplay.value = "";
+      fileSelect.innerHTML = "";
+    }
+    statusArea.innerHTML = "";
+    instructions.innerHTML = "";
+  });
 
-    stashButton.addEventListener("click", function() {
-    window.open(STASH, '_blank');
-    });
+  body.appendChild(idInput);
+  body.appendChild(titleDisplay);
+  body.appendChild(fileSelect);
+  body.appendChild(fillButton);
+  body.appendChild(stashButton);
+  body.appendChild(moreOptions);
+  body.appendChild(statusArea);
+  body.appendChild(instructions);
 
-    idInput.addEventListener("input", function(event) {
-        GM_xmlhttpRequest(Object.assign({}, graphql, {
-            data: JSON.stringify({
-                "query": '{ findScene(id: "' + idInput.value + '") { id title performers { id name image_path } files { id basename path format width height video_codec audio_codec duration bit_rate frame_rate } } }',
-            }),
-            context: { fileSelect: fileSelect, titleDisplay: titleDisplay },
-            onload: function(response) {
-                try {
-                    let scene = JSON.parse(response.responseText).data.findScene;
-                    let optionsAsString = "";
-                    if (scene.title.length > 0) {
-                        this.context.titleDisplay.value = scene.title;
-                    }
-                    else {
-                        this.context.titleDisplay.value = scene.files[0].basename;
-                    }
-                    for(let i = 0; i < scene.files.length; i++) {
-                        let file = scene.files[i];
-                        let duration = new Date(file.duration * 1000).toISOString().slice(11, 19).replace(/^00:/, '');
-                        optionsAsString += "<option value='" + file.id + "'>" + file.width + "×" + file.height + ", " + file.format + ", " + file.video_codec + "/" + file.audio_codec + ", " + duration + "</option>";
-                    }
-                    this.context.fileSelect.innerHTML = optionsAsString;
-                }
-                catch(err) {
-                    this.context.titleDisplay.value = "";
-                    this.context.fileSelect.innerHTML = "";
-                }
-            },
-        }));
-        if (event.target.value === "") {
-            titleDisplay.value = "";
-            fileSelect.innerHTML = "";
-        }
-        statusArea.innerHTML = "";
-        instructions.innerHTML = "";
-    } );
-
-    body.appendChild(idInput);
-    body.appendChild(titleDisplay);
-    body.appendChild(fileSelect);
-    body.appendChild(fillButton);
-    body.appendChild(stashButton);
-    body.appendChild(moreOptions);
-    body.appendChild(statusArea);
-    body.appendChild(instructions);
-
-    parent.insertBefore(body, parent.children[5]);
-    parent.insertBefore(head, body);
-
+  parent.insertBefore(body, parent.children[5]);
+  parent.insertBefore(head, body);
 })();

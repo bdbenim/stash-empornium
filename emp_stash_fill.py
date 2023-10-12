@@ -646,14 +646,47 @@ def generate():
                 "description": description,
                 "torrent_path": torrent_path,
                 "file_path": stash_file["path"]
-            }
+            },
+            "suggestions": tags.tag_suggestions
         }
     })
     logging.info("Done")
 
+def processSuggestions():
+    j = request.get_json()
+    acceptedTags = {}
+    if "accept" in j:
+        for tag in j["accept"]:
+            acceptedTags[tag["name"]] = tag["emp"]
+    ignoredTags = []
+    if "ignore" in j:
+        for tag in j["ignore"]:
+            ignoredTags.append(tag["name"])
+    success = tags.acceptSuggestions(acceptedTags)
+    success = success and tags.rejectSuggestions(ignoredTags)
+    if success:
+        return json.dumps({
+            "status": "success",
+            "data": {
+                "message": "Tags saved"
+            }
+        })
+    else:
+        return json.dumps({
+            "status": "error",
+            "data": {
+                "message": "Failed to save tags"
+            }
+        })
+
+
 @app.route('/fill', methods=["POST"])
 def fill():
     return Response(generate(), mimetype="application/json") # type: ignore
+
+@app.route('/suggestions', methods=["POST"])
+def suggestions():
+    return Response(processSuggestions(), mimetype="application/json")
 
 @app.route('/templates')
 def templates():
