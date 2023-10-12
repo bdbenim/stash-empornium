@@ -94,8 +94,9 @@ mutex.add_argument(
 args = parser.parse_args()
 
 log_level = getattr(logging, args.log) if args.log else min(10 * args.level, 50)
+logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=log_level)
-logging.info(f"stash-empornium version {__version__}")
+logger.info(f"stash-empornium version {__version__}")
 
 ##########
 # CONFIG #
@@ -116,12 +117,12 @@ template_dir = os.path.join(config_dir, "templates")
 config_file = os.path.join(config_dir, "config.ini")
 
 if not os.path.isfile(config_file):
-    logging.info(f"Config file not found at {config_file}, creating")
+    logger.info(f"Config file not found at {config_file}, creating")
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
     shutil.copyfile("default.ini", config_file)
 
-logging.info(f"Reading config from {config_file}")
+logger.info(f"Reading config from {config_file}")
 conf.read(config_file)
 default_conf.read("default.ini")
 skip_sections = ["empornium", "empornium.tags"]
@@ -134,11 +135,11 @@ for section in default_conf.sections():
                 value = default_conf[section][option].value
                 conf[section].insert_at(-1).comment("Value imported automatically:")
                 conf[section].insert_at(-1).option(option, value)
-                logging.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
+                logger.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
 try:
     conf.update_file()
 except:
-    logging.error("Unable to save updated config")
+    logger.error("Unable to save updated config")
 
 if not os.path.exists(template_dir):
     shutil.copytree("default-templates", template_dir, copy_function=shutil.copyfile)
@@ -153,14 +154,14 @@ for filename in os.listdir("default-templates"):
                     srcVer = int("".join(filter(str.isdigit, "0" + srcFile.readline())))
                     dstVer = int("".join(filter(str.isdigit, "0" + dstFile.readline())))
                     if srcVer > dstVer:
-                        logging.info(
+                        logger.info(
                             f'Template "{filename}" has a new version available in the default-templates directory'
                         )
             except:
-                logging.error(f"Couldn't compare version of {src} and {dst}")
+                logger.error(f"Couldn't compare version of {src} and {dst}")
         else:
             shutil.copyfile(src, dst)
-            logging.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
+            logger.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
             if not conf["templates"].has_option(filename):
                 tmpConf = configupdater.ConfigUpdater()
                 tmpConf.read("default.ini")
@@ -168,12 +169,12 @@ for filename in os.listdir("default-templates"):
 
 
 def error(message: str, altMessage: str | None = None) -> str:
-    logging.error(message)
+    logger.error(message)
     return json.dumps({"status": "error", "message": altMessage if altMessage else message})
 
 
 def info(message: str, altMessage: str | None = None) -> str:
-    logging.info(message)
+    logger.info(message)
     return json.dumps({"status": "success", "data": {"message": altMessage if altMessage else message}})
 
 
@@ -196,9 +197,9 @@ TORRENT_DIR = (
 assert TORRENT_DIR is not None
 if not os.path.isdir(TORRENT_DIR):
     if os.path.isfile(TORRENT_DIR):
-        logging.critical(f"Cannot use {TORRENT_DIR} for torrents, path is a file")
+        logger.critical(f"Cannot use {TORRENT_DIR} for torrents, path is a file")
         exit(1)
-    logging.info(f"Creating directory {TORRENT_DIR}")
+    logger.info(f"Creating directory {TORRENT_DIR}")
     os.makedirs(TORRENT_DIR)
 TITLE_FORMAT = getConfigOption(
     conf,
@@ -227,7 +228,7 @@ for k in conf["templates"].to_dict():
     if k in template_files:
         template_names[k] = conf["templates"][k].value
     else:
-        logging.warning(f"Template {k} from config.ini is not present in {template_dir}")
+        logger.warning(f"Template {k} from config.ini is not present in {template_dir}")
 
 stash_headers = {
     "Content-type": "application/json",
@@ -268,7 +269,7 @@ def img_host_upload(
 ) -> str | None:
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
-    logging.debug(f"Uploading image from {img_path}")
+    logger.debug(f"Uploading image from {img_path}")
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
         if isWebpAnimated(img_path):
@@ -283,7 +284,7 @@ def img_host_upload(
                 img.save(img_path)
             img_mime_type = "image/png"
             image_ext = "png"
-        logging.debug(f"Saved image as {img_path}")
+        logger.debug(f"Saved image as {img_path}")
 
     if width > 0:
         with Image.open(img_path) as img:
@@ -298,7 +299,7 @@ def img_host_upload(
             with Image.open(img_path) as img:
                 img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
                 img.save(img_path)
-        logging.debug(f"Resized {img_path}")
+        logger.debug(f"Resized {img_path}")
 
     files = {
         "source": (
@@ -327,7 +328,7 @@ def img_host_upload(
     url = "https://jerking.empornium.ph/json"
     response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
     if "error" in response.json():
-        logging.error(f"Error uploading image: {response.json()['error']['message']}")
+        logger.error(f"Error uploading image: {response.json()['error']['message']}")
         return None
     return response.json()["image"]["image"]["url"]
 
@@ -340,7 +341,7 @@ def generate():
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
 
-    logging.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
+    logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
     template = (
         j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
@@ -384,10 +385,10 @@ def generate():
 
     stash_file = None
     for f in scene["files"]:
-        logging.debug(f"Checking path {f['path']}")
+        logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
             # Apply remote path mappings
-            logging.debug(f"Got path {f['path']} from stash")
+            logger.debug(f"Got path {f['path']} from stash")
             for remote, localopt in conf.items("file.maps"):
                 local = localopt.value
                 assert local is not None
@@ -446,7 +447,7 @@ def generate():
     # COVER #
     #########
 
-    logging.debug(f'Downloading cover from {scene["paths"]["screenshot"]}')
+    logger.debug(f'Downloading cover from {scene["paths"]["screenshot"]}')
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     cover_ext = ""
@@ -471,7 +472,7 @@ def generate():
     sudio_img_mime_type = ""
     studio_img_file = None
     if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
-        logging.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
+        logger.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
         studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
         match sudio_img_mime_type:
@@ -513,10 +514,10 @@ def generate():
                 tags.add(emp_tag)
 
         # image
-        logging.debug(f'Downloading performer image from {performer["image_path"]}')
+        logger.debug(f'Downloading performer image from {performer["image_path"]}')
         performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
         performer_image_mime_type = performer_image_response.headers["Content-Type"]
-        logging.debug(f"Got image with mime type {performer_image_mime_type}")
+        logger.debug(f"Got image with mime type {performer_image_mime_type}")
         performer_image_ext = ""
         match performer_image_mime_type:
             case "image/jpeg":
@@ -606,7 +607,7 @@ def generate():
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
 
     except:
-        logging.warning("Unable to determine audio bitrate")
+        logger.warning("Unable to determine audio bitrate")
         audio_bitrate = "UNK"
 
     ###########
@@ -618,7 +619,7 @@ def generate():
     tempdir = tempfile.TemporaryDirectory()
     temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
     torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
-    logging.debug(f"Saving torrent to {temppath}")
+    logger.debug(f"Saving torrent to {temppath}")
     cmd = [
         "mktorrent",
         "-l",
@@ -640,7 +641,7 @@ def generate():
         return error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
     shutil.move(temppath, torrent_path)
     tempdir.cleanup()
-    logging.debug(f"Moved torrent to {torrent_path}")
+    logger.debug(f"Moved torrent to {torrent_path}")
 
     #############
     # MEDIAINFO #
@@ -746,7 +747,7 @@ def generate():
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
             performers[performer_name]["image_remote_url"] = PERFORMER_DEFAULT_IMAGE
-            logging.warning(f"Unable to upload image for performer {performer_name}")
+            logger.warning(f"Unable to upload image for performer {performer_name}")
 
     logo_url = STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
@@ -760,14 +761,14 @@ def generate():
         )
         if logo_url is None:
             logo_url = STUDIO_DEFAULT_LOGO
-            logging.warning("Unable to upload studio image")
+            logger.warning("Unable to upload studio image")
 
     yield info("Uploading screens")
     screens_urls = []
     a = 1
     b = len(screens)
     for screen in screens:
-        logging.debug(f"Uploading screens ({a} of {b})")
+        logger.debug(f"Uploading screens ({a} of {b})")
         a += 1
         scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
         if scrn_url is None:
@@ -820,7 +821,7 @@ def generate():
 
     description = render_template(template, **template_context)
 
-    logging.info("Done")
+    logger.info("Done")
     return json.dumps(
         {
             "status": "success",
@@ -855,5 +856,5 @@ if __name__ == "__main__":
 
         serve(app, host="0.0.0.0", port=PORT)
     except:
-        logging.info("Waitress not installed, using builtin server")
+        logging.getLogger(__name__).info("Waitress not installed, using builtin server")
         app.run(host="0.0.0.0", port=PORT)
