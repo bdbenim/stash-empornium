@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.1.1
+// @version      0.1.2
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       You
 // @match        https://www.empornium.sx/upload.php*
@@ -18,6 +18,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v0.1.2
+//  - Add Open Stash button
 // v0.1.1
 //  - Fixed default values in settings menu
 // v0.1.0
@@ -260,7 +262,13 @@ if (STASH_API_KEY !== null) {
   });
 
   stashButton.addEventListener("click", function () {
-    window.open(STASH, "_blank");
+        let idInput = document.getElementById("stash_id");
+        if (idInput.value.length > 0) {
+            window.open(STASH + "/scenes/" + idInput.value, '_blank');
+        }
+        else {
+            window.open(STASH, "_blank");
+        }
   });
 
   idInput.addEventListener("input", function (event) {
