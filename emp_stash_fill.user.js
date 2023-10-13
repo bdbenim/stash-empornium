@@ -162,28 +162,51 @@ if (STASH_API_KEY !== null) {
                         const { done, value } = await reader.read(); // value is Uint8Array
                         if (value) {
                             let text = new TextDecoder().decode(value);
-                            let j = JSON.parse(text);
-                            if (j.status === "success") {
-                                if ("message" in j.data) {
-                                    this.context.statusArea.innerText = j.data.message;
-                                }
-                                if ("fill" in j.data) {
-                                    this.context.description.value = j.data.fill.description;
-                                    this.context.tags.value = j.data.fill.tags;
-                                    this.context.cover.value = j.data.fill.cover;
-                                    this.context.title.value = j.data.fill.title;
-                                    let instructions = "";
-                                    instructions += "Instructions:<ol>";
-                                    instructions += '<li>Set a category for the upload and double-check everything for correctness</li>';
-                                    instructions += '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' + j.data.fill.torrent_path + '" disabled></div></li>';
-                                    instructions += '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' + j.data.fill.file_path + '" disabled></div></li>';
-                                    instructions += "</ol>";
-                                    this.context.instructions.innerHTML = instructions;
-                                }
+                            let j;
+                            try {
+                               j = JSON.parse(text);
+                            } catch (e) {
+                               if (text.includes('"message": "Done"')) {
+                                  console.debug("The response stream was incomplete, reading until end of stream.");
+                                  const stashData = [];
+                                  stashData.push(text);
+                                  while (true) {
+                                     let { done, value } = await reader.read();
+                                     stashData.push(new TextDecoder().decode(value));
+                                     if (done) break;
+                                  }
+                                  text = stashData.join("");
+                                  console.debug(text);
+                                  j = JSON.parse(text);
+                               } else {
+                                  console.warn("Unexpected failure to read stream data.");
+                               }
                             }
-                            else if (j.status === "error") {
-                                this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
-                                break;
+                            if (j) {
+                                if (j.status === "success") {
+                                    if ("message" in j.data) {
+                                        this.context.statusArea.innerText = j.data.message;
+                                    }
+                                    if ("fill" in j.data) {
+                                        this.context.description.value = j.data.fill.description;
+                                        this.context.tags.value = j.data.fill.tags;
+                                        this.context.cover.value = j.data.fill.cover;
+                                        this.context.title.value = j.data.fill.title;
+                                        let instructions = "";
+                                        instructions += "Instructions:<ol>";
+                                        instructions += '<li>Set a category for the upload and double-check everything for correctness</li>';
+                                        instructions += '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' + j.data.fill.torrent_path + '" disabled></div></li>';
+                                        instructions += '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' + j.data.fill.file_path + '" disabled></div></li>';
+                                        instructions += "</ol>";
+                                        this.context.instructions.innerHTML = instructions;
+                                    }
+                                }
+                                else if (j.status === "error") {
+                                    this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
+                                    break;
+                                }
+                            } else {
+                                console.warn("The response was not read or not converted to JSON.");
                             }
                         }
                         if (done) break;
