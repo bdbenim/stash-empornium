@@ -27,7 +27,7 @@ class TagHandler:
         for key in conf["empornium"]:
             self.TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
             self.TAG_LISTS[key].sort()
-            conf["empornium"].set(key, self.TAG_LISTS[key])
+            conf["empornium"].set(key, ", ".join(self.TAG_LISTS[key]))
             self.tag_sets[key] = set()
         conf.update_file()
         assert "sex_acts" in self.TAG_LISTS

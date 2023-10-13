@@ -663,7 +663,7 @@ def generate():
     for tag in scene["tags"]:
         tags.processTag(tag["name"])
         for parent in tag["parents"]:
-            tags.processTag(parent)
+            tags.processTag(parent["name"])
 
     if TAG_CODEC and stash_file["video_codec"] is not None:
         tags.add(stash_file["video_codec"])
