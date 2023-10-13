@@ -162,7 +162,26 @@ if (STASH_API_KEY !== null) {
                         const { done, value } = await reader.read(); // value is Uint8Array
                         if (value) {
                             let text = new TextDecoder().decode(value);
-                            let j = JSON.parse(text);
+                            let j;
+                            try {
+                               j = JSON.parse(text);
+                            } catch (e) {
+                               if (text.includes('"message": "Done"')) {
+                                  console.debug("The response stream was incomplete, reading until end of stream.");
+                                  const stashData = [];
+                                  stashData.push(text);
+                                  while (true) {
+                                     let { done, value } = await reader.read();
+                                     stashData.push(new TextDecoder().decode(value));
+                                     if (done) break;
+                                  }
+                                  text = stashData.join("");
+                                  console.debug(text);
+                                  j = JSON.parse(text);
+                               } else {
+                                  console.warn("Unexpected failure to read stream data.");
+                               }
+                            }
                             if (j.status === "success") {
                                 if ("message" in j.data) {
                                     this.context.statusArea.innerText = j.data.message;
