@@ -832,7 +832,7 @@ def generate():
     description = render_template(template, **template_context)
 
     logger.info("Done")
-    return json.dumps(
+    yield json.dumps(
         {
             "status": "success",
             "data": {
@@ -848,6 +848,14 @@ def generate():
             },
         }
     )
+
+    time.sleep(1)
+    return json.dumps({
+        "status": "success",
+        "data": {
+            "message": "Finished"
+        }
+    })
 
 
 @app.route("/fill", methods=["POST"])
