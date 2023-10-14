@@ -173,6 +173,9 @@ def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
     return json.dumps({"status": "error", "message": altMessage if altMessage else message})
 
+def warning(message: str, altMessage: str | None = None) -> str:
+    logger.warning(message)
+    return json.dumps({"status": "error", "message": altMessage if altMessage else message})
 
 def info(message: str, altMessage: str | None = None) -> str:
     logger.info(message)
@@ -265,6 +268,8 @@ def img_host_upload(
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
     logger.debug(f"Uploading image from {img_path}")
+    if image_ext == "unk":
+        return STUDIO_DEFAULT_LOGO
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
         if isWebpAnimated(img_path):
@@ -452,6 +457,7 @@ def generate():
         case "image/webp":
             cover_ext = "webp"
         case _:
+            #TODO handle gracefully
             return error(f"Unrecognized mime type {cover_mime_type}", "Unrecognized cover format")
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     with open(cover_file[1], "wb") as fp:
@@ -475,8 +481,11 @@ def generate():
                 studio_img_ext = "png"
             case "image/svg+xml":
                 studio_img_ext = "svg"
+            case "image/webp":
+                studio_img_ext = "webp"
             case _:
-                return error(
+                studio_img_ext = "unk"
+                yield warning(
                     f"Unknown studio logo file type: {sudio_img_mime_type}", "Unrecognized studio image file type"
                 )
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
@@ -540,7 +549,7 @@ def generate():
     contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
     cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    yield json.dumps({"status": "success", "data": {"message": "Generating contact sheet"}})
+    yield info("Generating contact sheet")
     process.wait()
     if process.returncode != 0:
         return error("vcsi failed", "Couldn't generate contact sheet")
@@ -741,10 +750,11 @@ def generate():
             logo_url = STUDIO_DEFAULT_LOGO
             logger.warning("Unable to upload studio image")
 
-    yield info("Uploading screens")
     screens_urls = []
     a = 1
     b = len(screens)
+    if b > 0:
+        yield info("Uploading screens")
     for screen in screens:
         logger.debug(f"Uploading screens ({a} of {b})")
         a += 1

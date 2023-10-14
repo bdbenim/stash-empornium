@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.1.2
+// @version      0.1.3
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       You
 // @match        https://www.empornium.sx/upload.php*
@@ -18,6 +18,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v0.1.3
+//  - Ensure all stash data is read before processing
 // v0.1.2
 //  - Add Open Stash button
 // v0.1.1
@@ -162,104 +164,114 @@ if (STASH_API_KEY !== null) {
     null
   ).singleNodeValue.value;
 
-  fillButton.addEventListener("click", () => {
-    statusArea.innerHTML = "";
-    instructions.innerHTML = "";
-    GM_xmlhttpRequest({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      url: new URL("/fill", BACKEND).href,
-      responseType: "stream",
-      data: JSON.stringify({
-        scene_id: idInput.value,
-        file_id: fileSelect.value,
-        announce_url: announceURL,
-        template: templateSelect.value,
-        screens: screensToggle.checked,
-      }),
-      context: {
-        statusArea: statusArea,
-        description: document.getElementById("desc"),
-        tags: document.getElementById("taginput"),
-        cover: document.getElementById("image"),
-        title: document.getElementById("title"),
-        instructions: instructions,
-      },
-      onreadystatechange: async function (response) {
-        if (response.readyState == 2 && response.status == 200) {
-          const reader = response.response.getReader();
-          while (true) {
-            const { done, value } = await reader.read(); // value is Uint8Array
-            if (value) {
-              let text = new TextDecoder().decode(value);
-              let j = JSON.parse(text);
-              if (j.status === "success") {
-                if ("message" in j.data) {
-                  this.context.statusArea.innerText = j.data.message;
-                }
-                if ("fill" in j.data) {
-                  this.context.description.value = j.data.fill.description;
-                  this.context.tags.value = j.data.fill.tags;
-                  this.context.cover.value = j.data.fill.cover;
-                  this.context.title.value = j.data.fill.title;
-                  let instructions = "";
-                  instructions += "Instructions:<ol>";
-                  instructions +=
-                    "<li>Set a category for the upload and double-check everything for correctness</li>";
-                  instructions +=
-                    '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' +
-                    j.data.fill.torrent_path +
-                    '" disabled></div></li>';
-                  instructions +=
-                    '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' +
-                    j.data.fill.file_path +
-                    '" disabled></div></li>';
-                  instructions += "</ol>";
-                  this.context.instructions.innerHTML = instructions;
-                }
-                if ("suggestions" in j.data) {
-                  let parent = document.getElementsByClassName("thin")[0];
-
-                  let head = document.createElement("div");
-                  head.classList.add("head");
-                  head.innerHTML = "Tag Suggestions";
-
-                  let body = document.createElement("div");
-                  body.classList.add("box", "pad");
-
-                  for (var key in j.data.suggestions) {
-                    if (j.data.suggestions.hasOwnProperty(key)) {
-                      let tagDisplay = document.createElement("input");
-                      tagDisplay.setAttribute("disabled", true);
-                      tagDisplay.style.marginLeft = "12pt";
-                      tagDisplay.setAttribute("size", 60);
-                      tagDisplay.value = key;
-
-                      let tagInput = document.createElement("input");
-                      tagInput.setAttribute("id", "taginput");
-                      tagInput.setAttribute("size", 8);
-                      tagInput.setAttribute("type", "text");
-                      tagInput.autocomplete = "on";
-                      tagInput.value = j.data.suggestions[key];
-                      unsafeWindow.AutoComplete.addInput(tagInput, "/tags.php");
+    fillButton.addEventListener("click", () => {
+        statusArea.innerHTML = "";
+        instructions.innerHTML = "";
+        GM_xmlhttpRequest({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            url: new URL("/fill", BACKEND).href,
+            responseType: "stream",
+            data: JSON.stringify({ scene_id: idInput.value, file_id: fileSelect.value, announce_url: announceURL, template: templateSelect.value, screens: screensToggle.checked }),
+            context: {
+                statusArea: statusArea,
+                description: document.getElementById("desc"),
+                tags: document.getElementById("taginput"),
+                cover: document.getElementById("image"),
+                title: document.getElementById("title"),
+                instructions: instructions
+            },
+            onreadystatechange: async function(response) {
+                if (response.readyState == 2 && response.status == 200) {
+                    const reader = response.response.getReader();
+                    while (true) {
+                        const { done, value } = await reader.read(); // value is Uint8Array
+                        if (value) {
+                            let text = new TextDecoder().decode(value);
+                            let j;
+                            try {
+                               j = JSON.parse(text);
+                            } catch (e) {
+                               if (text.includes('"message": "Done"')) {
+                                  console.debug("The response stream was incomplete, reading until end of stream.");
+                                  const stashData = [];
+                                  stashData.push(text);
+                                  while (true) {
+                                     let { done, value } = await reader.read();
+                                     stashData.push(new TextDecoder().decode(value));
+                                     if (done) break;
+                                  }
+                                  text = stashData.join("");
+                                  console.debug(text);
+                                  j = JSON.parse(text);
+                               } else {
+                                  console.warn("Unexpected failure to read stream data.");
+                               }
+                            }
+                            if (j) {
+                                if (j.status === "success") {
+                                    if ("message" in j.data) {
+                                        this.context.statusArea.innerText = j.data.message;
+                                    }
+                                    if ("fill" in j.data) {
+                                        this.context.description.value = j.data.fill.description;
+                                        this.context.tags.value = j.data.fill.tags;
+                                        this.context.cover.value = j.data.fill.cover;
+                                        this.context.title.value = j.data.fill.title;
+                                        let instructions = "";
+                                        instructions += "Instructions:<ol>";
+                                        instructions += '<li>Set a category for the upload and double-check everything for correctness</li>';
+                                        instructions += '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' + j.data.fill.torrent_path + '" disabled></div></li>';
+                                        instructions += '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' + j.data.fill.file_path + '" disabled></div></li>';
+                                        instructions += "</ol>";
+                                        this.context.instructions.innerHTML = instructions;
+                                        if ("suggestions" in j.data) {
+                                          let parent = document.getElementsByClassName("thin")[0];
+                        
+                                          let head = document.createElement("div");
+                                          head.classList.add("head");
+                                          head.innerHTML = "Tag Suggestions";
+                        
+                                          let body = document.createElement("div");
+                                          body.classList.add("box", "pad");
+                        
+                                          for (var key in j.data.suggestions) {
+                                            if (j.data.suggestions.hasOwnProperty(key)) {
+                                              let tagDisplay = document.createElement("input");
+                                              tagDisplay.setAttribute("disabled", true);
+                                              tagDisplay.style.marginLeft = "12pt";
+                                              tagDisplay.setAttribute("size", 60);
+                                              tagDisplay.value = key;
+                        
+                                              let tagInput = document.createElement("input");
+                                              tagInput.setAttribute("id", "taginput");
+                                              tagInput.setAttribute("size", 8);
+                                              tagInput.setAttribute("type", "text");
+                                              tagInput.autocomplete = "on";
+                                              tagInput.value = j.data.suggestions[key];
+                                              unsafeWindow.AutoComplete.addInput(tagInput, "/tags.php");
+                                            }
+                                          }
+                        
+                                          parent.insertBefore(body, parent.children[5]);
+                                          parent.insertBefore(head, body);
+                                        }
+                                    }
+                                }
+                                else if (j.status === "error") {
+                                    this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
+                                    break;
+                                }
+                            } else {
+                                console.warn("The response was not read or not converted to JSON.");
+                            }
+                        }
+                        if (done) break;
                     }
-                  }
-
-                  parent.insertBefore(body, parent.children[5]);
-                  parent.insertBefore(head, body);
                 }
-              } else if (j.status === "error") {
-                this.context.statusArea.innerHTML =
-                  "<span style='color: red;'>" + j.message + "</span>";
-                break;
-              }
             }
-            if (done) break;
-          }
-        }
-      },
+        });
     });
-  });
 
   stashButton.addEventListener("click", function () {
         let idInput = document.getElementById("stash_id");
