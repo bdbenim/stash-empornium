@@ -561,7 +561,7 @@ def generate():
     contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
     cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    yield json.dumps({"status": "success", "data": {"message": "Generating contact sheet"}})
+    yield info("Generating contact sheet")
     process.wait()
     if process.returncode != 0:
         return error("vcsi failed", "Couldn't generate contact sheet")
@@ -772,10 +772,11 @@ def generate():
             logo_url = STUDIO_DEFAULT_LOGO
             logger.warning("Unable to upload studio image")
 
-    yield info("Uploading screens")
     screens_urls = []
     a = 1
     b = len(screens)
+    if b > 0:
+        yield info("Uploading screens")
     for screen in screens:
         logger.debug(f"Uploading screens ({a} of {b})")
         a += 1
