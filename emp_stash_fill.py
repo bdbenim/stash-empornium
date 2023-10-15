@@ -74,14 +74,14 @@ parser.add_argument(
     help="specify the directory where .torrent files should be saved",
     nargs=1,
 )
-parser.add_argument("-p", "--port", nargs=1, help="port to listen on", type=int)
+parser.add_argument("-p", "--port", nargs=1, help="port to listen on (default: 9932)", type=int)
 flags = parser.add_argument_group("Tags", "optional tag settings")
 flags.add_argument("-c", action="store_true", help="include codec as tag")
 flags.add_argument("-d", action="store_true", help="include date as tag")
 flags.add_argument("-f", action="store_true", help="include framerate as tag")
 flags.add_argument("-r", action="store_true", help="include resolution as tag")
 parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
-mutex = parser.add_mutually_exclusive_group()
+mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
 mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
 mutex.add_argument("-v", "--verbose", "--debug", dest="level", action="store_const", const=1, help="output more")
 mutex.add_argument(
@@ -89,7 +89,7 @@ mutex.add_argument(
     "--log",
     choices=["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL", "FATAL"],
     metavar="LEVEL",
-    help="log level",
+    help="log level: [DEBUG | INFO | WARNING | ERROR | CRITICAL]",
     type=str.upper,
 )
 
