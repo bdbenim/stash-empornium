@@ -806,7 +806,7 @@ def generate():
     description = render_template(template, **template_context)
 
     logger.info("Done")
-    return json.dumps(
+    yield json.dumps(
         {
             "status": "success",
             "data": {
@@ -819,22 +819,35 @@ def generate():
                     "torrent_path": torrent_path,
                     "file_path": stash_file["path"],
                 },
+                "suggestions": tags.tag_suggestions
             },
-            "suggestions": tags.tag_suggestions,
         }
     )
 
+    time.sleep(1)
 
+    return json.dumps({
+        "status": "success",
+        "data": {
+            "message": "Done"
+        }
+    })
+
+@app.route("/suggestions", methods=["POST"])
 def processSuggestions():
     j = request.get_json()
+    logger.debug(f"Got json {j}")
     acceptedTags = {}
     if "accept" in j:
+        logger.info(f"Accepting {len(j['accept'])} tag suggestions")
         for tag in j["accept"]:
-            acceptedTags[tag["name"]] = tag["emp"]
+            if "name" in tag:
+                acceptedTags[tag["name"]] = tag["emp"]
     ignoredTags = []
     if "ignore" in j:
+        logger.info(f"Ignoring {len(j['ignore'])} tags")
         for tag in j["ignore"]:
-            ignoredTags.append(tag["name"])
+            ignoredTags.append(tag)
     success = tags.acceptSuggestions(acceptedTags)
     success = success and tags.rejectSuggestions(ignoredTags)
     if success:

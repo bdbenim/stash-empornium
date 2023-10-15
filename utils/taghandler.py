@@ -71,7 +71,7 @@ class TagHandler:
         not alphanumeric before finally converting the full 
         string to lowercase."""
         newtag = re.sub(r"[^\w\s]", "", tag).lower()
-        newtag = re.sub(r"\s+", ".", tag)
+        newtag = re.sub(r"\s+", ".", newtag)
         self.logger.debug(f"Reformatted tag '{tag}' to '{newtag}'")
         return newtag
 
