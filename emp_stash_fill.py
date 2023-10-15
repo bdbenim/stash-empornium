@@ -24,11 +24,11 @@ waitress
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 # external
 import requests
-from flask import Flask, Response, request, stream_with_context, render_template
+from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
 from PIL import Image, ImageSequence
 import configupdater
 from cairosvg import svg2png
@@ -43,6 +43,7 @@ import os
 import pathlib
 import re
 import shutil
+import string
 import subprocess
 import tempfile
 import urllib.parse
@@ -56,6 +57,7 @@ from utils import taghandler
 
 PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
 STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 #############
 # ARGUMENTS #
 #############
@@ -73,14 +75,14 @@ parser.add_argument(
     help="specify the directory where .torrent files should be saved",
     nargs=1,
 )
-parser.add_argument("-p", "--port", nargs=1, help="port to listen on", type=int)
+parser.add_argument("-p", "--port", nargs=1, help="port to listen on (default: 9932)", type=int)
 flags = parser.add_argument_group("Tags", "optional tag settings")
 flags.add_argument("-c", action="store_true", help="include codec as tag")
 flags.add_argument("-d", action="store_true", help="include date as tag")
 flags.add_argument("-f", action="store_true", help="include framerate as tag")
 flags.add_argument("-r", action="store_true", help="include resolution as tag")
 parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
-mutex = parser.add_mutually_exclusive_group()
+mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
 mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
 mutex.add_argument("-v", "--verbose", "--debug", dest="level", action="store_const", const=1, help="output more")
 mutex.add_argument(
@@ -88,7 +90,7 @@ mutex.add_argument(
     "--log",
     choices=["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL", "FATAL"],
     metavar="LEVEL",
-    help="log level",
+    help="log level: [DEBUG | INFO | WARNING | ERROR | CRITICAL]",
     type=str.upper,
 )
 
@@ -125,6 +127,10 @@ if not os.path.isfile(config_file):
 
 logger.info(f"Reading config from {config_file}")
 conf.read(config_file)
+if conf["backend"].has_option("date_default"):
+    conf["backend"]["date_default"].key = "date_format"
+    conf.update_file()
+    logger.info("Key 'date_default' renamed to 'date_format'")
 default_conf.read("default.ini")
 skip_sections = ["empornium", "empornium.tags"]
 for section in default_conf.sections():
@@ -173,9 +179,11 @@ def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
     return json.dumps({"status": "error", "message": altMessage if altMessage else message})
 
+
 def warning(message: str, altMessage: str | None = None) -> str:
     logger.warning(message)
     return json.dumps({"status": "error", "message": altMessage if altMessage else message})
+
 
 def info(message: str, altMessage: str | None = None) -> str:
     logger.info(message)
@@ -205,15 +213,25 @@ if not os.path.isdir(TORRENT_DIR):
         exit(1)
     logger.info(f"Creating directory {TORRENT_DIR}")
     os.makedirs(TORRENT_DIR)
-TITLE_FORMAT = getConfigOption(
+TITLE_FORMAT = None
+TITLE_TEMPLATE = None
+if conf["backend"].has_option("title_default"):
+    logger.warning(
+        "Config option 'title_default' is deprecated and will be removed in v1. Please switch to 'title_template'\nSee https://github.com/bdbenim/stash-empornium#title-templates for details."
+    )
+    TITLE_FORMAT = getConfigOption(
+        conf,
+        "backend",
+        "title_default",
+        "[{studio}] {performers} - {title} ({date})[{resolution}]",
+    )
+TITLE_TEMPLATE = getConfigOption(
     conf,
     "backend",
-    "title_default",
-    "[{studio}] {performers} - {title} ({date})[{resolution}]",
+    "title_template",
+    "{% if studio %}[{{studio}}]{% endif %} {{performers|join(', ')}} - {{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]",
 )
-assert TITLE_FORMAT is not None
-DATE_FORMAT = getConfigOption(conf, "backend", "date_default", "%B %-d, %Y")
-assert DATE_FORMAT is not None
+DATE_FORMAT = getConfigOption(conf, "backend", "date_format", "%B %-d, %Y")
 TAG_CODEC = args.c or getConfigOption(conf, "metadata", "tag_codec", "false").lower() == "true"
 TAG_DATE = args.d or getConfigOption(conf, "metadata", "tag_date", "false").lower() == "true"
 TAG_FRAMERATE = args.f or (getConfigOption(conf, "metadata", "tag_framerate", "false").lower() == "true")
@@ -264,12 +282,13 @@ def img_host_upload(
     img_mime_type: str,
     image_ext: str,
     width: int = 0,
+    default: str = STUDIO_DEFAULT_LOGO,
 ) -> str | None:
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
     logger.debug(f"Uploading image from {img_path}")
     if image_ext == "unk":
-        return STUDIO_DEFAULT_LOGO
+        return default
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
         if isWebpAnimated(img_path):
@@ -294,7 +313,8 @@ def img_host_upload(
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ["ffmpeg", "-i", img_path, "-vf", "scale=iw:ih", "-y", img_path]
-        subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        proc = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.STDOUT, text=True)
+        logger.debug(f"ffmpeg output:\n{proc.stdout}")
         while os.path.getsize(img_path) > 5000000:
             with Image.open(img_path) as img:
                 img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
@@ -329,7 +349,7 @@ def img_host_upload(
     response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
     if "error" in response.json():
         logger.error(f"Error uploading image: {response.json()['error']['message']}")
-        return None
+        return default
     return response.json()["image"]["image"]["url"]
 
 
@@ -405,6 +425,9 @@ def generate():
         return error("No file exists")
     elif not os.path.isfile(stash_file["path"]):
         return error(f"Couldn't find file {stash_file['path']}")
+    
+    if len(scene["title"]) == 0:
+        scene["title"] = stash_file["basename"]
 
     ht = stash_file["height"]
     resolution = None
@@ -445,10 +468,11 @@ def generate():
     # COVER #
     #########
 
-    logger.debug(f'Downloading cover from {scene["paths"]["screenshot"]}')
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
+    logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
     cover_ext = ""
+    cover_gen = False
     match cover_mime_type:
         case "image/jpeg":
             cover_ext = "jpg"
@@ -457,11 +481,30 @@ def generate():
         case "image/webp":
             cover_ext = "webp"
         case _:
-            #TODO handle gracefully
-            return error(f"Unrecognized mime type {cover_mime_type}", "Unrecognized cover format")
+            cover_gen = True
+            cover_ext = "png"
+            cover_mime_type = "image/png"
+            logger.warning(f"Unrecognized cover format")  # TODO return warnings to client
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
-    with open(cover_file[1], "wb") as fp:
-        fp.write(cover_response.content)
+    if cover_gen:
+        CMD = [
+            "ffmpeg",
+            "-ss",
+            "30",
+            "-i",
+            stash_file["path"],
+            "-vf",
+            "thumbnail=300",
+            "-frames:v",
+            "1",
+            cover_file[1],
+            "-y",
+        ]
+        proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        logger.debug(f"ffmpeg output:\n{proc.stdout}")
+    else:
+        with open(cover_file[1], "wb") as fp:
+            fp.write(cover_response.content)
 
     ###############
     # STUDIO LOGO #
@@ -548,9 +591,9 @@ def generate():
     # upload images and paste in description
     contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
     cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     yield info("Generating contact sheet")
-    process.wait()
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    logger.debug(f"vcsi output:\n{process.stdout}")
     if process.returncode != 0:
         return error("vcsi failed", "Couldn't generate contact sheet")
 
@@ -583,8 +626,8 @@ def generate():
                 "scale=960:-2",
                 screen_file[1],
             ]
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            process.wait()
+            process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            logger.debug(f"ffmpeg output:\n{process.stdout}")
 
     audio_bitrate = ""
     cmd = [
@@ -601,6 +644,7 @@ def generate():
     ]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        logger.debug(f"ffprobe output:\n{proc.stdout}")
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
 
     except:
@@ -614,7 +658,10 @@ def generate():
     yield info("Making torrent")
     piece_size = int(math.log(stash_file["size"] / 2**10, 2))
     tempdir = tempfile.TemporaryDirectory()
-    temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
+    basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
+    # logger.debug(f"Sanitized filename: {basename}")
+    # basename = stash_file["basename"]
+    temppath = os.path.join(tempdir.name, basename + ".torrent")
     torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
     logger.debug(f"Saving torrent to {temppath}")
     cmd = [
@@ -631,8 +678,8 @@ def generate():
         temppath,
         stash_file["path"],
     ]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    process.wait()
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    logger.debug(f"mktorrent output:\n{process.stdout}")
     if process.returncode != 0:
         tempdir.cleanup()
         return error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
@@ -648,22 +695,40 @@ def generate():
     if shutil.which("mediainfo"):
         yield info("Generating media info")
         CMD = ["mediainfo", stash_file["path"]]
-        mediainfo = subprocess.check_output(CMD).decode()
+        try:
+            mediainfo = subprocess.check_output(CMD, text=True)
+        except subprocess.CalledProcessError as e:
+            yield error(f"mediainfo exited with code {e.returncode}", "Error generating mediainfo")
+            mediainfo = ""
+            logger.debug(f"mediainfo output:\n{e.output}")
 
     #########
     # TITLE #
     #########
 
-    title = TITLE_FORMAT.format(
-        studio=scene["studio"]["name"] if scene["studio"] else "",
-        performers=", ".join([p["name"] for p in scene["performers"]]),
-        title=scene["title"],
-        date=scene["date"],
-        resolution=resolution if resolution is not None else "",
-        codec=stash_file["video_codec"],
-        duration=str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-        framerate="{} fps".format(stash_file["frame_rate"]),
-    )
+    title = ""
+    if TITLE_FORMAT is not None:
+        title = TITLE_FORMAT.format(
+            studio=scene["studio"]["name"] if scene["studio"] else "",
+            performers=", ".join([p["name"] for p in scene["performers"]]),
+            title=scene["title"],
+            date=scene["date"],
+            resolution=resolution if resolution is not None else "",
+            codec=stash_file["video_codec"],
+            duration=str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+            framerate="{} fps".format(stash_file["frame_rate"]),
+        )
+    else:
+        title = render_template_string(TITLE_TEMPLATE, **{
+            "studio": scene["studio"]["name"] if scene["studio"] else "",
+            "performers": [p["name"] for p in scene["performers"]],
+            "title": scene["title"],
+            "date": scene["date"],
+            "resolution": resolution if resolution is not None else "",
+            "codec": stash_file["video_codec"],
+            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+            "framerate": stash_file["frame_rate"],
+        })
 
     ########
     # TAGS #
@@ -730,6 +795,7 @@ def generate():
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
+            default=PERFORMER_DEFAULT_IMAGE,
         )
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
@@ -826,6 +892,7 @@ def generate():
 
     time.sleep(1)
 
+<<<<<<< HEAD
     return json.dumps({
         "status": "success",
         "data": {
@@ -865,6 +932,8 @@ def processSuggestions():
             }
         })
 
+=======
+>>>>>>> main
 
 @app.route("/fill", methods=["POST"])
 def fill():
