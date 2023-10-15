@@ -301,7 +301,8 @@ def img_host_upload(
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ["ffmpeg", "-i", img_path, "-vf", "scale=iw:ih", "-y", img_path]
-        subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        proc = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.STDOUT)
+        logger.debug(f"ffmpeg output:\n{proc.stdout}")
         while os.path.getsize(img_path) > 5000000:
             with Image.open(img_path) as img:
                 img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
@@ -565,6 +566,7 @@ def generate():
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     yield info("Generating contact sheet")
     process.wait()
+    logger.debug(f"vcsi output:\n{process.stdout}")
     if process.returncode != 0:
         return error("vcsi failed", "Couldn't generate contact sheet")
 
@@ -599,6 +601,7 @@ def generate():
             ]
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             process.wait()
+            logger.debug(f"ffmpeg output:\n{process.stdout}")
 
     audio_bitrate = ""
     cmd = [
@@ -615,6 +618,7 @@ def generate():
     ]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        logger.debug(f"ffprobe output:\n{proc.stdout}")
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
 
     except:
@@ -665,7 +669,12 @@ def generate():
     if shutil.which("mediainfo"):
         yield info("Generating media info")
         CMD = ["mediainfo", stash_file["path"]]
-        mediainfo = subprocess.check_output(CMD).decode()
+        try:
+            mediainfo = subprocess.check_output(CMD).decode()
+        except subprocess.CalledProcessError as e:
+            yield error(f"mediainfo exited with code {e.returncode}","Error generating mediainfo")
+            mediainfo = ""
+            logger.debug(f"mediainfo output:\n{e.output}")
 
     #########
     # TITLE #
@@ -855,12 +864,6 @@ def generate():
     )
 
     time.sleep(1)
-    return json.dumps({
-        "status": "success",
-        "data": {
-            "message": "Finished"
-        }
-    })
 
 
 @app.route("/fill", methods=["POST"])
