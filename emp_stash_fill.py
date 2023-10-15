@@ -892,14 +892,6 @@ def generate():
 
     time.sleep(1)
 
-<<<<<<< HEAD
-    return json.dumps({
-        "status": "success",
-        "data": {
-            "message": "Done"
-        }
-    })
-
 @app.route("/suggestions", methods=["POST"])
 def processSuggestions():
     j = request.get_json()
@@ -932,8 +924,6 @@ def processSuggestions():
             }
         })
 
-=======
->>>>>>> main
 
 @app.route("/fill", methods=["POST"])
 def fill():
