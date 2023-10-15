@@ -110,37 +110,37 @@ The port above corresponds to the backend URL in step 1, so if you change one yo
 
 The script can be run with optional command line arguments, most of which override a corresponding configuration file option. These can be used to quickly change a setting without needing to modify the config file, such as for temporarily listening on a different port or saving torrent files in a different directory. Not all configuration options can currently be set via the command line. The available options are described in the script's help text below:
 
->```text
->usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [-q | -v | -l LEVEL]
->
->backend server for EMP Stash upload helper userscript
->
->options:
->  -h, --help            show this help message and exit
->  --configdir CONFIGDIR
->                        specify the directory containing configuration files
->  -t TORRENTDIR, --torrentdir TORRENTDIR
->                        specify the directory where .torrent files should be saved
->  -p PORT, --port PORT  port to listen on (default: 9932)
->  --version             show program's version number and exit
->
->Tags:
->  optional tag settings
->
->  -c                    include codec as tag
->  -d                    include date as tag
->  -f                    include framerate as tag
->  -r                    include resolution as tag
->
->Output:
->  options for setting the log level
->
->  -q, --quiet           output less
->  -v, --verbose, --debug
->                        output more
->  -l LEVEL, --log LEVEL
->                        log level: [DEBUG | INFO | WARNING | ERROR | CRITICAL]
->```
+```text
+usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [-q | -v | -l LEVEL]
+
+backend server for EMP Stash upload helper userscript
+
+options:
+  -h, --help            show this help message and exit
+  --configdir CONFIGDIR
+                        specify the directory containing configuration files
+  -t TORRENTDIR, --torrentdir TORRENTDIR
+                        specify the directory where .torrent files should be saved
+  -p PORT, --port PORT  port to listen on (default: 9932)
+  --version             show program's version number and exit
+
+Tags:
+  optional tag settings
+
+  -c                    include codec as tag
+  -d                    include date as tag
+  -f                    include framerate as tag
+  -r                    include resolution as tag
+
+Output:
+  options for setting the log level
+
+  -q, --quiet           output less
+  -v, --verbose, --debug
+                        output more
+  -l LEVEL, --log LEVEL
+                        log level: [DEBUG | INFO | WARNING | ERROR | CRITICAL]
+```
 
 ## Templates
 
@@ -210,3 +210,18 @@ The available variables that can be used are:
 - resolution
 - studio
 - title
+
+### Title Templates
+
+Beginning with `v0.7.0`, the `title_template` config option has been added, which extends the title formatting capability using jinja templates. With this system, the equivalent to the earlier example is:
+
+```python
+{% if studio %}[{{studio}}] {% endif %}{{performers|join(', ')}}{% if performers %} - {% endif %}{{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]
+```
+
+This system has the added advantage of builtin `if` statements, `for` loops, and many other features. The above example uses these to ensure that there are no empty square brackets if the scene's studio is not set, nor empty parentheses around a missing date. Since the resolution is determined by the script, this will always be available. The same variables are available to this setting as the `title_default` option, with some minor differences:
+
+- `performers` will be provided as a list rather than a single comma-separated string. This allows more control over how the list will be formatted, but the above example shows how to keep the same comma-separated list formatting.
+- `framerate` does not include "fps" in the string, again for more flexibility in the template
+
+For more information on using jinja templates, refer to the [documentation](https://jinja.palletsprojects.com/en/3.1.x/)
