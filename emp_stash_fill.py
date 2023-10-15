@@ -43,6 +43,7 @@ import os
 import pathlib
 import re
 import shutil
+import string
 import subprocess
 import tempfile
 import urllib.parse
@@ -55,6 +56,7 @@ import uuid
 
 PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
 STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 #############
 # ARGUMENTS #
 #############
@@ -626,7 +628,10 @@ def generate():
     yield info("Making torrent")
     piece_size = int(math.log(stash_file["size"] / 2**10, 2))
     tempdir = tempfile.TemporaryDirectory()
-    temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
+    basename = ''.join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
+    # logger.debug(f"Sanitized filename: {basename}")
+    # basename = stash_file["basename"]
+    temppath = os.path.join(tempdir.name, basename + ".torrent")
     torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
     logger.debug(f"Saving torrent to {temppath}")
     cmd = [
@@ -643,8 +648,8 @@ def generate():
         temppath,
         stash_file["path"],
     ]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    process.wait()
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    logger.debug(f"mktorrent output:\n{process.stdout}")
     if process.returncode != 0:
         tempdir.cleanup()
         return error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
