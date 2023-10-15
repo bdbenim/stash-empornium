@@ -14,4 +14,4 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run the Flask app when the container is executed
-CMD ["python", "emp_stash_fill.py", "--configdir", "/config"]
+ENTRYPOINT ["python", "emp_stash_fill.py", "--configdir", "/config"]
