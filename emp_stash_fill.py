@@ -271,12 +271,13 @@ def img_host_upload(
     img_mime_type: str,
     image_ext: str,
     width: int = 0,
+    default: str = STUDIO_DEFAULT_LOGO
 ) -> str | None:
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
     logger.debug(f"Uploading image from {img_path}")
     if image_ext == "unk":
-        return STUDIO_DEFAULT_LOGO
+        return default
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
         if isWebpAnimated(img_path):
@@ -301,7 +302,7 @@ def img_host_upload(
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
         CMD = ["ffmpeg", "-i", img_path, "-vf", "scale=iw:ih", "-y", img_path]
-        proc = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.STDOUT)
+        proc = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
         while os.path.getsize(img_path) > 5000000:
             with Image.open(img_path) as img:
@@ -337,7 +338,7 @@ def img_host_upload(
     response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
     if "error" in response.json():
         logger.error(f"Error uploading image: {response.json()['error']['message']}")
-        return None
+        return default
     return response.json()["image"]["image"]["url"]
 
 
@@ -455,10 +456,11 @@ def generate():
     # COVER #
     #########
 
-    logger.debug(f'Downloading cover from {scene["paths"]["screenshot"]}')
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
+    logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
     cover_ext = ""
+    cover_gen = False
     match cover_mime_type:
         case "image/jpeg":
             cover_ext = "jpg"
@@ -467,11 +469,18 @@ def generate():
         case "image/webp":
             cover_ext = "webp"
         case _:
-            #TODO handle gracefully
-            return error(f"Unrecognized mime type {cover_mime_type}", "Unrecognized cover format")
+            cover_gen = True
+            cover_ext = "png"
+            cover_mime_type = "image/png"
+            logger.warning(f"Unrecognized cover format") #TODO return warnings to client
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
-    with open(cover_file[1], "wb") as fp:
-        fp.write(cover_response.content)
+    if cover_gen:
+        CMD = ['ffmpeg', '-ss', '30', '-i', stash_file['path'], '-vf', "thumbnail=300", '-frames:v', '1', cover_file[1], '-y']
+        proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        logger.debug(f"ffmpeg output:\n{proc.stdout}")
+    else:
+        with open(cover_file[1], "wb") as fp:
+            fp.write(cover_response.content)
 
     ###############
     # STUDIO LOGO #
@@ -563,9 +572,8 @@ def generate():
     # upload images and paste in description
     contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
     cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     yield info("Generating contact sheet")
-    process.wait()
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     logger.debug(f"vcsi output:\n{process.stdout}")
     if process.returncode != 0:
         return error("vcsi failed", "Couldn't generate contact sheet")
@@ -599,8 +607,7 @@ def generate():
                 "scale=960:-2",
                 screen_file[1],
             ]
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            process.wait()
+            process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             logger.debug(f"ffmpeg output:\n{process.stdout}")
 
     audio_bitrate = ""
@@ -670,7 +677,7 @@ def generate():
         yield info("Generating media info")
         CMD = ["mediainfo", stash_file["path"]]
         try:
-            mediainfo = subprocess.check_output(CMD).decode()
+            mediainfo = subprocess.check_output(CMD, text=True)
         except subprocess.CalledProcessError as e:
             yield error(f"mediainfo exited with code {e.returncode}","Error generating mediainfo")
             mediainfo = ""
@@ -766,6 +773,7 @@ def generate():
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
+            default=PERFORMER_DEFAULT_IMAGE
         )
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
