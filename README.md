@@ -41,6 +41,7 @@ The backend can also be run directly by intalling its dependencies and running t
   - configupdater
   - cairosvg
   - waitress (optional)
+  - redis (optional)
 - ffmpeg
 - mktorrent
 - mediainfo (optional)

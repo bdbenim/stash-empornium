@@ -96,11 +96,19 @@ mutex.add_argument(
     type=str.upper,
 )
 
+redisgroup = parser.add_argument_group("redis", "options for connecting to a redis server")
+redisgroup.add_argument("--rhost", "--redis--host", "--rh", help="host redis server is listening on")
+redisgroup.add_argument("--rport", "--redis-port", "--rp", help="port redis server is listening on (default: 6379)", type=int)
+redisgroup.add_argument("--username", "--redis-user", help="redis username")
+redisgroup.add_argument("--password", "--redis-pass", help="redis password")
+redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
+redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
+
 args = parser.parse_args()
 
 log_level = getattr(logging, args.log) if args.log else min(10 * args.level, 50)
-logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=log_level)
+logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}")
 
 ##########
@@ -271,16 +279,16 @@ findScene(id: "{}") {{
 }}
 """
 
-host = getConfigOption(conf, "redis", "host")
+host = args.rhost if args.rhost else getConfigOption(conf, "redis", "host")
 host = host if len(host) > 0 else None
-logger.debug(f"Host: {host}")
-port = int(getConfigOption(conf, "redis", "port", "6379"))
-ssl = getConfigOption(conf, "redis", "ssl", "false").lower() == "true"
-set_name = getConfigOption(conf, "redis", "set_name", "stash-empornium")
-username = getConfigOption(conf, "redis", "username", "")
-password = getConfigOption(conf, "redis", "password", "")
+port = args.rport if args.rport else int(getConfigOption(conf, "redis", "port", "6379"))
+ssl = args.use_ssl or getConfigOption(conf, "redis", "ssl", "false").lower() == "true"
+username = args.username if args.username else getConfigOption(conf, "redis", "username", "")
+password = args.password if args.password else getConfigOption(conf, "redis", "password", "")
 
-imgCache = cache.Cache(host, port, username, password, set_name, ssl)
+imgCache = cache.Cache(host, port, username, password, ssl)
+if args.flush:
+    imgCache.clear()
 
 app = Flask(__name__, template_folder=template_dir)
 
