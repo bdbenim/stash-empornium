@@ -32,10 +32,12 @@ from flask import Flask, Response, request, stream_with_context, render_template
 from PIL import Image, ImageSequence
 import configupdater
 from cairosvg import svg2png
+from utils import cache
 
 # built-in
 import argparse
 import datetime
+import hashlib
 import json
 import logging
 import math
@@ -58,6 +60,7 @@ from utils import taghandler
 PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
 STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
+
 #############
 # ARGUMENTS #
 #############
@@ -94,11 +97,19 @@ mutex.add_argument(
     type=str.upper,
 )
 
+redisgroup = parser.add_argument_group("redis", "options for connecting to a redis server")
+redisgroup.add_argument("--rhost", "--redis--host", "--rh", help="host redis server is listening on")
+redisgroup.add_argument("--rport", "--redis-port", "--rp", help="port redis server is listening on (default: 6379)", type=int)
+redisgroup.add_argument("--username", "--redis-user", help="redis username")
+redisgroup.add_argument("--password", "--redis-pass", help="redis password")
+redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
+redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
+
 args = parser.parse_args()
 
 log_level = getattr(logging, args.log) if args.log else min(10 * args.level, 50)
-logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=log_level)
+logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}")
 
 ##########
@@ -173,7 +184,6 @@ for filename in os.listdir("default-templates"):
                 tmpConf = configupdater.ConfigUpdater()
                 tmpConf.read("default.ini")
                 conf["templates"].set(filename, tmpConf["templates"][filename].value)
-
 
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
@@ -264,6 +274,17 @@ findScene(id: "{}") {{
 }}
 """
 
+host = args.rhost if args.rhost else getConfigOption(conf, "redis", "host")
+host = host if len(host) > 0 else None
+port = args.rport if args.rport else int(getConfigOption(conf, "redis", "port", "6379"))
+ssl = args.use_ssl or getConfigOption(conf, "redis", "ssl", "false").lower() == "true"
+username = args.username if args.username else getConfigOption(conf, "redis", "username", "")
+password = args.password if args.password else getConfigOption(conf, "redis", "password", "")
+
+imgCache = cache.Cache(host, port, username, password, ssl)
+if args.flush:
+    imgCache.clear()
+
 app = Flask(__name__, template_folder=template_dir)
 
 
@@ -287,8 +308,20 @@ def img_host_upload(
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
     logger.debug(f"Uploading image from {img_path}")
+
+    # Return default image if unknown
     if image_ext == "unk":
         return default
+    
+    # Return cached url if available
+    digest = ""
+    with open(img_path, 'rb') as f:
+        digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
+    if imgCache.exists(digest):
+        url = imgCache.get(digest)
+        logger.debug(f"Found url {url} in cache")
+        return url
+
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
         if isWebpAnimated(img_path):
@@ -350,7 +383,11 @@ def img_host_upload(
     if "error" in response.json():
         logger.error(f"Error uploading image: {response.json()['error']['message']}")
         return default
-    return response.json()["image"]["image"]["url"]
+    # Cache and return url
+    url = response.json()["image"]["image"]["url"]
+    imgCache.add(digest, url)
+    logger.debug(f"Added {url} to cache for {img_path}")
+    return url
 
 
 @stream_with_context

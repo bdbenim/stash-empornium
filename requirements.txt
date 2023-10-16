@@ -4,3 +4,4 @@ vcsi
 waitress
 configupdater
 cairosvg
+redis[hiredis]
