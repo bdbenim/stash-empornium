@@ -97,6 +97,25 @@ url = http://localhost:9999
 
 The port above corresponds to the backend URL in step 1, so if you change one you must change the other.
 
+### Redis
+
+The backend server can be configured to connect to an optional [redis][3] server. This is not required for any of the functionality of the script, but it allows image URLs to be cached even when restarting the backend, speeding up the upload process whenever an image is reused (e.g. performer images, studio logos). If redis is not used, these URLs will still be cached in memory for as long as the server is running.
+
+Connection settings can be specified in the `[redis]` configuration section:
+
+```ini
+[redis]
+host = localhost
+port = 6379
+username = stash-empornium
+password = stash-empornium
+ssl = false
+```
+
+Any unused options can simply be omitted.
+
+[3]: https://redis.io/
+
 ## Usage
 
 1. Run `emp_stash_fill.py`
@@ -112,7 +131,8 @@ The port above corresponds to the backend URL in step 1, so if you change one yo
 The script can be run with optional command line arguments, most of which override a corresponding configuration file option. These can be used to quickly change a setting without needing to modify the config file, such as for temporarily listening on a different port or saving torrent files in a different directory. Not all configuration options can currently be set via the command line. The available options are described in the script's help text below:
 
 ```text
-usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [-q | -v | -l LEVEL]
+usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [-q | -v | -l LEVEL] [--rhost RHOST] [--rport RPORT] [--username USERNAME]
+                         [--password PASSWORD] [--use-ssl] [--flush]
 
 backend server for EMP Stash upload helper userscript
 
@@ -141,7 +161,21 @@ Output:
                         output more
   -l LEVEL, --log LEVEL
                         log level: [DEBUG | INFO | WARNING | ERROR | CRITICAL]
-```
+
+redis:
+  options for connecting to a redis server
+
+  --rhost RHOST, --redis--host RHOST, --rh RHOST
+                        host redis server is listening on
+  --rport RPORT, --redis-port RPORT, --rp RPORT
+                        port redis server is listening on (default: 6379)
+  --username USERNAME, --redis-user USERNAME
+                        redis username
+  --password PASSWORD, --redis-pass PASSWORD
+                        redis password
+  --use-ssl, -s         use SSL to connect to redis
+  --flush               flush redis cache
+  ```
 
 ## Templates
 
