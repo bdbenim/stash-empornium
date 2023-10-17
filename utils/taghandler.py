@@ -120,6 +120,9 @@ class TagHandler:
             if tag in self.tag_suggestions:
                 self.tag_suggestions.pop(tag)
         self.TAG_LISTS["ignored_tags"].sort()
+        if not self.conf["empornium"].has_option("ignored_tags"):
+            # For cosmetic purposes, add section before last blank line of section instead of after:
+            self.conf["empornium"].option_blocks()[-1].add_after.option("ignored_tags")
         self.conf.set("empornium", "ignored_tags", ", ".join(self.TAG_LISTS["ignored_tags"]))
         return self.update_file()
 

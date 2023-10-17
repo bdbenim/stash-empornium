@@ -12,6 +12,7 @@ mktorrent
 Required Python modules:
 configupdater
 Flask
+Pillow
 requests
 vcsi
 
@@ -19,6 +20,7 @@ Optional external utilities:
 mediainfo
 
 Optional Python modules:
+redis
 waitress
 """
 
@@ -99,7 +101,9 @@ mutex.add_argument(
 
 redisgroup = parser.add_argument_group("redis", "options for connecting to a redis server")
 redisgroup.add_argument("--rhost", "--redis--host", "--rh", help="host redis server is listening on")
-redisgroup.add_argument("--rport", "--redis-port", "--rp", help="port redis server is listening on (default: 6379)", type=int)
+redisgroup.add_argument(
+    "--rport", "--redis-port", "--rp", help="port redis server is listening on (default: 6379)", type=int
+)
 redisgroup.add_argument("--username", "--redis-user", help="redis username")
 redisgroup.add_argument("--password", "--redis-pass", help="redis password")
 redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
@@ -130,11 +134,21 @@ config_dir = args.configdir[0]
 template_dir = os.path.join(config_dir, "templates")
 config_file = os.path.join(config_dir, "config.ini")
 
+# Ensure config file is present
 if not os.path.isfile(config_file):
     logger.info(f"Config file not found at {config_file}, creating")
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
     shutil.copyfile("default.ini", config_file)
+
+# Ensure config file properly ends with a '\n' character
+fstr = ""
+with open(config_file, "r") as f:
+    fstr = f.read()
+if fstr[-1] != '\n':
+    with open(config_file, "w") as f:
+        f.write(fstr+'\n')
+del fstr
 
 logger.info(f"Reading config from {config_file}")
 conf.read(config_file)
@@ -147,12 +161,16 @@ skip_sections = ["empornium", "empornium.tags"]
 for section in default_conf.sections():
     if not conf.has_section(section):
         conf.add_section(section)
+        conf[section].add_space('\n')
     if section not in skip_sections:
         for option in default_conf[section].options():
             if not conf[section].has_option(option):
                 value = default_conf[section][option].value
-                conf[section].insert_at(-1).comment("Value imported automatically:")
-                conf[section].insert_at(-1).option(option, value)
+                if len(conf[section].option_blocks()) > 0:
+                    conf[section].option_blocks()[-1].add_after.comment("Value imported automatically:").option(option, value)
+                else:
+                    conf[section].add_comment("Value imported automatically:")
+                    conf[section].add_option(option, value)
                 logger.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
 try:
     conf.update_file()
@@ -185,6 +203,7 @@ for filename in os.listdir("default-templates"):
                 tmpConf.read("default.ini")
                 conf["templates"].set(filename, tmpConf["templates"][filename].value)
 
+
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
     return json.dumps({"status": "error", "message": altMessage if altMessage else message})
@@ -201,8 +220,7 @@ def info(message: str, altMessage: str | None = None) -> str:
 
 
 def getConfigOption(config: configupdater.ConfigUpdater, section: str, option: str, default: str = "") -> str:
-    config[section].setdefault(option, default)  # type: ignore
-    value = config[section][option].value
+    value = config[section][option].value if config[section].has_option(option) else default
     return value if value else ""
 
 
@@ -312,10 +330,10 @@ def img_host_upload(
     # Return default image if unknown
     if image_ext == "unk":
         return default
-    
+
     # Return cached url if available
     digest = ""
-    with open(img_path, 'rb') as f:
+    with open(img_path, "rb") as f:
         digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
     if imgCache.exists(digest):
         url = imgCache.get(digest)
@@ -462,7 +480,7 @@ def generate():
         return error("No file exists")
     elif not os.path.isfile(stash_file["path"]):
         return error(f"Couldn't find file {stash_file['path']}")
-    
+
     if len(scene["title"]) == 0:
         scene["title"] = stash_file["basename"]
 
@@ -756,16 +774,19 @@ def generate():
             framerate="{} fps".format(stash_file["frame_rate"]),
         )
     else:
-        title = render_template_string(TITLE_TEMPLATE, **{
-            "studio": scene["studio"]["name"] if scene["studio"] else "",
-            "performers": [p["name"] for p in scene["performers"]],
-            "title": scene["title"],
-            "date": scene["date"],
-            "resolution": resolution if resolution is not None else "",
-            "codec": stash_file["video_codec"],
-            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-            "framerate": stash_file["frame_rate"],
-        })
+        title = render_template_string(
+            TITLE_TEMPLATE,
+            **{
+                "studio": scene["studio"]["name"] if scene["studio"] else "",
+                "performers": [p["name"] for p in scene["performers"]],
+                "title": scene["title"],
+                "date": scene["date"],
+                "resolution": resolution if resolution is not None else "",
+                "codec": stash_file["video_codec"],
+                "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+                "framerate": stash_file["frame_rate"],
+            },
+        )
 
     ########
     # TAGS #
@@ -879,6 +900,7 @@ def generate():
         date = datetime.datetime.fromisoformat(date).strftime(DATE_FORMAT)
 
     yield info("Rendering template")
+    time.sleep(0.5)
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
         "studio_logo": logo_url,
@@ -909,25 +931,32 @@ def generate():
     description = render_template(template, **template_context)
 
     logger.info("Done")
-    yield json.dumps(
-        {
-            "status": "success",
-            "data": {
-                "message": "Done",
-                "fill": {
-                    "title": title,
-                    "cover": cover_remote_url,
-                    "tags": " ".join(tags.tags),
-                    "description": description,
-                    "torrent_path": torrent_path,
-                    "file_path": stash_file["path"],
-                },
-                "suggestions": tags.tag_suggestions
+
+    tag_suggestions = tags.tag_suggestions
+
+    result = {
+        "status": "success",
+        "data": {
+            "message": "Done",
+            "fill": {
+                "title": title,
+                "cover": cover_remote_url,
+                "tags": " ".join(tags.tags),
+                "description": description,
+                "torrent_path": torrent_path,
+                "file_path": stash_file["path"],
             },
-        }
-    )
+        },
+    }
+
+    logger.debug(f"Sending {len(tag_suggestions)} suggestions")
+    if len(tag_suggestions) > 0:
+        result["data"]["suggestions"] = tag_suggestions
+
+    yield json.dumps(result)
 
     time.sleep(1)
+
 
 @app.route("/suggestions", methods=["POST"])
 def processSuggestions():
@@ -947,19 +976,9 @@ def processSuggestions():
     success = tags.acceptSuggestions(acceptedTags)
     success = success and tags.rejectSuggestions(ignoredTags)
     if success:
-        return json.dumps({
-            "status": "success",
-            "data": {
-                "message": "Tags saved"
-            }
-        })
+        return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
     else:
-        return json.dumps({
-            "status": "error",
-            "data": {
-                "message": "Failed to save tags"
-            }
-        })
+        return json.dumps({"status": "error", "data": {"message": "Failed to save tags"}})
 
 
 @app.route("/fill", methods=["POST"])
@@ -967,9 +986,10 @@ def fill():
     return Response(generate(), mimetype="application/json")  # type: ignore
 
 
-@app.route('/suggestions', methods=["POST"])
+@app.route("/suggestions", methods=["POST"])
 def suggestions():
     return Response(processSuggestions(), mimetype="application/json")
+
 
 @app.route("/templates")
 def templates():

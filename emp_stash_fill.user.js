@@ -166,6 +166,11 @@ if (STASH_API_KEY !== null) {
   ).singleNodeValue.value;
 
   fillButton.addEventListener("click", () => {
+    let suggestionsHead = document.getElementById("suggestions-head");
+    let suggestionsBody = document.getElementById("suggestions-body");
+    if (suggestionsHead) suggestionsHead.remove();
+    if (suggestionsBody) suggestionsBody.remove();
+
     statusArea.innerHTML = "";
     instructions.innerHTML = "";
     GM_xmlhttpRequest({
@@ -246,13 +251,16 @@ if (STASH_API_KEY !== null) {
 
                       let head = document.createElement("div");
                       head.classList.add("head");
+                      head.id = "suggestions-head";
                       head.innerHTML = "Tag Suggestions";
 
                       let body = document.createElement("div");
                       body.classList.add("box", "pad");
+                      body.id = "suggestions-body";
 
                       let table = document.createElement("table");
                       table.id = "tagsuggestions";
+                      table.style.width = "1%";
                       let header = document.createElement("tr");
                       let stashTagHeader = document.createElement("th");
                       stashTagHeader.setAttribute("scope", "col");
@@ -270,7 +278,18 @@ if (STASH_API_KEY !== null) {
                       ignoreTagHeader.setAttribute("scope", "col");
                       ignoreTagHeader.style.marginLeft = "12pt";
                       ignoreTagHeader.style.marginRight = "auto";
-                      ignoreTagHeader.innerText = "Ignore?";
+                      ignoreTagHeader.innerText = "Ignore? ";
+
+                      let ignoreAll = document.createElement("input");
+                      ignoreAll.type = "checkbox";
+                      ignoreAll.addEventListener("change", function () {
+                        for (let checkbox of document.getElementsByClassName(
+                          "tag-ignore"
+                        )) {
+                          checkbox.checked = this.checked;
+                        }
+                      });
+                      ignoreTagHeader.appendChild(ignoreAll);
 
                       header.appendChild(stashTagHeader);
                       header.appendChild(empTagHeader);
@@ -295,6 +314,11 @@ if (STASH_API_KEY !== null) {
                           ignoreTagBox.style.marginLeft = "12pt";
                           ignoreTagBox.style.marginRight = "auto";
                           ignoreTagBox.style.whiteSpace = "nowrap";
+                          ignoreTagBox.style.textAlign = "center";
+                          let acceptTagBox = document.createElement("td");
+                          acceptTagBox.style.marginLeft = "12pt";
+                          acceptTagBox.style.marginRight = "auto";
+                          acceptTagBox.style.whiteSpace = "nowrap";
 
                           let tagDisplay = document.createElement("input");
                           tagDisplay.setAttribute("type", "text");
@@ -323,9 +347,67 @@ if (STASH_API_KEY !== null) {
 
                           let ignoreInput = document.createElement("input");
                           ignoreInput.setAttribute("type", "checkbox");
+                          ignoreInput.classList.add("tag-ignore");
 
                           ignoreTagBox.appendChild(ignoreInput);
                           row.appendChild(ignoreTagBox);
+
+                          let acceptTagButton = document.createElement("input");
+                          acceptTagButton.type = "submit";
+                          acceptTagButton.value = "Accept/Ignore Suggestion";
+                          acceptTagButton.addEventListener(
+                            "submit",
+                            function () {
+                              let acceptTags = [];
+                              let ignoreTags = [];
+                              if (ignoreInput.checked) {
+                                acceptTags.push({
+                                  name: tagDisplay.value,
+                                  emp: tagInput.value,
+                                });
+                              } else {
+                                ignoreTags.push(tagDisplay.value);
+                              }
+                              GM_xmlhttpRequest({
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                url: new URL("/suggestions", BACKEND).href,
+                                responseType: "json",
+                                data: JSON.stringify({
+                                  accept: acceptTags,
+                                  ignore: ignoreTags,
+                                }),
+                                context: {
+                                  statusArea: statusArea,
+                                },
+                                onload: function (response) {
+                                  try {
+                                    let j = JSON.parse(response.responseText);
+                                    if (j.status === "success") {
+                                      if ("message" in j.data) {
+                                        this.context.statusArea.innerText =
+                                          j.data.message;
+                                      }
+                                    } else if (j.status === "error") {
+                                      this.context.statusArea.innerHTML =
+                                        "<span style='color: red;'>" +
+                                        j.message +
+                                        "</span>";
+                                    }
+                                  } catch (e) {
+                                    console.warn(
+                                      "Unexpected failure to parse text: " +
+                                        response.responseText
+                                    );
+                                  }
+                                },
+                              });
+                              row.remove();
+                            }
+                          );
+
+                          acceptTagBox.appendChild(acceptTagButton);
+                          row.appendChild(acceptTagBox);
 
                           table.appendChild(row);
                         }
@@ -333,10 +415,7 @@ if (STASH_API_KEY !== null) {
 
                       let tagSubmitButton = document.createElement("input");
                       tagSubmitButton.setAttribute("type", "submit");
-                      tagSubmitButton.setAttribute(
-                        "value",
-                        "Accept Suggestions"
-                      );
+                      tagSubmitButton.value = "Accept/Ignore All Suggestions";
                       tagSubmitButton.style.marginLeft = "12pt";
 
                       body.appendChild(table);
@@ -346,30 +425,18 @@ if (STASH_API_KEY !== null) {
                         console.log("Accepting tag suggestions");
                         let acceptTags = [];
                         let ignoreTags = [];
-                        for (let i in table.rows) {
-                          let row = table.rows[i];
-                          let stashTag;
-                          let empTag;
-                          let ignore;
-                          for (let j in row.cells) {
-                            let cell = row.cells[j];
-                            switch (j) {
-                              case 0:
-                                stashTag = cell.childNodes[0].value;
-                                break;
-                              case 1:
-                                empTag = cell.childNodes[0].value;
-                                break;
-                              case 2:
-                                ignore = cell.childNodes[0].checked;
-                            }
-                          }
+                        for (const row of Array.from(table.rows).slice(1)) {
+                          let stashTag = row.cells[0].childNodes[0].value;
+                          let empTag = row.cells[1].childNodes[0].value;
+                          let ignore = row.cells[2].childNodes[0].checked;
                           if (ignore) {
                             ignoreTags.push(stashTag);
                           } else {
-                            acceptTags.push({ "name": stashTag, "emp": empTag });
+                            acceptTags.push({ name: stashTag, emp: empTag });
                           }
                         }
+                        head.remove();
+                        body.remove();
                         GM_xmlhttpRequest({
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
@@ -406,7 +473,7 @@ if (STASH_API_KEY !== null) {
                         });
                       });
 
-                      parent.insertBefore(body, parent.children[6]);
+                      parent.insertBefore(body, parent.children[7]);
                       parent.insertBefore(head, body);
                     }
                   }
@@ -419,6 +486,7 @@ if (STASH_API_KEY !== null) {
                 console.warn(
                   "The response was not read or not converted to JSON."
                 );
+                console.debug(text);
               }
             }
             if (done) break;
