@@ -216,7 +216,6 @@ if (STASH_API_KEY !== null) {
                     if (done) break;
                   }
                   text = stashData.join("");
-                  console.debug(text);
                   j = JSON.parse(text);
                 } else {
                   console.warn("Unexpected failure to read stream data.");
@@ -261,6 +260,7 @@ if (STASH_API_KEY !== null) {
                       let table = document.createElement("table");
                       table.id = "tagsuggestions";
                       table.style.width = "1%";
+                      table.style.marginLeft = "12pt";
                       let header = document.createElement("tr");
                       let stashTagHeader = document.createElement("th");
                       stashTagHeader.setAttribute("scope", "col");
@@ -299,11 +299,9 @@ if (STASH_API_KEY !== null) {
 
                       for (var key in j.data.suggestions) {
                         if (j.data.suggestions.hasOwnProperty(key)) {
-                          console.debug("Suggestion key: " + key);
                           let row = document.createElement("tr");
 
                           let stashTagBox = document.createElement("td");
-                          stashTagBox.style.marginLeft = "12pt";
                           stashTagBox.style.marginRight = "auto";
                           stashTagBox.style.whiteSpace = "nowrap";
                           let empTagBox = document.createElement("td");
@@ -323,7 +321,6 @@ if (STASH_API_KEY !== null) {
                           let tagDisplay = document.createElement("input");
                           tagDisplay.setAttribute("type", "text");
                           tagDisplay.setAttribute("disabled", true);
-                          // tagDisplay.style.marginLeft = "12pt";
                           tagDisplay.setAttribute("size", 30);
                           tagDisplay.value = key;
 
@@ -334,7 +331,6 @@ if (STASH_API_KEY !== null) {
                           tagInput.setAttribute("id", "taginput");
                           tagInput.setAttribute("size", 30);
                           tagInput.setAttribute("type", "text");
-                          // tagInput.style.marginLeft = "12pt";
                           tagInput.autocomplete = "on";
                           tagInput.value = j.data.suggestions[key];
                           unsafeWindow.AutoComplete.addInput(
@@ -356,17 +352,17 @@ if (STASH_API_KEY !== null) {
                           acceptTagButton.type = "submit";
                           acceptTagButton.value = "Accept/Ignore Suggestion";
                           acceptTagButton.addEventListener(
-                            "submit",
+                            "click",
                             function () {
                               let acceptTags = [];
                               let ignoreTags = [];
                               if (ignoreInput.checked) {
+                                ignoreTags.push(tagDisplay.value);
+                              } else {
                                 acceptTags.push({
                                   name: tagDisplay.value,
                                   emp: tagInput.value,
                                 });
-                              } else {
-                                ignoreTags.push(tagDisplay.value);
                               }
                               GM_xmlhttpRequest({
                                 method: "POST",
@@ -472,6 +468,17 @@ if (STASH_API_KEY !== null) {
                           },
                         });
                       });
+
+                      let tagCloseButton = document.createElement("input");
+                      tagCloseButton.setAttribute("type", "submit");
+                      tagCloseButton.value = "Close Suggestions";
+                      tagCloseButton.style.marginLeft = "12pt";
+                      tagCloseButton.addEventListener("click", function(){
+                        head.remove();
+                        body.remove();
+                      });
+
+                      body.appendChild(tagCloseButton);
 
                       parent.insertBefore(body, parent.children[7]);
                       parent.insertBefore(head, body);

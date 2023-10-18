@@ -54,7 +54,7 @@ class TagHandler:
         mapping for a provided tag and add it to
         the working lists, or generate a suggested
         mapping."""
-        if "ignored_tags" in self.TAG_LISTS and tag in self.TAG_LISTS["ignored_tags"]:
+        if "ignored_tags" in self.TAG_LISTS and tag.lower() in self.TAG_LISTS["ignored_tags"]:
             return None
         if tag.lower() in self.TAGS_MAP:
             self.tags.add(self.TAGS_MAP[tag.lower()])
@@ -116,7 +116,7 @@ class TagHandler:
         if "ignored_tags" not in self.TAG_LISTS:
             self.TAG_LISTS["ignored_tags"] = []
         for tag in tags:
-            self.TAG_LISTS["ignored_tags"].append(tag)
+            self.TAG_LISTS["ignored_tags"].append(tag.lower())
             if tag in self.tag_suggestions:
                 self.tag_suggestions.pop(tag)
         self.TAG_LISTS["ignored_tags"].sort()
