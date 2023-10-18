@@ -328,7 +328,6 @@ if (STASH_API_KEY !== null) {
                           row.appendChild(stashTagBox);
 
                           let tagInput = document.createElement("input");
-                          tagInput.setAttribute("id", "taginput");
                           tagInput.setAttribute("size", 30);
                           tagInput.setAttribute("type", "text");
                           tagInput.autocomplete = "on";
@@ -363,6 +362,7 @@ if (STASH_API_KEY !== null) {
                                   name: tagDisplay.value,
                                   emp: tagInput.value,
                                 });
+                                document.getElementById("taginput").value += " " + tagInput.value;
                               }
                               GM_xmlhttpRequest({
                                 method: "POST",
@@ -429,6 +429,7 @@ if (STASH_API_KEY !== null) {
                             ignoreTags.push(stashTag);
                           } else {
                             acceptTags.push({ name: stashTag, emp: empTag });
+                            document.getElementById("taginput").value += " " + empTag;
                           }
                         }
                         head.remove();
