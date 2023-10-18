@@ -26,7 +26,7 @@ waitress
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 # external
 import requests
@@ -170,7 +170,7 @@ for section in default_conf.sections():
                     conf[section].option_blocks()[-1].add_after.comment("Value imported automatically:").option(option, value)
                 else:
                     conf[section].add_comment("Value imported automatically:")
-                    conf[section].add_option(option, value)
+                    conf[section].add_option(configupdater.Option(option, value))
                 logger.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
 try:
     conf.update_file()
