@@ -98,6 +98,11 @@ class TagHandler:
                 if cca2 in self.DEMONYMS:
                     logger.debug(f"Found demonyms {self.DEMONYMS[cca2]} for performer {performer['name']}")
                     self.tags.update(self.DEMONYMS[cca2])
+        if "circumcised" in performer:
+            if performer["circumcised"] == "CUT":
+                self.tags.add("circumcised.cock")
+            elif performer["circumcised"] == "UNCUT":
+                self.tags.add("uncircumcised.cock")
         return performer_tag
 
     def empify(self, tag: str) -> str:

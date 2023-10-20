@@ -245,6 +245,7 @@ if (STASH_API_KEY !== null) {
                       '" disabled></div></li>';
                     instructions += "</ol>";
                     this.context.instructions.innerHTML = instructions;
+
                     if ("suggestions" in j.data) {
                       let parent = document.getElementsByClassName("thin")[0];
 

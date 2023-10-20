@@ -305,6 +305,7 @@ findScene(id: "{}") {{
     }}
     performers {{
         name
+        circumcised
         country
         gender
         image_path
