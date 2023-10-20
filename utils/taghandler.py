@@ -28,7 +28,7 @@ class TagHandler:
         assert conf._filename is not None
         self.conf = conf
         self.TAGS_MAP = conf["empornium.tags"].to_dict() # type: ignore
-        for key in conf["empornium"].options():
+        for key in conf["empornium"]:
             self.TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
             self.TAG_LISTS[key].sort()
             conf["empornium"].set(key, ", ".join(self.TAG_LISTS[key]))
