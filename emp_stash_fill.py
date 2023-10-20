@@ -308,6 +308,8 @@ findScene(id: "{}") {{
         circumcised
         country
         gender
+        height_cm
+        measurements
         image_path
         tags {{
             name
