@@ -333,12 +333,13 @@ def img_host_upload(
 
     # Return cached url if available
     digest = ""
-    with open(img_path, "rb") as f:
-        digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
-    if imgCache.exists(digest):
-        url = imgCache.get(digest)
-        logger.debug(f"Found url {url} in cache")
-        return url
+    if width == 0:
+        with open(img_path, "rb") as f:
+            digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
+        if imgCache.exists(digest):
+            url = imgCache.get(digest)
+            logger.debug(f"Found url {url} in cache")
+            return url
 
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
@@ -360,6 +361,12 @@ def img_host_upload(
         with Image.open(img_path) as img:
             img.thumbnail((width, img.height))
             img.save(img_path)
+        with open(img_path, "rb") as f:
+            digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
+        if imgCache.exists(digest):
+            url = imgCache.get(digest)
+            logger.debug(f"Found url {url} in cache")
+            return url
 
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > 5000000:
