@@ -807,7 +807,7 @@ def generate():
         tags.add(f"{year}.{month}.{day}")
 
     if TAG_FRAMERATE:
-        tags.add(str(stash_file["frame_rate"]) + ".fps")
+        tags.add(str(round(stash_file["frame_rate"])) + ".fps")
 
     if scene["studio"] and scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
