@@ -23,7 +23,7 @@ class TagHandler:
         self.logger = logging.getLogger(__name__)
         assert conf._filename is not None
         self.conf = conf
-        self.TAGS_MAP = conf["empornium.tags"].to_dict()
+        self.TAGS_MAP = conf["empornium.tags"].to_dict() # type: ignore
         for key in conf["empornium"]:
             self.TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
             self.TAG_LISTS[key].sort()
@@ -70,7 +70,7 @@ class TagHandler:
         '.' and strips out all other characters that are 
         not alphanumeric before finally converting the full 
         string to lowercase."""
-        newtag = re.sub(r"[^\w\s]", "", tag).lower()
+        newtag = re.sub(r"[^\w\s\.]", "", tag).lower()
         newtag = re.sub(r"\s+", ".", newtag)
         self.logger.debug(f"Reformatted tag '{tag}' to '{newtag}'")
         return newtag

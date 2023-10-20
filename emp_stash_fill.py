@@ -26,7 +26,7 @@ waitress
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.9.0"
+__version__ = "0.8.2"
 
 # external
 import requests
@@ -807,7 +807,7 @@ def generate():
         tags.add(f"{year}.{month}.{day}")
 
     if TAG_FRAMERATE:
-        tags.add(str(stash_file["frame_rate"]) + "fps")
+        tags.add(str(stash_file["frame_rate"]) + ".fps")
 
     if scene["studio"] and scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
