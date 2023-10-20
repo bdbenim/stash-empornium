@@ -63,6 +63,8 @@ PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.
 STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 
+ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
+
 #############
 # ARGUMENTS #
 #############
@@ -115,6 +117,7 @@ log_level = getattr(logging, args.log) if args.log else min(10 * args.level, 50)
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=log_level)
 logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}")
+logger.info(ODBL_NOTICE)
 
 ##########
 # CONFIG #
@@ -122,12 +125,6 @@ logger.info(f"stash-empornium version {__version__}")
 
 conf = configupdater.ConfigUpdater()
 default_conf = configupdater.ConfigUpdater()
-
-# if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
-#     config_dir = sys.argv[-1]
-# else:
-#     work_dir = os.getcwd()
-#     config_dir = os.path.join(work_dir, "config")
 
 config_dir = args.configdir[0]
 
@@ -169,8 +166,9 @@ for section in default_conf.sections():
                 if len(conf[section].option_blocks()) > 0:
                     conf[section].option_blocks()[-1].add_after.comment("Value imported automatically:").option(option, value)
                 else:
-                    conf[section].add_comment("Value imported automatically:")
-                    conf[section].add_option(configupdater.Option(option, value))
+                    opt = configupdater.Option(option, value)
+                    conf[section].add_option(opt)
+                    opt.add_before.comment("Value imported automatically:")
                 logger.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
 try:
     conf.update_file()
@@ -287,8 +285,52 @@ if conf["stash"].has_option("api_key"):
 
 stash_query = """
 findScene(id: "{}") {{
-  title details director date studio {{ name url image_path parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot preview webp}}
-  files {{ id path basename width height format duration video_codec audio_codec frame_rate bit_rate size }}
+    title
+    details
+    director
+    date
+    studio {{
+        name
+        url
+        image_path
+        parent_studio {{
+            url
+        }}
+    }}
+    tags {{
+        name
+        parents {{
+            name
+        }}
+    }}
+    performers {{
+        name
+        country
+        gender
+        image_path
+        tags {{
+            name
+        }}
+    }}
+    paths {{
+        screenshot
+        preview
+        webp
+    }}
+    files {{
+        id
+        path
+        basename
+        width
+        height
+        format
+        duration
+        video_codec
+        audio_codec
+        frame_rate
+        bit_rate
+        size
+    }}
 }}
 """
 
@@ -602,11 +644,7 @@ def generate():
     ##############
 
     for performer in scene["performers"]:
-        performer_tag = tags.add(performer["name"])
-        # also include alias tags?
-
-        for tag in performer["tags"]:
-            tags.processTag(tag["name"])
+        performer_tag = tags.processPerformer(performer)
 
         # image
         logger.debug(f'Downloading performer image from {performer["image_path"]}')
@@ -807,7 +845,7 @@ def generate():
         tags.add(f"{year}.{month}.{day}")
 
     if TAG_FRAMERATE:
-        tags.add(str(stash_file["frame_rate"]) + "fps")
+        tags.add(str(stash_file["frame_rate"]) + ".fps")
 
     if scene["studio"] and scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
