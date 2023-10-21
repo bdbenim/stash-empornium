@@ -31,27 +31,23 @@ __version__ = "0.8.2"
 # external
 import requests
 from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
-from PIL import Image, ImageSequence
 import configupdater
 from cairosvg import svg2png
 
 # built-in
 import argparse
 import datetime
-import hashlib
 import json
 import logging
 import math
 import os
 import pathlib
-import re
 import shutil
 import string
 import subprocess
 import tempfile
 import urllib.parse
 import time
-import uuid
 
 # included
 from utils import taghandler, imagehandler
@@ -107,7 +103,9 @@ redisgroup.add_argument("--username", "--redis-user", help="redis username")
 redisgroup.add_argument("--password", "--redis-pass", help="redis password")
 redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
 redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
-redisgroup.add_argument("--no-cache", help="do not retrieve cached values", action="store_true") # TODO implement
+cache = redisgroup.add_mutually_exclusive_group()
+cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true") # TODO implement
+cache.add_argument("--overwrite", help="overwrite cached values", action="store_true") # TODO implement
 
 args = parser.parse_args()
 
@@ -299,9 +297,14 @@ ssl = args.use_ssl or getConfigOption(conf, "redis", "ssl", "false").lower() == 
 username = args.username if args.username else getConfigOption(conf, "redis", "username", "")
 password = args.password if args.password else getConfigOption(conf, "redis", "password", "")
 
-imgCache = imagehandler.ImageHandler(host, port, username, password, ssl)
+images = None
+try:
+    images = imagehandler.ImageHandler(host, port, username, password, ssl, args.no_cache, args.overwrite)
+except Exception as e:
+    logger.critical("Failed to initialize image handler")
+    exit(1)
 if args.flush:
-    imgCache.clear()
+    images.clear()
 
 app = Flask(__name__, template_folder=template_dir)
 
@@ -459,10 +462,10 @@ def generate():
             fp.write(cover_response.content)
 
     yield info("Uploading cover")
-    cover_remote_url = imgCache.img_host_upload(cover_file[1], cover_mime_type, cover_ext)[0]
+    cover_remote_url = images.img_host_upload(cover_file[1], cover_mime_type, cover_ext)[0]
     if cover_remote_url is None:
         return error("Failed to upload cover")
-    cover_resized_url = imgCache.img_host_upload(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
+    cover_resized_url = images.img_host_upload(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
     os.remove(cover_file[1])
 
     ###############
@@ -548,7 +551,7 @@ def generate():
     #################
 
     # upload images and paste in description
-    contact_sheet_remote_url = imgCache.generate_contact_sheet(stash_file)
+    contact_sheet_remote_url = images.generate_contact_sheet(stash_file)
     if contact_sheet_remote_url is None:
         return error("Failed to generate contact sheet")
 
@@ -557,7 +560,7 @@ def generate():
     ###########
 
     if gen_screens:
-        screens_urls = imgCache.generate_screens(stash_file=stash_file) # TODO customize number of screens from config
+        screens_urls = images.generate_screens(stash_file=stash_file) # TODO customize number of screens from config
         if screens_urls is None or None in screens_urls:
             return error("Failed to generate screens")
 
@@ -704,27 +707,27 @@ def generate():
     
     yield info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = imgCache.img_host_upload(
+        performers[performer_name]["image_remote_url"] = images.img_host_upload(
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
-            default=imgCache.PERFORMER_DEFAULT_IMAGE,
+            default=imagehandler.PERFORMER_DEFAULT_IMAGE,
         )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            performers[performer_name]["image_remote_url"] = imgCache.PERFORMER_DEFAULT_IMAGE
+            performers[performer_name]["image_remote_url"] = imagehandler.PERFORMER_DEFAULT_IMAGE
             logger.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = imgCache.STUDIO_DEFAULT_LOGO
+    logo_url = imagehandler.STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
         yield info("Uploading studio logo")
-        logo_url = imgCache.img_host_upload(
+        logo_url = images.img_host_upload(
             studio_img_file[1],
             sudio_img_mime_type,
             studio_img_ext,
         )[0]
         if logo_url is None:
-            logo_url = imgCache.STUDIO_DEFAULT_LOGO
+            logo_url = imagehandler.STUDIO_DEFAULT_LOGO
             logger.warning("Unable to upload studio image")
 
     ############

@@ -24,21 +24,20 @@ except:
     logger.info("Redis module not found, using local caching only")
 
 CHUNK_SIZE = 5000
-
+PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
+STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+PREFIX = "stash-empornium"
+HASH_PREFIX = f"{PREFIX}-file"
 
 class ImageHandler:
     urls: dict = {}
     digests: dict[str, dict[str,list[str]]] = {}
     redis = None
-    prefix: str = "stash-empornium"
-    hash_prefix: str = f"{prefix}-file"
     no_cache: bool = False
+    overwrite: bool = False
 
     cookies = None
     img_host_token: str
-
-    PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-    STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
 
     def __init__(
         self,
@@ -48,7 +47,9 @@ class ImageHandler:
         password: str | None = None,
         use_ssl: bool = False,
         no_cache: bool = False,
+        overwrite: bool = False,
     ) -> None:
+        self.overwrite = overwrite
         if not no_cache and redisHost is not None and use_redis:
             self.redis = redis.Redis(
                 redisHost, redisPort, username=user, password=password, ssl=use_ssl, decode_responses=True
@@ -69,9 +70,11 @@ class ImageHandler:
     def __connectionInit(self):
         img_host_request = requests.get("https://jerking.empornium.ph/json")
         m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
-        if m is None:
+        try:
+            assert m is not None
+        except:
             logger.critical("Unable to get auth token for image host.")
-            return None
+            raise
         self.img_host_token = m.group(1)
         self.cookies = img_host_request.cookies
         self.cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
@@ -187,22 +190,22 @@ class ImageHandler:
     def exists(self, key: str) -> bool:
         if key in self.urls:
             return True
-        return self.redis is not None and self.redis.exists(f"{self.prefix}:{key}") != 0
+        return self.redis is not None and self.redis.exists(f"{PREFIX}:{key}") != 0
 
     def get(self, key: str) -> Optional[str]:
-        if self.no_cache:
+        if self.no_cache or self.overwrite:
             return None
         if key in self.urls:
             return self.urls[key]
         elif self.redis is not None:
-            value = self.redis.get(f"{self.prefix}:{key}")
+            value = self.redis.get(f"{PREFIX}:{key}")
             if value is not None:
                 self.urls[key] = str(value)
                 return str(value)
         return None
 
     def get_images(self, id: str, key: str) -> list[Optional[str]]:
-        if self.no_cache:
+        if self.no_cache or self.overwrite:
             logger.debug("Skipping cache check")
             return [None]
         if id in self.digests and key in self.digests[id]:
@@ -210,7 +213,7 @@ class ImageHandler:
             logger.debug(f"Got {len(urls)} urls of type {key} for file {id} from local cache")
             return urls
         if self.redis is not None:
-            digests = self.redis.hget(f"{self.hash_prefix}:{id}", key)
+            digests = self.redis.hget(f"{HASH_PREFIX}:{id}", key)
             if digests is not None:
                 if id not in self.digests:
                     self.digests[id] = {}
@@ -289,7 +292,7 @@ class ImageHandler:
         self.digests[id][key] = digests
         logger.debug(f"Added {len(digests)} image digests of type {key} to local cache")
         if self.redis is not None:
-            self.redis.hset(f"{self.hash_prefix}:{id}", key, ":".join(digests))
+            self.redis.hset(f"{HASH_PREFIX}:{id}", key, ":".join(digests))
             logger.debug(f"Added {len(digests)} image digests of type {key} to remote cache")
 
     def add(self, key, value) -> None:
@@ -297,14 +300,14 @@ class ImageHandler:
             return None
         self.urls[key] = value
         if self.redis is not None:
-            self.redis.set(f"{self.prefix}:{key}", value)
+            self.redis.set(f"{PREFIX}:{key}", value)
 
     def clear(self) -> None:
         lcount = len(self.urls)
         self.urls.clear()
         if self.redis is not None:
             cursor = 0
-            ns_keys = f"{self.prefix}:*"
+            ns_keys = f"{PREFIX}:*"
             count = 0
             while True:
                 cursor, keys = self.redis.scan(cursor=cursor, match=ns_keys, count=CHUNK_SIZE)  # type: ignore
