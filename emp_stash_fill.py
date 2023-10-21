@@ -34,7 +34,6 @@ from flask import Flask, Response, request, stream_with_context, render_template
 from PIL import Image, ImageSequence
 import configupdater
 from cairosvg import svg2png
-from utils import cache
 
 # built-in
 import argparse
@@ -53,14 +52,14 @@ import tempfile
 import urllib.parse
 import time
 import uuid
-from utils import taghandler
+
+# included
+from utils import taghandler, imagehandler
 
 #############
 # CONSTANTS #
 #############
 
-PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 
 #############
@@ -108,6 +107,7 @@ redisgroup.add_argument("--username", "--redis-user", help="redis username")
 redisgroup.add_argument("--password", "--redis-pass", help="redis password")
 redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
 redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
+redisgroup.add_argument("--no-cache", help="do not retrieve cached values", action="store_true") # TODO implement
 
 args = parser.parse_args()
 
@@ -299,121 +299,11 @@ ssl = args.use_ssl or getConfigOption(conf, "redis", "ssl", "false").lower() == 
 username = args.username if args.username else getConfigOption(conf, "redis", "username", "")
 password = args.password if args.password else getConfigOption(conf, "redis", "password", "")
 
-imgCache = cache.Cache(host, port, username, password, ssl)
+imgCache = imagehandler.ImageHandler(host, port, username, password, ssl)
 if args.flush:
     imgCache.clear()
 
 app = Flask(__name__, template_folder=template_dir)
-
-
-def isWebpAnimated(path: str):
-    with Image.open(path) as img:
-        count = 0
-        for frame in ImageSequence.Iterator(img):
-            count += 1
-        return count > 1
-
-
-def img_host_upload(
-    token: str,
-    cookies,
-    img_path: str,
-    img_mime_type: str,
-    image_ext: str,
-    width: int = 0,
-    default: str = STUDIO_DEFAULT_LOGO,
-) -> str | None:
-    """Upload an image and return the URL, or None if there is an error. Optionally takes
-    a width, and scales the image down to that width if it is larger."""
-    logger.debug(f"Uploading image from {img_path}")
-
-    # Return default image if unknown
-    if image_ext == "unk":
-        return default
-
-    # Return cached url if available
-    digest = ""
-    if width == 0:
-        with open(img_path, "rb") as f:
-            digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
-        if imgCache.exists(digest):
-            url = imgCache.get(digest)
-            logger.debug(f"Found url {url} in cache")
-            return url
-
-    # Convert animated webp to gif
-    if img_mime_type == "image/webp":
-        if isWebpAnimated(img_path):
-            with Image.open(img_path) as img:
-                img_path = img_path.strip(image_ext) + "gif"
-                img.save(img_path, save_all=True)
-            img_mime_type = "image/gif"
-            image_ext = "gif"
-        else:
-            with Image.open(img_path) as img:
-                img_path = img_path.strip(image_ext) + "png"
-                img.save(img_path)
-            img_mime_type = "image/png"
-            image_ext = "png"
-        logger.debug(f"Saved image as {img_path}")
-
-    if width > 0:
-        with Image.open(img_path) as img:
-            img.thumbnail((width, img.height))
-            img.save(img_path)
-        with open(img_path, "rb") as f:
-            digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
-        if imgCache.exists(digest):
-            url = imgCache.get(digest)
-            logger.debug(f"Found url {url} in cache")
-            return url
-
-    # Quick and dirty resize for images above max filesize
-    if os.path.getsize(img_path) > 5000000:
-        CMD = ["ffmpeg", "-i", img_path, "-vf", "scale=iw:ih", "-y", img_path]
-        proc = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.STDOUT, text=True)
-        logger.debug(f"ffmpeg output:\n{proc.stdout}")
-        while os.path.getsize(img_path) > 5000000:
-            with Image.open(img_path) as img:
-                img.thumbnail((int(img.width * 0.95), int(img.height * 0.95)), Image.LANCZOS)
-                img.save(img_path)
-        logger.debug(f"Resized {img_path}")
-
-    files = {
-        "source": (
-            str(uuid.uuid4()) + "." + image_ext,
-            open(img_path, "rb"),
-            img_mime_type,
-        )
-    }
-    request_body = {
-        "thumb_width": 160,
-        "thumb_height": 160,
-        "thumb_crop": False,
-        "medium_width": 800,
-        "medium_crop": "false",
-        "type": "file",
-        "action": "upload",
-        "timestamp": int(time.time() * 1e3),  # Time in milliseconds
-        "auth_token": token,
-        "nsfw": 0,
-    }
-    headers = {
-        "accept": "application/json",
-        "origin": "https://jerking.empornium.ph",
-        "referer": "https://jerking.empornium.ph/",
-    }
-    url = "https://jerking.empornium.ph/json"
-    response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
-    if "error" in response.json():
-        logger.error(f"Error uploading image: {response.json()['error']['message']}")
-        return default
-    # Cache and return url
-    url = response.json()["image"]["image"]["url"]
-    imgCache.add(digest, url)
-    logger.debug(f"Added {url} to cache for {img_path}")
-    return url
-
 
 @stream_with_context
 def generate():
@@ -431,7 +321,7 @@ def generate():
     assert template is not None
 
     performers = {}
-    screens = []
+    screens_urls = []
     studio_tag = ""
 
     tags.clear()
@@ -568,6 +458,13 @@ def generate():
         with open(cover_file[1], "wb") as fp:
             fp.write(cover_response.content)
 
+    yield info("Uploading cover")
+    cover_remote_url = imgCache.img_host_upload(cover_file[1], cover_mime_type, cover_ext)[0]
+    if cover_remote_url is None:
+        return error("Failed to upload cover")
+    cover_resized_url = imgCache.img_host_upload(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
+    os.remove(cover_file[1])
+
     ###############
     # STUDIO LOGO #
     ###############
@@ -651,45 +548,18 @@ def generate():
     #################
 
     # upload images and paste in description
-    contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
-    cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
-    yield info("Generating contact sheet")
-    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    logger.debug(f"vcsi output:\n{process.stdout}")
-    if process.returncode != 0:
-        return error("vcsi failed", "Couldn't generate contact sheet")
+    contact_sheet_remote_url = imgCache.generate_contact_sheet(stash_file)
+    if contact_sheet_remote_url is None:
+        return error("Failed to generate contact sheet")
 
     ###########
     # SCREENS #
     ###########
 
-    num_frames = 10
     if gen_screens:
-        yield info(f"Generating screens for {stash_file['path']}", "Generating screenshots")
-
-        for seek in map(
-            lambda i: stash_file["duration"] * (0.05 + i / (num_frames - 1) * 0.9),
-            range(num_frames),
-        ):
-            screen_file = tempfile.mkstemp(suffix="-screen.jpg")
-            screens.append(screen_file[1])
-            cmd = [
-                "ffmpeg",
-                "-v",
-                "error",
-                "-y",
-                "-ss",
-                str(seek),
-                "-i",
-                stash_file["path"],
-                "-frames:v",
-                "1",
-                "-vf",
-                "scale=960:-2",
-                screen_file[1],
-            ]
-            process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            logger.debug(f"ffmpeg output:\n{process.stdout}")
+        screens_urls = imgCache.generate_screens(stash_file=stash_file) # TODO customize number of screens from config
+        if screens_urls is None or None in screens_urls:
+            return error("Failed to generate screens")
 
     audio_bitrate = ""
     cmd = [
@@ -705,7 +575,7 @@ def generate():
         stash_file["path"],
     ]
     try:
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         logger.debug(f"ffprobe output:\n{proc.stdout}")
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
 
@@ -831,69 +701,31 @@ def generate():
     ##########
 
     yield json.dumps({"status": "success", "data": {"message": "Uploading images"}})
-
-    img_host_request = requests.get("https://jerking.empornium.ph/json")
-    m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
-    if m is None:
-        return error("Unable to get auth token for image host.")
-    img_host_token = m.group(1)
-    cookies = img_host_request.cookies
-    cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
-    cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
-
-    yield info("Uploading cover")
-    cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
-    if cover_remote_url is None:
-        return error("Failed to upload cover")
-    cover_resized_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext, width=800)
-    os.remove(cover_file[1])
-    yield info("Uploading contact sheet")
-    contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
-    if contact_sheet_remote_url is None:
-        return error("Failed to upload contact sheet")
-    os.remove(contact_sheet_file[1])
+    
     yield info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = img_host_upload(
-            img_host_token,
-            cookies,
+        performers[performer_name]["image_remote_url"] = imgCache.img_host_upload(
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
-            default=PERFORMER_DEFAULT_IMAGE,
-        )
+            default=imgCache.PERFORMER_DEFAULT_IMAGE,
+        )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            performers[performer_name]["image_remote_url"] = PERFORMER_DEFAULT_IMAGE
+            performers[performer_name]["image_remote_url"] = imgCache.PERFORMER_DEFAULT_IMAGE
             logger.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = STUDIO_DEFAULT_LOGO
+    logo_url = imgCache.STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
         yield info("Uploading studio logo")
-        logo_url = img_host_upload(
-            img_host_token,
-            cookies,
+        logo_url = imgCache.img_host_upload(
             studio_img_file[1],
             sudio_img_mime_type,
             studio_img_ext,
-        )
+        )[0]
         if logo_url is None:
-            logo_url = STUDIO_DEFAULT_LOGO
+            logo_url = imgCache.STUDIO_DEFAULT_LOGO
             logger.warning("Unable to upload studio image")
-
-    screens_urls = []
-    a = 1
-    b = len(screens)
-    if b > 0:
-        yield info("Uploading screens")
-    for screen in screens:
-        logger.debug(f"Uploading screens ({a} of {b})")
-        a += 1
-        scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
-        if scrn_url is None:
-            return error("Failed to upload screens")
-        screens_urls.append(scrn_url)
-        os.remove(screen)
 
     ############
     # TEMPLATE #
