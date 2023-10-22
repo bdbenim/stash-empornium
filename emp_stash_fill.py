@@ -82,6 +82,7 @@ flags.add_argument("-d", action="store_true", help="include date as tag")
 flags.add_argument("-f", action="store_true", help="include framerate as tag")
 flags.add_argument("-r", action="store_true", help="include resolution as tag")
 parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
+parser.add_argument("--anon", action="store_true", help="upload anonymously")
 mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
 mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
 mutex.add_argument("-v", "--verbose", "--debug", dest="level", action="store_const", const=1, help="output more")
@@ -242,6 +243,8 @@ def mapPath(f: dict) -> dict:
     return f
 
 # TODO: better handling of unexpected values
+ANON: bool = args.anon or getConfigOption(conf, "backend", "anon", "false").lower() == "true"
+logger.debug(f"Anonymous uploading: {ANON}")
 STASH_URL = getConfigOption(conf, "stash", "url", "http://localhost:9999")
 assert STASH_URL is not None
 PORT = args.port[0] if args.port else int(getConfigOption(conf, "backend", "port", "9932"))  # type: ignore
@@ -806,6 +809,7 @@ def generate():
                 "description": description,
                 "torrent_path": torrent_paths[0],
                 "file_path": stash_file["path"],
+                "anon": ANON,
             },
         },
     }
