@@ -18,6 +18,7 @@ vcsi
 
 Optional external utilities:
 mediainfo
+redis
 
 Optional Python modules:
 redis
@@ -26,7 +27,7 @@ waitress
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.10.0"
+__version__ = "0.10.1"
 
 # external
 import requests
