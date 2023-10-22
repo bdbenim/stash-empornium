@@ -126,6 +126,7 @@ class ImageHandler:
             with Image.open(img_path) as img:
                 img.thumbnail((width, img.height))
                 img.save(img_path)
+                logger.debug(f"Resized image to {img.width}x{img.height}")
             with open(img_path, "rb") as f:
                 digest = hashlib.file_digest(f, hashlib.md5).hexdigest()
             url = self.get(digest)
