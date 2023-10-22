@@ -278,10 +278,12 @@ class ImageHandler:
             process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             url, digest = self.img_host_upload(screen_file[1], "image/jpeg", "jpg")
             screens.append(url)
-            digests.append(digest)
+            if digest is not None:
+                digests.append(digest)
             if len(process.stdout) > 0:
                 logger.debug(f"ffmpeg output:\n{process.stdout}")
-        self.set_images(stash_file["id"], "screens", digests)
+        if len(digests) > 0:
+            self.set_images(stash_file["id"], "screens", digests)
         logger.debug(f"Screens: {screens}")
         return screens
 
