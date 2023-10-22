@@ -221,6 +221,21 @@ def getConfigOption(config: configupdater.ConfigUpdater, section: str, option: s
     value = config[section][option].value if config[section].has_option(option) else default
     return value if value else ""
 
+def mapPath(f: dict) -> dict:
+    # Apply remote path mappings
+    logger.debug(f"Got path {f['path']} from stash")
+    for remote, localopt in conf.items("file.maps"):
+        local = localopt.value
+        assert local is not None
+        if not f["path"].startswith(remote):
+            continue
+        if remote[-1] != "/":
+            remote += "/"
+        if local[-1] != "/":
+            local += "/"
+        f["path"] = local + f["path"].removeprefix(remote)
+        break
+    return f
 
 # TODO: better handling of unexpected values
 STASH_URL = getConfigOption(conf, "stash", "url", "http://localhost:9999")
@@ -333,6 +348,7 @@ def generate():
     # STASH REQUEST #
     #################
 
+    logger.info("Querying stash")
     stash_request_body = {"query": "{" + stash_query.format(scene_id) + "}"}
     stash_response = requests.post(
         urllib.parse.urljoin(STASH_URL, "/graphql"),
@@ -360,24 +376,16 @@ def generate():
     for f in scene["files"]:
         logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
-            # Apply remote path mappings
-            logger.debug(f"Got path {f['path']} from stash")
-            for remote, localopt in conf.items("file.maps"):
-                local = localopt.value
-                assert local is not None
-                if not f["path"].startswith(remote):
-                    continue
-                if remote[-1] != "/":
-                    remote += "/"
-                if local[-1] != "/":
-                    local += "/"
-                f["path"] = local + f["path"].removeprefix(remote)
-                break
             stash_file = f
+            stash_file = mapPath(stash_file)
             break
 
     if stash_file is None:
-        return error("No file exists")
+        tmp_file = scene["files"][0]
+        if tmp_file is None:
+            return error("No file exists")
+        stash_file = mapPath(tmp_file)
+        logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
         return error(f"Couldn't find file {stash_file['path']}")
 
