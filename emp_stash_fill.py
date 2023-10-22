@@ -118,6 +118,12 @@ logger.info(f"stash-empornium version {__version__}")
 # CONFIG #
 ##########
 
+def renameKey(section: str, oldkey: str, newkey: str) -> None:
+    if conf[section].has_option(oldkey):
+        conf[section][oldkey].key = newkey
+        conf.update_file()
+        logger.info(f"Key '{oldkey}' renamed to '{newkey}'")
+
 conf = configupdater.ConfigUpdater()
 default_conf = configupdater.ConfigUpdater()
 
@@ -150,10 +156,8 @@ del fstr
 
 logger.info(f"Reading config from {config_file}")
 conf.read(config_file)
-if conf["backend"].has_option("date_default"):
-    conf["backend"]["date_default"].key = "date_format"
-    conf.update_file()
-    logger.info("Key 'date_default' renamed to 'date_format'")
+renameKey("backend", "date_default", "date_format")
+renameKey("backend", "torrent_directory", "torrent_directories")
 default_conf.read("default.ini")
 skip_sections = ["empornium", "empornium.tags"]
 for section in default_conf.sections():
@@ -242,18 +246,24 @@ STASH_URL = getConfigOption(conf, "stash", "url", "http://localhost:9999")
 assert STASH_URL is not None
 PORT = args.port[0] if args.port else int(getConfigOption(conf, "backend", "port", "9932"))  # type: ignore
 DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakestash-v2")
-TORRENT_DIR = (
-    args.torrentdir[0]
+TORRENT_DIRS = (
+    [args.torrentdir[0]]
     if args.torrentdir
-    else getConfigOption(conf, "backend", "torrent_directory", str(pathlib.Path.home()))
+    else [x.strip() for x in getConfigOption(conf, "backend", "torrent_directories", str(pathlib.Path.home())).split(",")]
 )
-assert TORRENT_DIR is not None
-if not os.path.isdir(TORRENT_DIR):
-    if os.path.isfile(TORRENT_DIR):
-        logger.critical(f"Cannot use {TORRENT_DIR} for torrents, path is a file")
-        exit(1)
-    logger.info(f"Creating directory {TORRENT_DIR}")
-    os.makedirs(TORRENT_DIR)
+assert TORRENT_DIRS is not None and len(TORRENT_DIRS) > 0
+for dir in TORRENT_DIRS:
+    if not os.path.isdir(dir):
+        if os.path.isfile(dir):
+            logger.error(f"Cannot use {dir} for torrents, path is a file")
+            TORRENT_DIRS.remove(dir)
+            exit(1)
+        logger.info(f"Creating directory {dir}")
+        os.makedirs(dir)
+logger.debug(f"Torrent directories: {TORRENT_DIRS}")
+if len(TORRENT_DIRS) == 0:
+    logger.critical("No valid output directories found")
+    exit(1)
 TITLE_FORMAT = None
 TITLE_TEMPLATE = None
 if conf["backend"].has_option("title_default"):
@@ -605,7 +615,7 @@ def generate():
     # logger.debug(f"Sanitized filename: {basename}")
     # basename = stash_file["basename"]
     temppath = os.path.join(tempdir.name, basename + ".torrent")
-    torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
+    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in TORRENT_DIRS]
     logger.debug(f"Saving torrent to {temppath}")
     cmd = [
         "mktorrent",
@@ -626,9 +636,10 @@ def generate():
     if process.returncode != 0:
         tempdir.cleanup()
         return error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
-    shutil.move(temppath, torrent_path)
+    for path in torrent_paths:
+        shutil.copy(temppath, path)
     tempdir.cleanup()
-    logger.debug(f"Moved torrent to {torrent_path}")
+    logger.debug(f"Moved torrent to {torrent_paths}")
 
     #############
     # MEDIAINFO #
@@ -793,7 +804,7 @@ def generate():
                 "cover": cover_remote_url,
                 "tags": " ".join(tags.tags),
                 "description": description,
-                "torrent_path": torrent_path,
+                "torrent_path": torrent_paths[0],
                 "file_path": stash_file["path"],
             },
         },
