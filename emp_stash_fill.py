@@ -27,7 +27,7 @@ waitress
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.10.2"
+__version__ = "0.11.0"
 
 # external
 import requests
@@ -59,154 +59,14 @@ from utils import taghandler, imagehandler
 
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 
-#############
-# ARGUMENTS #
-#############
+import utils.confighandler
+config = utils.confighandler.ConfigHandler()
 
-parser = argparse.ArgumentParser(description="backend server for EMP Stash upload helper userscript")
-parser.add_argument(
-    "--configdir",
-    default=[os.path.join(os.getcwd(), "config")],
-    help="specify the directory containing configuration files",
-    nargs=1,
-)
-parser.add_argument(
-    "-t",
-    "--torrentdir",
-    help="specify the directory where .torrent files should be saved",
-    nargs=1,
-)
-parser.add_argument("-p", "--port", nargs=1, help="port to listen on (default: 9932)", type=int)
-flags = parser.add_argument_group("Tags", "optional tag settings")
-flags.add_argument("-c", action="store_true", help="include codec as tag")
-flags.add_argument("-d", action="store_true", help="include date as tag")
-flags.add_argument("-f", action="store_true", help="include framerate as tag")
-flags.add_argument("-r", action="store_true", help="include resolution as tag")
-parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
-parser.add_argument("--anon", action="store_true", help="upload anonymously")
-mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
-mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
-mutex.add_argument("-v", "--verbose", "--debug", dest="level", action="store_const", const=1, help="output more")
-mutex.add_argument(
-    "-l",
-    "--log",
-    choices=["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL", "FATAL"],
-    metavar="LEVEL",
-    help="log level: [DEBUG | INFO | WARNING | ERROR | CRITICAL]",
-    type=str.upper,
-)
-
-redisgroup = parser.add_argument_group("redis", "options for connecting to a redis server")
-redisgroup.add_argument("--rhost", "--redis--host", "--rh", help="host redis server is listening on")
-redisgroup.add_argument(
-    "--rport", "--redis-port", "--rp", help="port redis server is listening on (default: 6379)", type=int
-)
-redisgroup.add_argument("--username", "--redis-user", help="redis username")
-redisgroup.add_argument("--password", "--redis-pass", help="redis password")
-redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
-redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
-cache = redisgroup.add_mutually_exclusive_group()
-cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true") # TODO implement
-cache.add_argument("--overwrite", help="overwrite cached values", action="store_true") # TODO implement
-
-args = parser.parse_args()
-
-log_level = getattr(logging, args.log) if args.log else min(10 * args.level, 50)
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=log_level)
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=config.log_level)
 logger = logging.getLogger(__name__)
+config.logging_init()
+config.configure()
 logger.info(f"stash-empornium version {__version__}")
-
-##########
-# CONFIG #
-##########
-
-def renameKey(section: str, oldkey: str, newkey: str) -> None:
-    if conf[section].has_option(oldkey):
-        conf[section][oldkey].key = newkey
-        conf.update_file()
-        logger.info(f"Key '{oldkey}' renamed to '{newkey}'")
-
-conf = configupdater.ConfigUpdater()
-default_conf = configupdater.ConfigUpdater()
-
-# if len(sys.argv) > 0 and not os.path.isfile(sys.argv[-1]):
-#     config_dir = sys.argv[-1]
-# else:
-#     work_dir = os.getcwd()
-#     config_dir = os.path.join(work_dir, "config")
-
-config_dir = args.configdir[0]
-
-template_dir = os.path.join(config_dir, "templates")
-config_file = os.path.join(config_dir, "config.ini")
-
-# Ensure config file is present
-if not os.path.isfile(config_file):
-    logger.info(f"Config file not found at {config_file}, creating")
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-    shutil.copyfile("default.ini", config_file)
-
-# Ensure config file properly ends with a '\n' character
-fstr = ""
-with open(config_file, "r") as f:
-    fstr = f.read()
-if fstr[-1] != '\n':
-    with open(config_file, "w") as f:
-        f.write(fstr+'\n')
-del fstr
-
-logger.info(f"Reading config from {config_file}")
-conf.read(config_file)
-renameKey("backend", "date_default", "date_format")
-renameKey("backend", "torrent_directory", "torrent_directories")
-default_conf.read("default.ini")
-skip_sections = ["empornium", "empornium.tags"]
-for section in default_conf.sections():
-    if not conf.has_section(section):
-        conf.add_section(section)
-        conf[section].add_space('\n')
-    if section not in skip_sections:
-        for option in default_conf[section].options():
-            if not conf[section].has_option(option):
-                value = default_conf[section][option].value
-                if len(conf[section].option_blocks()) > 0:
-                    conf[section].option_blocks()[-1].add_after.comment("Value imported automatically:").option(option, value)
-                else:
-                    conf[section].add_comment("Value imported automatically:")
-                    conf[section].add_option(configupdater.Option(option, value))
-                logger.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
-try:
-    conf.update_file()
-except:
-    logger.error("Unable to save updated config")
-
-if not os.path.exists(template_dir):
-    shutil.copytree("default-templates", template_dir, copy_function=shutil.copyfile)
-installed_templates = os.listdir(template_dir)
-for filename in os.listdir("default-templates"):
-    src = os.path.join("default-templates", filename)
-    if os.path.isfile(src):
-        dst = os.path.join(template_dir, filename)
-        if os.path.isfile(dst):
-            try:
-                with open(src) as srcFile, open(dst) as dstFile:
-                    srcVer = int("".join(filter(str.isdigit, "0" + srcFile.readline())))
-                    dstVer = int("".join(filter(str.isdigit, "0" + dstFile.readline())))
-                    if srcVer > dstVer:
-                        logger.info(
-                            f'Template "{filename}" has a new version available in the default-templates directory'
-                        )
-            except:
-                logger.error(f"Couldn't compare version of {src} and {dst}")
-        else:
-            shutil.copyfile(src, dst)
-            logger.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
-            if not conf["templates"].has_option(filename):
-                tmpConf = configupdater.ConfigUpdater()
-                tmpConf.read("default.ini")
-                conf["templates"].set(filename, tmpConf["templates"][filename].value)
-
 
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
@@ -223,16 +83,12 @@ def info(message: str, altMessage: str | None = None) -> str:
     return json.dumps({"status": "success", "data": {"message": altMessage if altMessage else message}})
 
 
-def getConfigOption(config: configupdater.ConfigUpdater, section: str, option: str, default: str = "") -> str:
-    value = config[section][option].value if config[section].has_option(option) else default
-    return value if value else ""
-
 def mapPath(f: dict) -> dict:
     # Apply remote path mappings
     logger.debug(f"Got path {f['path']} from stash")
-    for remote, localopt in conf.items("file.maps"):
-        local = localopt.value
-        assert local is not None
+    for remote in config.items("file.maps"):
+        local = config.get("file.maps", remote)
+        assert isinstance(local, str)
         if not f["path"].startswith(remote):
             continue
         if remote[-1] != "/":
@@ -243,99 +99,18 @@ def mapPath(f: dict) -> dict:
         break
     return f
 
-# TODO: better handling of unexpected values
-ANON: bool = args.anon or getConfigOption(conf, "backend", "anon", "false").lower() == "true"
-logger.debug(f"Anonymous uploading: {ANON}")
-STASH_URL = getConfigOption(conf, "stash", "url", "http://localhost:9999")
-assert STASH_URL is not None
-PORT = args.port[0] if args.port else int(getConfigOption(conf, "backend", "port", "9932"))  # type: ignore
-DEFAULT_TEMPLATE = getConfigOption(conf, "backend", "default_template", "fakestash-v2")
-TORRENT_DIRS = (
-    [args.torrentdir[0]]
-    if args.torrentdir
-    else [x.strip() for x in getConfigOption(conf, "backend", "torrent_directories", str(pathlib.Path.home())).split(",")]
-)
-assert TORRENT_DIRS is not None and len(TORRENT_DIRS) > 0
-for dir in TORRENT_DIRS:
-    if not os.path.isdir(dir):
-        if os.path.isfile(dir):
-            logger.error(f"Cannot use {dir} for torrents, path is a file")
-            TORRENT_DIRS.remove(dir)
-            exit(1)
-        logger.info(f"Creating directory {dir}")
-        os.makedirs(dir)
-logger.debug(f"Torrent directories: {TORRENT_DIRS}")
-if len(TORRENT_DIRS) == 0:
-    logger.critical("No valid output directories found")
-    exit(1)
-TITLE_FORMAT = None
-TITLE_TEMPLATE = None
-if conf["backend"].has_option("title_default"):
-    logger.warning(
-        "Config option 'title_default' is deprecated and will be removed in v1. Please switch to 'title_template'\nSee https://github.com/bdbenim/stash-empornium#title-templates for details."
-    )
-    TITLE_FORMAT = getConfigOption(
-        conf,
-        "backend",
-        "title_default",
-        "[{studio}] {performers} - {title} ({date})[{resolution}]",
-    )
-TITLE_TEMPLATE = getConfigOption(
-    conf,
-    "backend",
-    "title_template",
-    "{% if studio %}[{{studio}}]{% endif %} {{performers|join(', ')}} - {{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]",
-)
-DATE_FORMAT = getConfigOption(conf, "backend", "date_format", "%B %-d, %Y")
-TAG_CODEC = args.c or getConfigOption(conf, "metadata", "tag_codec", "false").lower() == "true"
-TAG_DATE = args.d or getConfigOption(conf, "metadata", "tag_date", "false").lower() == "true"
-TAG_FRAMERATE = args.f or (getConfigOption(conf, "metadata", "tag_framerate", "false").lower() == "true")
-TAG_RESOLUTION = args.r or (getConfigOption(conf, "metadata", "tag_resolution", "false").lower() == "true")
-tags = taghandler.TagHandler(conf)
-
-template_names = {}
-template_files = os.listdir(template_dir)
-for k in conf["templates"].to_dict():
-    if k in template_files:
-        template_names[k] = conf["templates"][k].value
-    else:
-        logger.warning(f"Template {k} from config.ini is not present in {template_dir}")
-
-stash_headers = {
-    "Content-type": "application/json",
-}
-
-if conf["stash"].has_option("api_key"):
-    api_key = conf["stash"].get("api_key")
-    assert api_key is not None
-    api_key = api_key.value
-    assert api_key is not None
-    stash_headers["apiKey"] = api_key
-
-stash_query = """
-findScene(id: "{}") {{
-  title details director date studio {{ name url image_path parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot preview webp}}
-  files {{ id path basename width height format duration video_codec audio_codec frame_rate bit_rate size }}
-}}
-"""
-
-host = args.rhost if args.rhost else getConfigOption(conf, "redis", "host")
-host = host if len(host) > 0 else None
-port = args.rport if args.rport else int(getConfigOption(conf, "redis", "port", "6379"))
-ssl = args.use_ssl or getConfigOption(conf, "redis", "ssl", "false").lower() == "true"
-username = args.username if args.username else getConfigOption(conf, "redis", "username", "")
-password = args.password if args.password else getConfigOption(conf, "redis", "password", "")
+tags = taghandler.TagHandler(config)
 
 images = None
 try:
-    images = imagehandler.ImageHandler(host, port, username, password, ssl, args.no_cache, args.overwrite)
+    images = imagehandler.ImageHandler(config.host, config.rport, config.username, config.password, config.ssl, config.args.no_cache, config.args.overwrite)
 except Exception as e:
     logger.critical("Failed to initialize image handler")
     exit(1)
-if args.flush:
+if config.args.flush:
     images.clear()
 
-app = Flask(__name__, template_folder=template_dir)
+app = Flask(__name__, template_folder=config.template_dir)
 
 @stream_with_context
 def generate():
@@ -348,7 +123,7 @@ def generate():
     logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
     template = (
-        j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
+        j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else config.default_template
     )
     assert template is not None
 
@@ -363,11 +138,11 @@ def generate():
     #################
 
     logger.info("Querying stash")
-    stash_request_body = {"query": "{" + stash_query.format(scene_id) + "}"}
+    stash_request_body = {"query": "{" + config.stash_query.format(scene_id) + "}"}
     stash_response = requests.post(
-        urllib.parse.urljoin(STASH_URL, "/graphql"),
+        urllib.parse.urljoin(config.stash_url, "/graphql"),
         json=stash_request_body,
-        headers=stash_headers,
+        headers=config.stash_headers,
     )
 
     # if not stash_response.status_code == 200:
@@ -438,14 +213,14 @@ def generate():
     elif ht >= 6143:
         resolution = "8K+"
 
-    if resolution is not None and TAG_RESOLUTION:
+    if resolution is not None and config.tag_resolution:
         tags.add(resolution)
 
     #########
     # COVER #
     #########
 
-    cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
+    cover_response = requests.get(scene["paths"]["screenshot"], headers=config.stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
     cover_ext = ""
@@ -499,7 +274,7 @@ def generate():
     studio_img_file = None
     if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
         logger.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
-        studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
+        studio_img_response = requests.get(scene["studio"]["image_path"], headers=config.stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
         match sudio_img_mime_type:
             case "image/jpeg":
@@ -539,7 +314,7 @@ def generate():
 
         # image
         logger.debug(f'Downloading performer image from {performer["image_path"]}')
-        performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
+        performer_image_response = requests.get(performer["image_path"], headers=config.stash_headers)
         performer_image_mime_type = performer_image_response.headers["Content-Type"]
         logger.debug(f"Got image with mime type {performer_image_mime_type}")
         performer_image_ext = ""
@@ -619,7 +394,7 @@ def generate():
     # logger.debug(f"Sanitized filename: {basename}")
     # basename = stash_file["basename"]
     temppath = os.path.join(tempdir.name, basename + ".torrent")
-    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in TORRENT_DIRS]
+    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
     logger.debug(f"Saving torrent to {temppath}")
     cmd = [
         "mktorrent",
@@ -664,32 +439,19 @@ def generate():
     # TITLE #
     #########
 
-    title = ""
-    if TITLE_FORMAT is not None:
-        title = TITLE_FORMAT.format(
-            studio=scene["studio"]["name"] if scene["studio"] else "",
-            performers=", ".join([p["name"] for p in scene["performers"]]),
-            title=scene["title"],
-            date=scene["date"],
-            resolution=resolution if resolution is not None else "",
-            codec=stash_file["video_codec"],
-            duration=str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-            framerate="{} fps".format(stash_file["frame_rate"]),
-        )
-    else:
-        title = render_template_string(
-            TITLE_TEMPLATE,
-            **{
-                "studio": scene["studio"]["name"] if scene["studio"] else "",
-                "performers": [p["name"] for p in scene["performers"]],
-                "title": scene["title"],
-                "date": scene["date"],
-                "resolution": resolution if resolution is not None else "",
-                "codec": stash_file["video_codec"],
-                "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-                "framerate": stash_file["frame_rate"],
-            },
-        )
+    title = render_template_string(
+        config.title_template,
+        **{
+            "studio": scene["studio"]["name"] if scene["studio"] else "",
+            "performers": [p["name"] for p in scene["performers"]],
+            "title": scene["title"],
+            "date": scene["date"],
+            "resolution": resolution if resolution is not None else "",
+            "codec": stash_file["video_codec"],
+            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+            "framerate": stash_file["frame_rate"],
+        },
+    )
 
     ########
     # TAGS #
@@ -700,16 +462,16 @@ def generate():
         for parent in tag["parents"]:
             tags.processTag(parent["name"])
 
-    if TAG_CODEC and stash_file["video_codec"] is not None:
+    if config.tag_codec and stash_file["video_codec"] is not None:
         tags.add(stash_file["video_codec"])
 
-    if TAG_DATE and scene["date"] is not None and len(scene["date"]) > 0:
+    if config.tag_codec and scene["date"] is not None and len(scene["date"]) > 0:
         year, month, day = scene["date"].split("-")
         tags.add(year)
         tags.add(f"{year}.{month}")
         tags.add(f"{year}.{month}.{day}")
 
-    if TAG_FRAMERATE:
+    if config.tag_framerate:
         tags.add(str(round(stash_file["frame_rate"])) + ".fps")
 
     if scene["studio"] and scene["studio"]["url"] is not None:
@@ -762,7 +524,7 @@ def generate():
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
-        date = datetime.datetime.fromisoformat(date).strftime(DATE_FORMAT)
+        date = datetime.datetime.fromisoformat(date).strftime(config.date_format)
 
     yield info("Rendering template")
     time.sleep(0.5)
@@ -810,7 +572,7 @@ def generate():
                 "description": description,
                 "torrent_path": torrent_paths[0],
                 "file_path": stash_file["path"],
-                "anon": ANON,
+                "anon": config.anon,
             },
         },
     }
@@ -859,14 +621,14 @@ def suggestions():
 
 @app.route("/templates")
 def templates():
-    return json.dumps(template_names)
+    return json.dumps(config.template_names)
 
 
 if __name__ == "__main__":
     try:
         from waitress import serve
 
-        serve(app, host="0.0.0.0", port=PORT)
+        serve(app, host="0.0.0.0", port=config.port)
     except:
         logging.getLogger(__name__).info("Waitress not installed, using builtin server")
-        app.run(host="0.0.0.0", port=PORT)
+        app.run(host="0.0.0.0", port=config.port)

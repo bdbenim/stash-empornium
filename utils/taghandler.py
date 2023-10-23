@@ -1,13 +1,13 @@
 """This module provides an object for storing and processing stash scene tags
 for uploading to empornium."""
 
-import configupdater
+import utils.confighandler
 import re
 import logging
 
 class TagHandler:
     logger: logging.Logger
-    conf: configupdater.ConfigUpdater
+    conf: utils.confighandler.ConfigHandler
     TAGS_MAP: dict[str,str] = {}
     TAG_LISTS: dict[str, list[str]] = {}
     tag_sets: dict[str,set] = {}
@@ -18,16 +18,15 @@ class TagHandler:
     # Set of tags to apply to the current scene
     tags: set[str] = set()
     
-    def __init__(self, conf: configupdater.ConfigUpdater) -> None:
+    def __init__(self, conf: utils.confighandler.ConfigHandler) -> None:
         """Initialize a TagHandler object from a config object."""
         self.logger = logging.getLogger(__name__)
-        assert conf._filename is not None
         self.conf = conf
-        self.TAGS_MAP = conf["empornium.tags"].to_dict() # type: ignore
-        for key in conf["empornium"]:
-            self.TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
+        self.TAGS_MAP = conf.items("empornium.tags")
+        for key in conf.items("empornium"):
+            self.TAG_LISTS[key] = list(conf.get("empornium", key)) # type: ignore
             self.TAG_LISTS[key].sort()
-            conf["empornium"].set(key, ", ".join(self.TAG_LISTS[key]))
+            conf.set("empornium", key, self.TAG_LISTS[key])
             self.tag_sets[key] = set()
         conf.update_file()
         assert "sex_acts" in self.TAG_LISTS
@@ -101,7 +100,7 @@ class TagHandler:
         self.logger.info("Saving tag mappings")
         self.logger.debug(f"Tags: {tags}")
         for tag in tags:
-            self.conf["empornium.tags"].set(tag, tags[tag])
+            self.conf.set("empornium.tags", tag.lower(), tags[tag])
             tag = tag.lower()
             self.TAGS_MAP[tag] = tags[tag]
             if tag in self.tag_suggestions:
@@ -120,10 +119,7 @@ class TagHandler:
             if tag in self.tag_suggestions:
                 self.tag_suggestions.pop(tag)
         self.TAG_LISTS["ignored_tags"].sort()
-        if not self.conf["empornium"].has_option("ignored_tags"):
-            # For cosmetic purposes, add section before last blank line of section instead of after:
-            self.conf["empornium"].option_blocks()[-1].add_after.option("ignored_tags")
-        self.conf.set("empornium", "ignored_tags", ", ".join(self.TAG_LISTS["ignored_tags"]))
+        self.conf.set("empornium", "ignored_tags", self.TAG_LISTS["ignored_tags"])
         return self.update_file()
 
     def keys(self) -> list[str]:
