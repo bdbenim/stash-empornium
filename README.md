@@ -79,20 +79,22 @@ The userscript can be installed [here][2]. Place the other files on the same mac
 
 2. Update config file located at `config/config.ini`:
 
-```ini
+```toml
 [backend]
 ## name of a file in templates/ dir
-default_template = fakestash-v2
-## where torrents are placed
-torrent_directory = /home/foobar/torrents
+default_template = "fakestash-v2"
+## List of directories where torrents are placed
+## Multiple directories can be specified in this format:
+## torrent_directories = ["/torrents", "/downloads"]
+torrent_directories = ["/torrents"]
 ## port that the backend listens on
 port = 9932
 
 [stash]
 ## url of your stash instance
-url = http://localhost:9999
+url = "http://localhost:9999"
 ## only needed if you set up authentication for stash
-# api_key = 123abc.xyz
+#api_key = 123abc.xyz
 ```
 
 The port above corresponds to the backend URL in step 1, so if you change one you must change the other.
@@ -131,8 +133,8 @@ Any unused options can simply be omitted.
 The script can be run with optional command line arguments, most of which override a corresponding configuration file option. These can be used to quickly change a setting without needing to modify the config file, such as for temporarily listening on a different port or saving torrent files in a different directory. Not all configuration options can currently be set via the command line. The available options are described in the script's help text below:
 
 ```text
-usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [-q | -v | -l LEVEL] [--rhost RHOST] [--rport RPORT] [--username USERNAME]
-                         [--password PASSWORD] [--use-ssl] [--flush]
+usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [--anon] [-q | -v | -l LEVEL] [--rhost RHOST] [--rport RPORT]
+                         [--username USERNAME] [--password PASSWORD] [--use-ssl] [--flush] [--no-cache | --overwrite]
 
 backend server for EMP Stash upload helper userscript
 
@@ -144,6 +146,7 @@ options:
                         specify the directory where .torrent files should be saved
   -p PORT, --port PORT  port to listen on (default: 9932)
   --version             show program's version number and exit
+  --anon                upload anonymously
 
 Tags:
   optional tag settings
@@ -175,6 +178,8 @@ redis:
                         redis password
   --use-ssl, -s         use SSL to connect to redis
   --flush               flush redis cache
+  --no-cache            do not retrieve cached values
+  --overwrite           overwrite cached values
   ```
 
 ## Templates
@@ -185,9 +190,9 @@ This repository includes default templates which can be used to fill in the pres
 
 To add a new template, save it in the `templates` directory alongside your `config.ini` file. Then add it to your configuration with the following format:
 
-```ini
+```toml
 [templates]
-filename = description
+filename = "description"
 ```
 
 Templates are written using Jinja syntax. The available variables are:
