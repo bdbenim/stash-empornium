@@ -179,7 +179,7 @@ class ConfigHandler:
                     if option not in self.conf[section]:
                         self.conf[section].add(tomlkit.comment("Option imported automatically:")) # type: ignore
                         value = default_conf[section][option] # type: ignore
-                        conf[section][option] = value # type: ignore
+                        self.conf[section][option] = value # type: ignore
                         self.logger.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
         try:
             self.update_file()
