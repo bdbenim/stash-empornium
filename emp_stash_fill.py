@@ -52,6 +52,7 @@ import time
 
 # included
 from utils import taghandler, imagehandler
+from utils.paths import mapPath
 
 #############
 # CONSTANTS #
@@ -83,7 +84,7 @@ def info(message: str, altMessage: str | None = None) -> str:
     return json.dumps({"status": "success", "data": {"message": altMessage if altMessage else message}})
 
 
-def mapPath(f: dict) -> dict:
+def mapPaths(f: dict) -> dict:
     # Apply remote path mappings
     logger.debug(f"Got path {f['path']} from stash")
     for remote in config.items("file.maps"):
@@ -166,14 +167,17 @@ def generate():
         logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
             stash_file = f
-            stash_file = mapPath(stash_file)
+            # stash_file = mapPaths(stash_file)
+            stash_file["path"] = mapPath(stash_file["path"], config.items("file.maps"))
             break
 
     if stash_file is None:
         tmp_file = scene["files"][0]
         if tmp_file is None:
             return error("No file exists")
-        stash_file = mapPath(tmp_file)
+        # stash_file = mapPaths(tmp_file)
+        stash_file = tmp_file
+        stash_file["path"] = mapPath(stash_file["path"], config.items("file.maps"))
         logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
         return error(f"Couldn't find file {stash_file['path']}")
@@ -259,6 +263,7 @@ def generate():
             fp.write(cover_response.content)
 
     yield info("Uploading cover")
+    time.sleep(0.1)
     cover_remote_url = images.img_host_upload(cover_file[1], cover_mime_type, cover_ext)[0]
     if cover_remote_url is None:
         return error("Failed to upload cover")
@@ -290,6 +295,7 @@ def generate():
                 yield warning(
                     f"Unknown studio logo file type: {sudio_img_mime_type}", "Unrecognized studio image file type"
                 )
+                time.sleep(0.1)
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
@@ -427,11 +433,13 @@ def generate():
     mediainfo = ""
     if shutil.which("mediainfo"):
         yield info("Generating media info")
+        time.sleep(0.1)
         CMD = ["mediainfo", stash_file["path"]]
         try:
             mediainfo = subprocess.check_output(CMD, text=True)
         except subprocess.CalledProcessError as e:
             yield error(f"mediainfo exited with code {e.returncode}", "Error generating mediainfo")
+            time.sleep(0.1)
             mediainfo = ""
             logger.debug(f"mediainfo output:\n{e.output}")
 
@@ -490,7 +498,7 @@ def generate():
 
     yield json.dumps({"status": "success", "data": {"message": "Uploading images"}})
     
-    yield info("Uploading performer images")
+    logger.info("Uploading performer images")
     for performer_name in performers:
         performers[performer_name]["image_remote_url"] = images.img_host_upload(
             performers[performer_name]["image_path"],
@@ -505,7 +513,7 @@ def generate():
 
     logo_url = imagehandler.STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
-        yield info("Uploading studio logo")
+        logger.info("Uploading studio logo")
         logo_url = images.img_host_upload(
             studio_img_file[1],
             sudio_img_mime_type,
@@ -527,7 +535,7 @@ def generate():
         date = datetime.datetime.fromisoformat(date).strftime(config.date_format)
 
     yield info("Rendering template")
-    time.sleep(0.5)
+    time.sleep(0.1)
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
         "studio_logo": logo_url,
@@ -582,6 +590,9 @@ def generate():
         result["data"]["suggestions"] = tag_suggestions
 
     yield json.dumps(result)
+
+    for client in config.torrent_clients:
+        client.add(torrent_paths[0], stash_file["path"])
 
     time.sleep(1)
 
