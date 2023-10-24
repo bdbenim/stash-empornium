@@ -4,6 +4,7 @@ import argparse
 import os
 import logging
 import shutil
+from utils.torrent import torrentclient
 
 __version__ = "0.11.0"
 
@@ -32,6 +33,7 @@ class ConfigHandler:
     title_template: str
     template_names: dict[str,str]
     config_file: str
+    torrent_clients: list[torrentclient.TorrentClient] = []
 
     stash_headers = {
         "Content-type": "application/json",
@@ -276,6 +278,14 @@ class ConfigHandler:
         self.ssl = self.args.use_ssl or self.get("redis", "ssl", False) # type: ignore
         self.username = self.args.username if self.args.username else self.get("redis", "username", "") # type: ignore
         self.password = self.args.password if self.args.password else self.get("redis", "password", "") # type: ignore
+        self.configureTorrents()
+
+    def configureTorrents(self) -> None:
+        # rtorrent:
+        if "rtorrent" in self.conf:
+            settings = dict(self.conf["rtorrent"]) # type: ignore
+            self.torrent_clients.append(torrentclient.RTorrent(settings))
+        self.logger.debug(f"Configured {len(self.torrent_clients)} torrent client(s)")
     
     def get(self, section: str, key: str, default = None):
         if section in self.conf:

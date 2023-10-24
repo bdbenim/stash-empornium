@@ -14,9 +14,27 @@ port = 9932
 ## Uncomment this title for Classic EMP template
 title_template = '{% if studio %}[{{studio}}] {% endif %}{{performers|join(", ")}}{% if performers %} - {% endif %}{{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]'
 # Date format for title release - https://strftime.org/ for reference
-date_format = "%y-%m-%d"
+date_format = "%Y-%m-%d"
 ## Set to 'true' to enable anonymous uploading
 anon = false
+
+# [rtorrent]
+## Hostname or IP address
+# host = "192.168.1.1"
+## Port number
+# port = 8080
+## Set to true for https
+# ssl = false
+## API path, typically "XMLRPC" or "RPC2"
+# path = "RPC2"
+## Username for XMLRPC if applicable (may be different from webui)
+# username = "user"
+## Password for XMLRPC if applicable (may be different from webui)
+# password = "password"
+# label = "stash-empornium"
+
+# [rtorrent.pathmaps]
+# "/stash-empornium/path" = "/rtorrent/path"
 
 #[redis]
 #host = "localhost"
