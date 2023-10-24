@@ -20,7 +20,7 @@ anon = false
 
 # [rtorrent]
 ## Hostname or IP address
-# host = "192.168.1.1"
+# host = "localhost"
 ## Port number
 # port = 8080
 ## Set to true for https
@@ -35,6 +35,19 @@ anon = false
 
 # [rtorrent.pathmaps]
 # "/stash-empornium/path" = "/rtorrent/path"
+
+# [deluge]
+## Hostname or IP address
+# host = "127.0.0.1"
+## Port number
+# port = 8112
+## Set to true for https
+# ssl = false
+## Password for API
+# password = "deluge"
+
+# [deluge.pathmaps]
+# "/stash-empornium/path" = "/deluge/path"
 
 #[redis]
 #host = "localhost"
