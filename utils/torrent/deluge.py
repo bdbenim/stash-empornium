@@ -89,6 +89,8 @@ class Deluge(TorrentClient):
                 j = result.json()
                 self.logger.debug(f"Deluge response: {j}")
                 if "result" in j and j["result"][0][0]:
+                    infohash = j["result"][0][1]
+                    self.recheck(infohash)
                     self.logger.info("Torrent added to deluge")
                 else:
                     self.logger.error(f"Torrent uploaded to Deluge but failed to start: {j['error'] if 'error' in j and j['error'] else 'Unknown error'}")
@@ -96,3 +98,13 @@ class Deluge(TorrentClient):
                 self.logger.error("Failed to start Deluge torrent (does it already exist?)")
         else:
             self.logger.error("Failed to upload torrent to Deluge")
+    
+    def recheck(self, infohash: str):
+        body = {
+            "method": "core.force_recheck",
+            "params": [
+                [ infohash ]
+            ],
+            "id": 1
+        }
+        requests.post(self.url, json=body, cookies=self.cookies, timeout=5)
