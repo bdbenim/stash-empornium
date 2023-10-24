@@ -18,7 +18,7 @@ class TorrentClient:
             self.label = settings["label"]
 
     def add(self, torrent_path: str, file_path: str) -> None:
-        raise NotImplementedError
+        raise NotImplementedError()
 
 class RTorrent(TorrentClient):
     """Implements rtorrent's XMLRPC protocol to

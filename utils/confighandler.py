@@ -1,10 +1,11 @@
+from venv import logger
 import tomlkit
 import configupdater
 import argparse
 import os
 import logging
 import shutil
-from utils.torrent import torrentclient
+from utils.torrent import torrentclient, deluge
 
 __version__ = "0.11.0"
 
@@ -165,8 +166,12 @@ class ConfigHandler:
         del fstr
 
         self.logger.info(f"Reading config from {self.config_file}")
-        with open(self.config_file) as f:
-            self.conf = tomlkit.load(f)
+        try:
+            with open(self.config_file) as f:
+                self.conf = tomlkit.load(f)
+        except Exception as e:
+            logger.critical(f"Failed to read config file: {e}")
+            exit(1)
         self.renameKey("backend", "torrent_directory", "torrent_directories")
         with open("default.toml") as f:
             default_conf = tomlkit.load(f)
@@ -285,6 +290,14 @@ class ConfigHandler:
         if "rtorrent" in self.conf:
             settings = dict(self.conf["rtorrent"]) # type: ignore
             self.torrent_clients.append(torrentclient.RTorrent(settings))
+        if "deluge" in self.conf:
+            logger.debug("Configuring deluge")
+            settings = dict(self.conf["deluge"]) # type: ignore
+            try:
+                d = deluge.Deluge(settings)
+                self.torrent_clients.append(d)
+            except Exception as e:
+                pass
         self.logger.debug(f"Configured {len(self.torrent_clients)} torrent client(s)")
     
     def get(self, section: str, key: str, default = None):
