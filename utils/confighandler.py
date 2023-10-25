@@ -5,7 +5,8 @@ import argparse
 import os
 import logging
 import shutil
-from utils.torrent import torrentclient, deluge, qbittorrent
+from utils.structures import CaseInsensitiveDict
+from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 
 __version__ = "0.11.0"
 
@@ -34,7 +35,7 @@ class ConfigHandler:
     title_template: str
     template_names: dict[str, str]
     config_file: str
-    torrent_clients: list[torrentclient.TorrentClient] = []
+    torrent_clients: list[TorrentClient] = []
 
     stash_headers = {
         "Content-type": "application/json",
@@ -295,7 +296,7 @@ class ConfigHandler:
 
     def configureTorrents(self) -> None:
         # rtorrent:
-        clients = {"rtorrent": torrentclient.RTorrent, "deluge": deluge.Deluge, "qbittorrent": qbittorrent.Qbittorrent}
+        clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent}
         for client in clients:
             try:
                 if client in self.conf:
@@ -328,5 +329,5 @@ class ConfigHandler:
 
     def items(self, section: str) -> dict:
         if section in self.conf:
-            return dict(self.conf[section])  # type: ignore
+            return CaseInsensitiveDict(self.conf[section])  # type: ignore
         return {}
