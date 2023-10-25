@@ -40,6 +40,7 @@ The backend can also be run directly by intalling its dependencies and running t
   - vcsi
   - configupdater
   - cairosvg
+  - tomlkit
   - waitress (optional)
   - redis (optional)
 - ffmpeg
