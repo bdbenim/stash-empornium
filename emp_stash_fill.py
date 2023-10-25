@@ -10,10 +10,12 @@ ffmpeg
 mktorrent
 
 Required Python modules:
+cairosvg
 configupdater
 Flask
 Pillow
 requests
+tomlkit
 vcsi
 
 Optional external utilities:

@@ -105,18 +105,74 @@ The backend server can be configured to connect to an optional [redis][3] server
 
 Connection settings can be specified in the `[redis]` configuration section:
 
-```ini
+```toml
 [redis]
-host = localhost
+host = "localhost"
 port = 6379
-username = stash-empornium
-password = stash-empornium
+username = "stash-empornium"
+password = "stash-empornium"
 ssl = false
 ```
 
 Any unused options can simply be omitted.
 
 [3]: https://redis.io/
+
+### Torrent Clients
+
+The backend server can be configured to communicate with any of several different torrent clients, allowing generated `.torrent` files to be automatically added to the client. Path mappings can also be used to ensure the torrent points at the correct location of files on disk, allowing them to be started with minimal settings. Additionally, some clients support applying labels to torrents for more granular control.
+
+Torrent client integrations are optional and are not required for the backend to work.
+
+#### rTorrent
+
+This software has been tested with rTorrent `v0.9.6` with ruTorrent `v3.10`.
+
+Example configuration:
+
+```toml
+[rtorrent]
+# Hostname or IP address
+host = "localhost"
+# Port number
+port = 8080
+# Set to true for https
+ssl = false
+# API path, typically "XMLRPC" or "RPC2"
+path = "RPC2"
+# Username for XMLRPC if applicable (may be different from webui)
+username = "user"
+# Password for XMLRPC if applicable (may be different from webui)
+password = "password"
+label = "stash-empornium"
+
+[rtorrent.pathmaps]
+"/stash-empornium/path" = "/rtorrent/path"
+```
+
+> [!NOTE]
+> The path mappings for the torrent client are with respect to the paths on the **backend server**, not stash. If your client is reporting errors that files are missing, make sure you check this setting carefully. For example, if your files are stored in `/media` on your stash server, and that directory is mapped to `/data` on your backend and `/downloads` in your torrent client, then you will need something like this in your config:
+>
+> ```toml
+> ["file.maps"]
+> "/media" = "/data"
+> ...
+> [rtorrent.pathmaps]
+> "/data" = "/downloads"
+> ```
+
+### Deluge
+
+This software has been tested with Deluge `v2.1.1`. The same configuration options are supported as with rTorrent, with two exceptions:
+
+- Labels are not supported
+- No username is required for authentication
+
+### qBittorrent
+
+This software has been tested with qBittorrent `v4.6.0`. The same configuration options are supported as with rTorrent.
+
+Currently there is one limitation with the qBittorrent API integration which prevents the backend from triggering a recheck of downloaded files when adding a `.torrent`. This is planned for a future release.
 
 ## Usage
 
