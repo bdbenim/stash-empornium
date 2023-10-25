@@ -10,10 +10,12 @@ ffmpeg
 mktorrent
 
 Required Python modules:
+cairosvg
 configupdater
 Flask
 Pillow
 requests
+tomlkit
 vcsi
 
 Optional external utilities:
@@ -67,7 +69,8 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=co
 logger = logging.getLogger(__name__)
 config.logging_init()
 config.configure()
-logger.info(f"stash-empornium version {__version__}")
+logger.info(f"stash-empornium version {__version__}.")
+logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)

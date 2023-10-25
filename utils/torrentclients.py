@@ -52,7 +52,7 @@ class RTorrent(TorrentClient):
         self.server = client.Server(uri)
         if "password" in settings:
             uri = uri.replace(settings["password"], "[REDACTED]")
-        self.logger.info(f"Connecting to rtorrent at '{uri}'")
+        self.logger.debug(f"Connecting to rtorrent at '{uri}'")
 
     def add(self, torrent_path: str, file_path: str) -> None:
         file_path = mapPath(file_path, self.pathmaps)
