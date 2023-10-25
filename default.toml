@@ -49,6 +49,23 @@ anon = false
 # [deluge.pathmaps]
 # "/stash-empornium/path" = "/deluge/path"
 
+# [qbittorrent]
+## Hostname or IP address
+# host = "127.0.0.1"
+## Port number
+# port = 8080
+## Set to true for https
+# ssl = false
+## Username for API
+# username = "admin"
+## Password for API
+# password = "adminadmin"
+## Equivalent to QBittorrent "category"
+# label = "stash-empornium"
+
+# [qbittorrent.pathmaps]
+# "/stash-empornium/path" = "/qbittorrent/path"
+
 #[redis]
 #host = "localhost"
 #port = 6379
