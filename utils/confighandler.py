@@ -5,12 +5,12 @@ import argparse
 import os
 import logging
 import shutil
-from utils.torrent import torrentclient, deluge
+from utils.torrent import torrentclient, deluge, qbittorrent
 
 __version__ = "0.11.0"
 
-class ConfigHandler:
 
+class ConfigHandler:
     logger: logging.Logger
     log_level: int
     args: argparse.Namespace
@@ -18,7 +18,7 @@ class ConfigHandler:
     default_template: str
     anon: bool
     port: int
-    host: str|None
+    host: str | None
     rport: int
     ssl: bool
     username: str
@@ -32,7 +32,7 @@ class ConfigHandler:
     tag_framerate: bool
     tag_resolution: bool
     title_template: str
-    template_names: dict[str,str]
+    template_names: dict[str, str]
     config_file: str
     torrent_clients: list[torrentclient.TorrentClient] = []
 
@@ -50,7 +50,7 @@ class ConfigHandler:
     def __init__(self) -> None:
         self.parse_args()
         self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
-    
+
     def logging_init(self) -> None:
         self.logger = logging.getLogger(__name__)
 
@@ -78,7 +78,9 @@ class ConfigHandler:
         parser.add_argument("--anon", action="store_true", help="upload anonymously")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
         mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
-        mutex.add_argument("-v", "--verbose", "--debug", dest="level", action="store_const", const=1, help="output more")
+        mutex.add_argument(
+            "-v", "--verbose", "--debug", dest="level", action="store_const", const=1, help="output more"
+        )
         mutex.add_argument(
             "-l",
             "--log",
@@ -98,15 +100,15 @@ class ConfigHandler:
         redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
         redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
         cache = redisgroup.add_mutually_exclusive_group()
-        cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true") # TODO implement
-        cache.add_argument("--overwrite", help="overwrite cached values", action="store_true") # TODO implement
+        cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true")  # TODO implement
+        cache.add_argument("--overwrite", help="overwrite cached values", action="store_true")  # TODO implement
 
         self.args = parser.parse_args()
-    
+
     def renameKey(self, section: str, oldkey: str, newkey: str) -> None:
-        if oldkey in self.conf[section]: # type: ignore
-            self.conf[section][newkey] = self.conf[section][oldkey] # type: ignore
-            del self.conf[section][oldkey] # type: ignore
+        if oldkey in self.conf[section]:  # type: ignore
+            self.conf[section][newkey] = self.conf[section][oldkey]  # type: ignore
+            del self.conf[section][oldkey]  # type: ignore
             self.update_file()
             self.logger.info(f"Key '{oldkey}' renamed to '{newkey}'")
 
@@ -127,7 +129,7 @@ class ConfigHandler:
                 os.makedirs(config_dir)
             oldconf_file = os.path.join(config_dir, "config.ini")
             if os.path.isfile(oldconf_file):
-                #TODO convert ini to toml
+                # TODO convert ini to toml
                 self.logger.info("Translating config from ini")
                 oldconf = configupdater.ConfigUpdater()
                 oldconf.read(oldconf_file)
@@ -141,16 +143,16 @@ class ConfigHandler:
                                 tomlitem = tomlkit.comment(str(item))
                                 table.add(tomlitem)
                             case configupdater.Option:
-                                value = str(item.value) # type: ignore
-                                if section in ["empornium", "demonyms"] or (section == "backend" and item.key == "torrent_directories"): # type: ignore
-                                    value = [x.strip() for x in value.split(",")] # type: ignore
+                                value = str(item.value)  # type: ignore
+                                if section in ["empornium", "demonyms"] or (section == "backend" and item.key == "torrent_directories"):  # type: ignore
+                                    value = [x.strip() for x in value.split(",")]  # type: ignore
                                 elif value.lower() == "true":
                                     value = True
                                 elif value.lower() == "false":
                                     value = False
                                 elif str.isdigit(value):
                                     value = int(value)
-                                table.append(item.key, value) # type: ignore
+                                table.append(item.key, value)  # type: ignore
                     self.conf.append(section, table)
                 self.update_file()
             else:
@@ -160,9 +162,9 @@ class ConfigHandler:
         fstr = ""
         with open(self.config_file, "r") as f:
             fstr = f.read()
-        if fstr[-1] != '\n':
+        if fstr[-1] != "\n":
             with open(self.config_file, "w") as f:
-                f.write(fstr+'\n')
+                f.write(fstr + "\n")
         del fstr
 
         self.logger.info(f"Reading config from {self.config_file}")
@@ -182,12 +184,14 @@ class ConfigHandler:
                 s.add(tomlkit.comment("Section added from default.toml"))
                 self.conf.append(section, s)
             if section not in skip_sections:
-                for option in default_conf[section]: # type: ignore
+                for option in default_conf[section]:  # type: ignore
                     if option not in self.conf[section]:
-                        self.conf[section].add(tomlkit.comment("Option imported automatically:")) # type: ignore
-                        value = default_conf[section][option] # type: ignore
-                        self.conf[section][option] = value # type: ignore
-                        self.logger.info(f"Automatically added option '{option}' to section [{section}] with value '{value}'")
+                        self.conf[section].add(tomlkit.comment("Option imported automatically:"))  # type: ignore
+                        value = default_conf[section][option]  # type: ignore
+                        self.conf[section][option] = value  # type: ignore
+                        self.logger.info(
+                            f"Automatically added option '{option}' to section [{section}] with value '{value}'"
+                        )
         try:
             self.update_file()
         except:
@@ -213,32 +217,34 @@ class ConfigHandler:
                         self.logger.error(f"Couldn't compare version of {src} and {dst}")
                 else:
                     shutil.copyfile(src, dst)
-                    self.logger.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
-                    if filename not in conf["templates"]: # type: ignore
+                    self.logger.info(
+                        f"Template {filename} has a been added. To use it, add it to config.ini under [templates]"
+                    )
+                    if filename not in conf["templates"]:  # type: ignore
                         with open("default.toml") as f:
                             tmpConf = tomlkit.load(f)
-                        conf["templates"][filename] = tmpConf["templates"][filename] # type: ignore
-        
+                        conf["templates"][filename] = tmpConf["templates"][filename]  # type: ignore
+
         # TODO: better handling of unexpected values
-        anon = self.conf["backend"]["anon"] # type: ignore
+        anon = self.conf["backend"]["anon"]  # type: ignore
         if anon is not None:
             assert isinstance(anon, bool)
         self.anon: bool = self.args.anon or anon
         self.logger.debug(f"Anonymous uploading: {self.anon}")
-        self.stash_url = self.conf["stash"]["url"] # type: ignore
+        self.stash_url = self.conf["stash"]["url"]  # type: ignore
         if self.stash_url is None:
             self.stash_url = "http://localhost:9999"
-        self.port = self.args.port[0] if self.args.port else self.conf["backend"]["port"] # type: ignore
+        self.port = self.args.port[0] if self.args.port else self.conf["backend"]["port"]  # type: ignore
         if not isinstance(self.port, int):
             self.port = 9932
-        self.default_template = self.conf["backend"]["default_template"] # type: ignore
+        self.default_template = self.conf["backend"]["default_template"]  # type: ignore
         if self.default_template is None:
             self.default_template = "fakestash-v2"
         # TODO check that template exists
         self.torrent_dirs = (
             [self.args.torrentdir[0]]
             if self.args.torrentdir
-            else list(self.conf["backend"]["torrent_directories"]) # type: ignore
+            else list(self.conf["backend"]["torrent_directories"])  # type: ignore
         )
         assert self.torrent_dirs is not None and len(self.torrent_dirs) > 0
         for dir in self.torrent_dirs:
@@ -253,16 +259,18 @@ class ConfigHandler:
         if len(self.torrent_dirs) == 0:
             self.logger.critical("No valid output directories found")
             exit(1)
-        self.title_template = str(self.get(
-            "backend",
-            "title_template",
-            "{% if studio %}[{{studio}}]{% endif %} {{performers|join(', ')}} - {{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]",
-        ))
-        self.date_format = self.get("backend", "date_format", "%B %-d, %Y") # type: ignore
-        self.tag_codec = self.args.c or self.get("metadata", "tag_codec", False) # type: ignore
-        self.tag_date = self.args.d or self.get("metadata", "tag_date", False) # type: ignore
-        self.tag_framerate = self.args.f or self.get("metadata", "tag_framerate", False) # type: ignore
-        self.tag_resolution = self.args.r or self.get("metadata", "tag_resolution", False) # type: ignore
+        self.title_template = str(
+            self.get(
+                "backend",
+                "title_template",
+                "{% if studio %}[{{studio}}]{% endif %} {{performers|join(', ')}} - {{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]",
+            )
+        )
+        self.date_format = self.get("backend", "date_format", "%B %-d, %Y")  # type: ignore
+        self.tag_codec = self.args.c or self.get("metadata", "tag_codec", False)  # type: ignore
+        self.tag_date = self.args.d or self.get("metadata", "tag_date", False)  # type: ignore
+        self.tag_framerate = self.args.f or self.get("metadata", "tag_framerate", False)  # type: ignore
+        self.tag_resolution = self.args.r or self.get("metadata", "tag_resolution", False)  # type: ignore
 
         self.template_names = {}
         template_files = os.listdir(self.template_dir)
@@ -271,46 +279,44 @@ class ConfigHandler:
                 self.template_names[k] = str(self.get("templates", k))
             else:
                 self.logger.warning(f"Template {k} from config.ini is not present in {self.template_dir}")
-        
-        if "api_key" in self.conf["stash"]: # type: ignore
+
+        if "api_key" in self.conf["stash"]:  # type: ignore
             api_key = self.get("stash", "api_key")
             assert api_key is not None
             self.stash_headers["apiKey"] = str(api_key)
-        
+
         self.host = self.args.rhost if self.args.rhost else str(self.get("redis", "host"))
         self.host = self.host if len(self.host) > 0 else None
-        self.rport = self.args.rport if self.args.rport else self.get("redis", "port", 6379) # type: ignore
-        self.ssl = self.args.use_ssl or self.get("redis", "ssl", False) # type: ignore
-        self.username = self.args.username if self.args.username else self.get("redis", "username", "") # type: ignore
-        self.password = self.args.password if self.args.password else self.get("redis", "password", "") # type: ignore
+        self.rport = self.args.rport if self.args.rport else self.get("redis", "port", 6379)  # type: ignore
+        self.ssl = self.args.use_ssl or self.get("redis", "ssl", False)  # type: ignore
+        self.username = self.args.username if self.args.username else self.get("redis", "username", "")  # type: ignore
+        self.password = self.args.password if self.args.password else self.get("redis", "password", "")  # type: ignore
         self.configureTorrents()
 
     def configureTorrents(self) -> None:
         # rtorrent:
-        if "rtorrent" in self.conf:
-            settings = dict(self.conf["rtorrent"]) # type: ignore
-            self.torrent_clients.append(torrentclient.RTorrent(settings))
-        if "deluge" in self.conf:
-            logger.debug("Configuring deluge")
-            settings = dict(self.conf["deluge"]) # type: ignore
+        clients = {"rtorrent": torrentclient.RTorrent, "deluge": deluge.Deluge, "qbittorrent": qbittorrent.Qbittorrent}
+        for client in clients:
             try:
-                d = deluge.Deluge(settings)
-                self.torrent_clients.append(d)
-            except Exception as e:
+                if client in self.conf:
+                    settings = dict(self.conf[client])  # type: ignore
+                    clientType = clients[client]
+                    self.torrent_clients.append(clientType(settings))
+            except:
                 pass
         self.logger.debug(f"Configured {len(self.torrent_clients)} torrent client(s)")
-    
-    def get(self, section: str, key: str, default = None):
+
+    def get(self, section: str, key: str, default=None):
         if section in self.conf:
-            if key in self.conf[section]: # type: ignore
-                return self.conf[section][key] # type: ignore
+            if key in self.conf[section]:  # type: ignore
+                return self.conf[section][key]  # type: ignore
         return default
-    
+
     def set(self, section: str, key: str, value) -> None:
         if section not in self.conf:
             self.conf[section] = {}
-        self.conf[section][key] = value # type: ignore
-    
+        self.conf[section][key] = value  # type: ignore
+
     # def append(self, section: str, key: str, value) -> None:
     #     if section not in self.conf:
     #         self.conf[section] = {}
@@ -322,5 +328,5 @@ class ConfigHandler:
 
     def items(self, section: str) -> dict:
         if section in self.conf:
-            return dict(self.conf[section]) # type: ignore
+            return dict(self.conf[section])  # type: ignore
         return {}

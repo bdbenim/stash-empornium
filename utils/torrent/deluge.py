@@ -1,4 +1,3 @@
-from unittest import result
 from utils.torrent.torrentclient import TorrentClient
 from utils.paths import mapPath
 import os
@@ -9,7 +8,6 @@ class Deluge(TorrentClient):
     password: str
     cookies = None
     host: str = ""
-    torrent_dir: str
 
     def __init__(self, settings: dict) -> None:
         super().__init__(settings)
@@ -20,10 +18,6 @@ class Deluge(TorrentClient):
             port = 443 if ssl else 8112
         self.url = f"http{'s' if ssl else ''}://{settings['host']}:{port}/json"
         self.password = settings["password"] if "password" in settings else ""
-        if "torrent_directory" not in settings:
-            self.logger.error("Deluge requires a directory to check for torrent files")
-            raise ValueError()
-        self.torrent_dir = settings["torrent_directory"]
         self.__connect()
     
     def __connect(self):
