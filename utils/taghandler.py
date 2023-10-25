@@ -4,11 +4,13 @@ for uploading to empornium."""
 import utils.confighandler
 import re
 import logging
+from utils.structures import CaseInsensitiveDict
+from collections.abc import MutableMapping
 
 class TagHandler:
     logger: logging.Logger
     conf: utils.confighandler.ConfigHandler
-    TAGS_MAP: dict[str,str] = {}
+    TAGS_MAP: MutableMapping[str,str] = {}
     TAG_LISTS: dict[str, list[str]] = {}
     tag_sets: dict[str,set] = {}
 
@@ -22,12 +24,16 @@ class TagHandler:
         """Initialize a TagHandler object from a config object."""
         self.logger = logging.getLogger(__name__)
         self.conf = conf
-        self.TAGS_MAP = conf.items("empornium.tags")
-        for key in conf.items("empornium"):
-            self.TAG_LISTS[key] = list(conf.get("empornium", key)) # type: ignore
-            self.TAG_LISTS[key].sort()
-            conf.set("empornium", key, self.TAG_LISTS[key])
-            self.tag_sets[key] = set()
+        empornium = conf.items("empornium")
+        self.TAGS_MAP = CaseInsensitiveDict(empornium["tags"]) if "tags" in empornium else conf.items("empornium.tags")
+        for key in empornium:
+            newkey = key.lower()
+            if newkey == "tags":
+                continue
+            self.TAG_LISTS[newkey] = list(conf.get("empornium", key)) # type: ignore
+            self.TAG_LISTS[newkey].sort()
+            conf.set("empornium", key, self.TAG_LISTS[newkey])
+            self.tag_sets[newkey] = set()
         conf.update_file()
         assert "sex_acts" in self.TAG_LISTS
 
@@ -55,10 +61,10 @@ class TagHandler:
         mapping."""
         if "ignored_tags" in self.TAG_LISTS and tag.lower() in self.TAG_LISTS["ignored_tags"]:
             return None
-        if tag.lower() in self.TAGS_MAP:
-            self.tags.add(self.TAGS_MAP[tag.lower()])
+        if tag in self.TAGS_MAP:
+            self.tags.add(self.TAGS_MAP[tag])
         else:
-            self.tag_suggestions[tag.lower()] = self.empify(tag)
+            self.tag_suggestions[tag] = self.empify(tag)
         for key in self.TAG_LISTS:
             if tag in self.TAG_LISTS[key]:
                 self.tag_sets[key].add(tag)

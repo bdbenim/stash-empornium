@@ -592,7 +592,10 @@ def generate():
     yield json.dumps(result)
 
     for client in config.torrent_clients:
-        client.add(torrent_paths[0], stash_file["path"])
+        try:
+            client.add(torrent_paths[0], stash_file["path"])
+        except:
+            logger.error(f"Error attempting to add torrent to {client.name}")
 
     time.sleep(1)
 
