@@ -34,17 +34,14 @@ __version__ = "0.12.0"
 # external
 import requests
 from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
-import configupdater
 from cairosvg import svg2png
 
 # built-in
-import argparse
 import datetime
 import json
 import logging
 import math
 import os
-import pathlib
 import shutil
 import string
 import subprocess

@@ -1,4 +1,3 @@
-from venv import logger
 import tomlkit
 import configupdater
 import argparse
@@ -173,7 +172,7 @@ class ConfigHandler:
             with open(self.config_file) as f:
                 self.conf = tomlkit.load(f)
         except Exception as e:
-            logger.critical(f"Failed to read config file: {e}")
+            self.logger.critical(f"Failed to read config file: {e}")
             exit(1)
         self.renameKey("backend", "torrent_directory", "torrent_directories")
         with open("default.toml") as f:
