@@ -184,8 +184,11 @@ Copyright 2019 Kenneth Reitz
 """
 
 from collections.abc import Mapping, MutableMapping
+from typing import TypeVar
 
-class CaseInsensitiveDict(MutableMapping):
+T = TypeVar("T")
+
+class CaseInsensitiveDict(MutableMapping[str, T]):
     """
     A case-insensitive ``dict``-like object.
 
@@ -217,7 +220,7 @@ class CaseInsensitiveDict(MutableMapping):
     and is licensed under the Apache License.
     """
     def __init__(self, data=None, **kwargs):
-        self._store = dict()
+        self._store:dict[str,tuple[str,T]] = dict()
         if data is None:
             data = {}
         self.update(data, **kwargs)
@@ -256,7 +259,7 @@ class CaseInsensitiveDict(MutableMapping):
         return dict(self.lower_items()) == dict(other.lower_items())
 
     # Copy is required
-    def copy(self):
+    def copy(self)-> 'CaseInsensitiveDict[T]':
          return CaseInsensitiveDict(self._store.values())
 
     def __repr__(self):

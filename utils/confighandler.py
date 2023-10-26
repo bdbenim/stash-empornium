@@ -71,6 +71,7 @@ class ConfigHandler:
         name
         circumcised
         country
+        eye_color
         fake_tits
         gender
         height_cm
