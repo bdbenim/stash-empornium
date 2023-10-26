@@ -20,6 +20,16 @@ HAIR_COLOR_MAP = CaseInsensitiveDict(
     }
 )
 
+ETHNICITY_MAP = CaseInsensitiveDict({
+    "caucasian": "caucasian",
+    "black": "black",
+    "asian": "asian",
+    "mixed": "mixed.race",
+    "latin": "latina",
+    "middle eastern": "middle.eastern",
+    "indian": "indian"
+})
+
 
 class TagHandler:
     logger: logging.Logger
@@ -111,7 +121,9 @@ class TagHandler:
                 self.tags.add("circumcised.cock")
             elif performer["circumcised"] == "UNCUT":
                 self.tags.add("uncircumcised.cock")
-        if "eye_color" in performer:
+        if "ethnicity" in performer and performer["ethnicity"] in ETHNICITY_MAP:
+            self.add(ETHNICITY_MAP[performer["ethnicity"]])
+        if "eye_color" in performer and len(performer["eye_color"]) > 0:
             self.add(performer["eye_color"] + ".eyes")
         fake_tits = ""
         if "fake_tits" in performer:
