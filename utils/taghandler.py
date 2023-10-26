@@ -9,6 +9,17 @@ import logging
 from utils.structures import CaseInsensitiveDict
 from collections.abc import MutableMapping
 
+HAIR_COLOR_MAP = CaseInsensitiveDict(
+    {
+        "blonde": "blonde",
+        "blond": "blonde",
+        "black": "black.hair",
+        "red": "redhead",
+        "auburn": "auburn.hair",
+        "grey": "grey.hair",
+    }
+)
+
 
 class TagHandler:
     logger: logging.Logger
@@ -109,6 +120,12 @@ class TagHandler:
                 self.add("natural.tits")
             elif fake_tits == "augmented" or fake_tits == "fake":
                 self.add("fake.tits")
+        if (
+            "hair_color" in performer
+            and len(performer["hair_color"]) > 0
+            and performer["hair_color"] in HAIR_COLOR_MAP
+        ):
+            self.add(HAIR_COLOR_MAP[performer["hair_color"]])
         if "measurements" in performer and len(performer["measurements"]) > 0:
             tits = self.processTits(performer["measurements"], fake_tits)
             if tits >= 0:

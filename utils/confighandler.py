@@ -74,6 +74,7 @@ class ConfigHandler:
         eye_color
         fake_tits
         gender
+        hair_color
         height_cm
         measurements
         image_path
