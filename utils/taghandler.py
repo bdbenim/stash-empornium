@@ -136,6 +136,16 @@ class TagHandler:
                         case 1:
                             if tits >= value:
                                 self.add(key)
+        tattoos = "tattoos" in performer and len(performer["tattoos"]) > 0
+        piercings = "piercings" in performer and len(performer["piercings"]) > 0
+        if tattoos:
+            self.add("tattoo")
+            if gender.lower() == "female":
+                self.add("tattooed.female")
+        if piercings:
+            self.add("piercings")
+        if tattoos and piercings:
+            self.add("tattoo.and.piercing")
         return performer_tag
 
     def processTits(self, measurements: str, fake_tits: str = "") -> int:
