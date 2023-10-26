@@ -5,3 +5,4 @@ waitress
 configupdater
 cairosvg
 redis[hiredis]
+tomlkit

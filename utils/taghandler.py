@@ -2,16 +2,17 @@
 for uploading to empornium."""
 
 from typing import Literal
-from venv import logger
-import configupdater
+import utils.confighandler
 import json
 import re
 import logging
+from utils.structures import CaseInsensitiveDict
+from collections.abc import MutableMapping
 
 class TagHandler:
     logger: logging.Logger
-    conf: configupdater.ConfigUpdater
-    TAGS_MAP: dict[str,str] = {}
+    conf: utils.confighandler.ConfigHandler
+    TAGS_MAP: MutableMapping[str,str] = {}
     TAG_LISTS: dict[str, list[str]] = {}
     tag_sets: dict[str,set] = {}
     countries = []
@@ -25,43 +26,20 @@ class TagHandler:
     # Set of tags to apply to the current scene
     tags: set[str] = set()
     
-    def __init__(self, conf: configupdater.ConfigUpdater) -> None:
+    def __init__(self, conf: utils.confighandler.ConfigHandler) -> None:
         """Initialize a TagHandler object from a config object."""
         self.logger = logging.getLogger(__name__)
-        assert conf._filename is not None
         self.conf = conf
-        self.TAGS_MAP = conf["empornium.tags"].to_dict() # type: ignore
-        for key in conf["empornium"]:
-            self.TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].value.split(","))) # type: ignore
-            self.TAG_LISTS[key].sort()
-            conf["empornium"].set(key, ", ".join(self.TAG_LISTS[key]))
-            self.tag_sets[key] = set()
-        for key in conf["demonyms"].options():
-            codes = list(map(lambda x: x.strip(), conf["demonyms"][key].value.split(","))) # type: ignore
-            codes.sort()
-            conf["demonyms"].set(key, ", ".join(codes))
-            for code in codes:
-                if code in self.DEMONYMS:
-                    self.DEMONYMS[code].append(key)
-                else:
-                    self.DEMONYMS[code] = [key]
-        if conf.has_section("cup.sizes"):
-            for key in conf["cup.sizes"].options():
-                value = conf["cup.sizes"][key].value
-                assert value is not None
-                if key == "mutually_exclusive":
-                    self.cup_mutex = value.lower() == "true"
-                    continue
-                op = 0
-                if "-" in value:
-                    op = -1
-                elif "+" in value:
-                    op = 1
-                value = self.processTits(value)
-                if value < 0:
-                    continue
-                self.cup_sizes[key] = (value, op)
-        logger.debug(self.cup_sizes)
+        empornium = conf.items("empornium")
+        self.TAGS_MAP = CaseInsensitiveDict(empornium["tags"]) if "tags" in empornium else conf.items("empornium.tags")
+        for key in empornium:
+            newkey = key.lower()
+            if newkey == "tags":
+                continue
+            self.TAG_LISTS[newkey] = list(conf.get("empornium", key)) # type: ignore
+            self.TAG_LISTS[newkey].sort()
+            conf.set("empornium", key, self.TAG_LISTS[newkey])
+            self.tag_sets[newkey] = set()
         conf.update_file()
         assert "sex_acts" in self.TAG_LISTS
         with open("countries.json") as c:
@@ -91,10 +69,10 @@ class TagHandler:
         mapping."""
         if "ignored_tags" in self.TAG_LISTS and tag.lower() in self.TAG_LISTS["ignored_tags"]:
             return None
-        if tag.lower() in self.TAGS_MAP:
-            self.tags.add(self.TAGS_MAP[tag.lower()])
+        if tag in self.TAGS_MAP:
+            self.tags.add(self.TAGS_MAP[tag])
         else:
-            self.tag_suggestions[tag.lower()] = self.empify(tag)
+            self.tag_suggestions[tag] = self.empify(tag)
         for key in self.TAG_LISTS:
             if tag in self.TAG_LISTS[key]:
                 self.tag_sets[key].add(tag)
@@ -114,7 +92,7 @@ class TagHandler:
                     if country["cca2"] == cca2:
                         self.tags.add(self.empify(country["demonyms"]["eng"][g]))
                 if cca2 in self.DEMONYMS:
-                    logger.debug(f"Found demonyms {self.DEMONYMS[cca2]} for performer {performer['name']}")
+                    self.logger.debug(f"Found demonyms {self.DEMONYMS[cca2]} for performer {performer['name']}")
                     self.tags.update(self.DEMONYMS[cca2])
         if "circumcised" in performer:
             if performer["circumcised"] == "CUT":
@@ -140,12 +118,12 @@ class TagHandler:
     def processTits(self, measurements: str) -> int:
         cup_size = re.sub(r"[^A-Z]", "", measurements.upper())
         if cup_size == "":
-            logger.error(f"No cup size found in {measurements}")
+            self.logger.error(f"No cup size found in {measurements}")
             return -1
         if len(cup_size) > 1:
             letter = cup_size[0]
             if cup_size != len(cup_size)*letter or (letter != "A" and letter != "D"):
-                logger.error(f"Invalid cup size {cup_size}")
+                self.logger.error(f"Invalid cup size {cup_size}")
                 return -1
             if letter == "A":
                 return 0
@@ -189,7 +167,7 @@ class TagHandler:
         self.logger.info("Saving tag mappings")
         self.logger.debug(f"Tags: {tags}")
         for tag in tags:
-            self.conf["empornium.tags"].set(tag, tags[tag])
+            self.conf.set("empornium.tags", tag.lower(), tags[tag])
             tag = tag.lower()
             self.TAGS_MAP[tag] = tags[tag]
             if tag in self.tag_suggestions:
@@ -208,10 +186,7 @@ class TagHandler:
             if tag in self.tag_suggestions:
                 self.tag_suggestions.pop(tag)
         self.TAG_LISTS["ignored_tags"].sort()
-        if not self.conf["empornium"].has_option("ignored_tags"):
-            # For cosmetic purposes, add section before last blank line of section instead of after:
-            self.conf["empornium"].option_blocks()[-1].add_after.option("ignored_tags")
-        self.conf.set("empornium", "ignored_tags", ", ".join(self.TAG_LISTS["ignored_tags"]))
+        self.conf.set("empornium", "ignored_tags", self.TAG_LISTS["ignored_tags"])
         return self.update_file()
 
     def keys(self) -> list[str]:

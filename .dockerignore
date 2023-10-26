@@ -7,3 +7,6 @@ emp_stash_fill.user.js
 *.md
 __pycache__/
 .vscode/
+.pytests_cache/
+dist/
+tests/
