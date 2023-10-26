@@ -99,8 +99,15 @@ class TagHandler:
                 self.tags.add("circumcised.cock")
             elif performer["circumcised"] == "UNCUT":
                 self.tags.add("uncircumcised.cock")
+        fake_tits = ""
+        if "fake_tits" in performer:
+            fake_tits = performer["fake_tits"].lower()
+            if fake_tits == "natural":
+                self.add("natural.tits")
+            elif fake_tits == "augmented" or fake_tits == "fake":
+                self.add("fake.tits")
         if "measurements" in performer:
-            tits = self.processTits(performer["measurements"])
+            tits = self.processTits(performer["measurements"], fake_tits)
             if tits >= 0:
                 for key, (value, op) in self.cup_sizes.items():
                     match op:
@@ -115,7 +122,8 @@ class TagHandler:
                                 self.add(key)
         return performer_tag
     
-    def processTits(self, measurements: str) -> int:
+    def processTits(self, measurements: str, fake_tits: str = "") -> int:
+        # TODO process size/type combo tags, e.g. big.natural.tits
         cup_size = re.sub(r"[^A-Z]", "", measurements.upper())
         if cup_size == "":
             self.logger.error(f"No cup size found in {measurements}")
