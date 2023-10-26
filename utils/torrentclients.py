@@ -66,6 +66,7 @@ class RTorrent(TorrentClient):
                 f"d.custom1.set={self.label}",
                 "d.check_hash=",
             )
+        self.logger.info("Torrent added to rTorrent")
 
 
 class Qbittorrent(TorrentClient):

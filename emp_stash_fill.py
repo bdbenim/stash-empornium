@@ -584,7 +584,7 @@ def generate():
 
     logger.debug(f"Sending {len(tag_suggestions)} suggestions")
     if len(tag_suggestions) > 0:
-        result["data"]["suggestions"] = tag_suggestions
+        result["data"]["suggestions"] = dict(tag_suggestions)
 
     yield json.dumps(result)
 
