@@ -17,6 +17,8 @@ HAIR_COLOR_MAP = CaseInsensitiveDict(
         "blonde": "blonde",
         "blond": "blonde",
         "black": "black.hair",
+        "brown": "brunette",
+        "brunette": "brunette",
         "red": "redhead",
         "auburn": "auburn.hair",
         "grey": "grey.hair",
@@ -123,6 +125,7 @@ class TagHandler:
 
     def processPerformer(self, performer: dict) -> str:
         # also include alias tags?
+        self.logger.debug(performer)
         performer_tag = self.empify(performer["name"])
         self.tags.add(performer_tag)
         gender = performer["gender"] if performer["gender"] else "FEMALE"  # Should this default be configurable?
@@ -143,9 +146,9 @@ class TagHandler:
                 self.tags.add("circumcised.cock")
             elif performer["circumcised"] == "UNCUT":
                 self.tags.add("uncircumcised.cock")
-        if "ethnicity" in performer and performer["ethnicity"] in ETHNICITY_MAP:
+        if self.conf["performers"]["tag_ethnicity"] and "ethnicity" in performer and performer["ethnicity"] in ETHNICITY_MAP: # type: ignore
             self.add(ETHNICITY_MAP[performer["ethnicity"]])
-        if "eye_color" in performer and len(performer["eye_color"]) > 0:
+        if self.conf["performers"]["tag_eye_color"] and "eye_color" in performer and len(performer["eye_color"]) > 0: # type: ignore
             self.add(performer["eye_color"] + ".eyes")
         fake_tits = ""
         if "fake_tits" in performer:
@@ -154,7 +157,7 @@ class TagHandler:
                 self.add("natural.tits")
             elif fake_tits == "augmented" or fake_tits == "fake":
                 self.add("fake.tits")
-        if "hair_color" in performer and performer["hair_color"] in HAIR_COLOR_MAP:
+        if self.conf["performers"]["tag_hair_color"] and "hair_color" in performer and performer["hair_color"] in HAIR_COLOR_MAP: # type: ignore
             self.add(HAIR_COLOR_MAP[performer["hair_color"]])
         if "measurements" in performer and len(performer["measurements"]) > 0:
             tits = self.processTits(performer["measurements"], fake_tits)
