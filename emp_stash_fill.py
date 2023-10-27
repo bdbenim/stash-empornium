@@ -32,6 +32,7 @@ __license__ = "unlicense"
 __version__ = "0.12.0"
 
 # external
+from crypt import methods
 import requests
 from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
 from cairosvg import svg2png
@@ -596,6 +597,11 @@ def generate():
 
     time.sleep(1)
 
+@app.route("/submit", methods=["POST"])
+def submit():
+    j = request.get_json()
+    logger.debug(f"Torrent submitted: {j}")
+    return json.dumps({"status": "success"})
 
 @app.route("/suggestions", methods=["POST"])
 def processSuggestions():
