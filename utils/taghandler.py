@@ -2,6 +2,9 @@
 for uploading to empornium."""
 
 from typing import Literal
+
+import tomlkit
+from tomlkit.items import AbstractTable
 import utils.confighandler
 import json
 import re
@@ -20,15 +23,17 @@ HAIR_COLOR_MAP = CaseInsensitiveDict(
     }
 )
 
-ETHNICITY_MAP = CaseInsensitiveDict({
-    "caucasian": "caucasian",
-    "black": "black",
-    "asian": "asian",
-    "mixed": "mixed.race",
-    "latin": "latina",
-    "middle eastern": "middle.eastern",
-    "indian": "indian"
-})
+ETHNICITY_MAP = CaseInsensitiveDict(
+    {
+        "caucasian": "caucasian",
+        "black": "black",
+        "asian": "asian",
+        "mixed": "mixed.race",
+        "latin": "latina",
+        "middle eastern": "middle.eastern",
+        "indian": "indian",
+    }
+)
 
 
 class TagHandler:
@@ -63,6 +68,23 @@ class TagHandler:
             conf.set("empornium", key, self.TAG_LISTS[newkey])
             self.tag_sets[newkey] = set()
         conf.update_file()
+        if "performers" in conf:
+            t = conf["performers"]
+            if isinstance(t, AbstractTable):
+                if "cup_sizes" in t:
+                    sizes = t["cup_sizes"]
+                    if isinstance(sizes, AbstractTable):
+                        for tag in sizes:
+                            size = sizes[tag].as_string()
+                            op = 0
+                            if "-" in size:
+                                op = -1
+                            elif "+" in size:
+                                op = 1
+                            size = self.processTits(size)
+                            self.cup_sizes[tag] = (size, op)
+                        self.logger.debug(self.cup_sizes)
+
         assert "sex_acts" in self.TAG_LISTS
         with open("countries.json") as c:
             self.countries = json.load(c)
