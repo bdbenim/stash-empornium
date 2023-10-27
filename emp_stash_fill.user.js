@@ -266,6 +266,19 @@ if (STASH_API_KEY !== null) {
                       }
                     }
 
+                    let submitBtn = unsafeWindow.document.getElementById("post");
+                    submitBtn.addEventListener("click", () => {
+                      GM_xmlhttpRequest({
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        url: new URL("/submit", BACKEND).href,
+                        responseType: "json",
+                        data: JSON.stringify({
+                          torrent_path: j.data.fill.torrent_path
+                        })
+                      })
+                    });
+
                     if ("suggestions" in j.data) {
                       let parent = document.getElementsByClassName("thin")[0];
 
