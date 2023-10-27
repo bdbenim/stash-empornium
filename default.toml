@@ -83,6 +83,20 @@ tag_date = true
 tag_framerate = true
 tag_resolution = true
 
+[performers]
+tag_ethnicity = false
+tag_hair_color = false
+tag_eye_color = false
+
+# [performers.cup_sizes]
+## Map EMP tags to cup sizes. Add a '-' to match sizes less than or equal to the specified
+## size, or a '+' to match sizes greater or equal. Add neither for exact matches only.
+# "tiny.tits" = "A-"
+# "small.tits" = "B-"
+# "big.tits" = "D+"
+# "huge.tits" = "DD+"
+# "a.cup" = "A"
+
 [templates]
 fakestash-v2 = "Stash / Fake video player v2 (by warblcoffin)"
 tushy = "Tushy video page lookalike (by dickon)"

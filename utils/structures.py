@@ -184,8 +184,13 @@ Copyright 2019 Kenneth Reitz
 """
 
 from collections.abc import Mapping, MutableMapping
+from typing import TypeVar
 
-class CaseInsensitiveDict(MutableMapping):
+from tomlkit import key
+
+T = TypeVar("T")
+
+class CaseInsensitiveDict(MutableMapping[str, T]):
     """
     A case-insensitive ``dict``-like object.
 
@@ -217,26 +222,31 @@ class CaseInsensitiveDict(MutableMapping):
     and is licensed under the Apache License.
     """
     def __init__(self, data=None, **kwargs):
-        self._store = dict()
+        self._store:dict[str,tuple[str,T]] = dict()
         if data is None:
             data = {}
         self.update(data, **kwargs)
+    
+    def __contains__(self, __key: object) -> bool:
+        if hasattr(__key,"lower"):
+            return super().__contains__(__key)
+        return False
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value):
         # Use the lowercased key for lookups, but store the actual
         # key alongside the value.
         self._store[key.lower()] = (key, value)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> T:
         return self._store[key.lower()][1]
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str):
         del self._store[key.lower()]
 
     def __iter__(self):
         return (casedkey for casedkey, mappedvalue in self._store.values())
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._store)
 
     def lower_items(self):
@@ -256,8 +266,8 @@ class CaseInsensitiveDict(MutableMapping):
         return dict(self.lower_items()) == dict(other.lower_items())
 
     # Copy is required
-    def copy(self):
+    def copy(self)-> 'CaseInsensitiveDict[T]':
          return CaseInsensitiveDict(self._store.values())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '%s(%r)' % (self.__class__.__name__, dict(self.items()))

@@ -10,7 +10,7 @@ from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 __version__ = "0.11.0"
 
 
-class ConfigHandler:
+class ConfigHandler(tomlkit.TOMLDocument):
     logger: logging.Logger
     log_level: int
     args: argparse.Namespace
@@ -42,8 +42,60 @@ class ConfigHandler:
 
     stash_query = """
     findScene(id: "{}") {{
-    title details director date studio {{ name url image_path parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot preview webp}}
-    files {{ id path basename width height format duration video_codec audio_codec frame_rate bit_rate size }}
+        title
+        details
+        director
+        date
+        studio {{
+            name
+            url
+            image_path
+            parent_studio {{
+                url
+            }}
+        }}
+        tags {{
+            name
+            parents {{
+                name
+            }}
+        }}
+        performers {{
+            name
+            circumcised
+            country
+            eye_color
+            fake_tits
+            gender
+            hair_color
+            height_cm
+            measurements
+            piercings
+            image_path
+            tags {{
+                name
+            }}
+            tattoos
+        }}
+        paths {{
+            screenshot
+            preview
+            webp
+        }}
+        files {{
+            id
+            path
+            basename
+            width
+            height
+            format
+            duration
+            video_codec
+            audio_codec
+            frame_rate
+            bit_rate
+            size
+        }}
     }}
     """
 
@@ -330,3 +382,9 @@ class ConfigHandler:
         if section in self.conf:
             return CaseInsensitiveDict(self.conf[section])  # type: ignore
         return {}
+
+    def __contains__(self, __key: object) -> bool:
+        return self.conf.__contains__(__key)
+    
+    def __getitem__(self, key: str):
+        return self.conf.__getitem__(key)

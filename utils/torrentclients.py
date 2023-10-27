@@ -66,6 +66,7 @@ class RTorrent(TorrentClient):
                 f"d.custom1.set={self.label}",
                 "d.check_hash=",
             )
+        self.logger.info("Torrent added to rTorrent")
 
 
 class Qbittorrent(TorrentClient):
@@ -219,10 +220,10 @@ class Deluge(TorrentClient):
                     self.logger.info("Torrent added to deluge")
                 else:
                     self.logger.error(
-                        f"Torrent uploaded to Deluge but failed to start: {j['error'] if 'error' in j and j['error'] else 'Unknown error'}"
+                        f"Torrent uploaded to Deluge but failed to add: {j['error'] if 'error' in j and j['error'] else 'Unknown error'}"
                     )
             except requests.ReadTimeout:
-                self.logger.error("Failed to start Deluge torrent (does it already exist?)")
+                self.logger.error("Failed to add torrent to Deluge (does it already exist?)")
         else:
             self.logger.error("Failed to upload torrent to Deluge")
 

@@ -52,22 +52,23 @@ import time
 # included
 from utils import taghandler, imagehandler
 from utils.paths import mapPath
+import utils.confighandler
 
 #############
 # CONSTANTS #
 #############
 
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
+ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
 
-import utils.confighandler
 config = utils.confighandler.ConfigHandler()
-
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=config.log_level)
 logger = logging.getLogger(__name__)
 config.logging_init()
 config.configure()
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
+logger.info(ODBL_NOTICE)
 
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
@@ -312,11 +313,7 @@ def generate():
     ##############
 
     for performer in scene["performers"]:
-        performer_tag = tags.add(performer["name"])
-        # also include alias tags?
-
-        for tag in performer["tags"]:
-            tags.processTag(tag["name"])
+        performer_tag = tags.processPerformer(performer)
 
         # image
         logger.debug(f'Downloading performer image from {performer["image_path"]}')
@@ -587,7 +584,7 @@ def generate():
 
     logger.debug(f"Sending {len(tag_suggestions)} suggestions")
     if len(tag_suggestions) > 0:
-        result["data"]["suggestions"] = tag_suggestions
+        result["data"]["suggestions"] = dict(tag_suggestions)
 
     yield json.dumps(result)
 
