@@ -7,7 +7,7 @@ import shutil
 from utils.structures import CaseInsensitiveDict
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 
-__version__ = "0.11.0"
+__version__ = "0.13.0"
 
 
 class ConfigHandler(tomlkit.TOMLDocument):
