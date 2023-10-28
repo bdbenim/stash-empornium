@@ -32,12 +32,12 @@ __license__ = "unlicense"
 __version__ = "0.12.0"
 
 # external
-from crypt import methods
 import requests
 from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
 from cairosvg import svg2png
 
 # built-in
+import base64
 import datetime
 import json
 import logging
@@ -71,6 +71,7 @@ logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
 
+
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
     return json.dumps({"status": "error", "message": altMessage if altMessage else message})
@@ -102,11 +103,20 @@ def mapPaths(f: dict) -> dict:
         break
     return f
 
+
 tags = taghandler.TagHandler(config)
 
 images = None
 try:
-    images = imagehandler.ImageHandler(config.host, config.rport, config.username, config.password, config.ssl, config.args.no_cache, config.args.overwrite)
+    images = imagehandler.ImageHandler(
+        config.host,
+        config.rport,
+        config.username,
+        config.password,
+        config.ssl,
+        config.args.no_cache,
+        config.args.overwrite,
+    )
 except Exception as e:
     logger.critical("Failed to initialize image handler")
     exit(1)
@@ -114,6 +124,7 @@ if config.args.flush:
     images.clear()
 
 app = Flask(__name__, template_folder=config.template_dir)
+
 
 @stream_with_context
 def generate():
@@ -126,7 +137,9 @@ def generate():
     logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
     template = (
-        j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else config.default_template
+        j["template"]
+        if "template" in j and j["template"] in os.listdir(app.template_folder)
+        else config.default_template
     )
     assert template is not None
 
@@ -361,7 +374,7 @@ def generate():
     ###########
 
     if gen_screens:
-        screens_urls = images.generate_screens(stash_file=stash_file) # TODO customize number of screens from config
+        screens_urls = images.generate_screens(stash_file=stash_file)  # TODO customize number of screens from config
         if screens_urls is None or None in screens_urls:
             return error("Failed to generate screens")
 
@@ -495,7 +508,7 @@ def generate():
     ##########
 
     yield json.dumps({"status": "success", "data": {"message": "Uploading images"}})
-    
+
     logger.info("Uploading performer images")
     for performer_name in performers:
         performers[performer_name]["image_remote_url"] = images.img_host_upload(
@@ -583,6 +596,12 @@ def generate():
         },
     }
 
+    with open(torrent_paths[0], "rb") as f:
+        result["data"]["file"] = {
+            "name": os.path.basename(f.name),
+            "content": str(base64.b64encode(f.read()).decode('ascii'))
+        }
+
     logger.debug(f"Sending {len(tag_suggestions)} suggestions")
     if len(tag_suggestions) > 0:
         result["data"]["suggestions"] = dict(tag_suggestions)
@@ -597,11 +616,13 @@ def generate():
 
     time.sleep(1)
 
+
 @app.route("/submit", methods=["POST"])
 def submit():
     j = request.get_json()
     logger.debug(f"Torrent submitted: {j}")
     return json.dumps({"status": "success"})
+
 
 @app.route("/suggestions", methods=["POST"])
 def processSuggestions():

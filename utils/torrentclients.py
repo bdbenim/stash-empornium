@@ -4,7 +4,6 @@ from utils import bencoder
 import os
 from xmlrpc import client
 import requests
-import hashlib
 
 
 class TorrentClient:
@@ -20,20 +19,12 @@ class TorrentClient:
             self.pathmaps = settings["pathmaps"]
         if "label" in settings:
             self.label = settings["label"]
-    
-    def hash(self, path:str) -> str:
-        with open(path, "rb") as f:
-            info = bencoder.decode(f.read())[b"info"] # type: ignore
-        return hashlib.sha1(bencoder.encode(info)).hexdigest()
-        
 
     def add(self, torrent_path: str, file_path: str) -> None:
         raise NotImplementedError()
-    
+
     def start(self, torrent_path: str) -> None:
         raise NotImplementedError()
-    
-
 
 
 class RTorrent(TorrentClient):
@@ -116,7 +107,8 @@ class Qbittorrent(TorrentClient):
     def add(self, torrent_path: str, file_path: str) -> None:
         if not self.logged_in:
             return
-        hash = self.hash(torrent_path)
+        with open(torrent_path, "rb") as f:
+            hash = bencoder.infohash(f.read())
         file_path = mapPath(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
         torrent_name = os.path.basename(torrent_path)
@@ -142,7 +134,7 @@ class Qbittorrent(TorrentClient):
         if not self.logged_in:
             return
         path = "/torrents/recheck"
-        requests.post(self.url+path, data={"hashes": infohash}, cookies=self.cookies, timeout=5)
+        requests.post(self.url + path, data={"hashes": infohash}, cookies=self.cookies, timeout=5)
 
 
 class Deluge(TorrentClient):

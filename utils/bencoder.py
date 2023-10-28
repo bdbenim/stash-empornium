@@ -1,6 +1,8 @@
 import re
 import string
 import itertools as it
+import hashlib
+
 
 def encode(obj):
     """
@@ -35,6 +37,7 @@ def encode(obj):
             raise ValueError("dict keys should be bytes")
     raise ValueError("Allowed types: int, bytes, list, dict; not %s", type(obj))
 
+
 def decode(s):
     """
     Decodes given bencoded bytes object.
@@ -48,11 +51,12 @@ def decode(s):
     >>> decode(b'd3:bar4:spam3:fooi42ee') == {b'bar': b'spam', b'foo': 42}
     True
     """
+
     def decode_first(s):
         if s.startswith(b"i"):
             match = re.match(b"i(-?\\d+)e", s)
             assert match is not None
-            return int(match.group(1)), s[match.span()[1]:]
+            return int(match.group(1)), s[match.span()[1] :]
         elif s.startswith(b"l") or s.startswith(b"d"):
             l = []
             rest = s[1:]
@@ -82,3 +86,12 @@ def decode(s):
     if rest:
         raise ValueError("Malformed input.")
     return ret
+
+
+def infohash(f: bytes) -> str:
+    info = decode(f)
+    try:
+        assert isinstance(info, dict) and b"info" in info
+    except:
+        return ""
+    return hashlib.sha1(encode(info)).hexdigest()

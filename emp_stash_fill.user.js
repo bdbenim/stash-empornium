@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.3.0
+// @version      0.4.0
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       You
 // @match        https://www.empornium.sx/upload.php*
@@ -18,6 +18,9 @@
 // ==/UserScript==
 
 // Changelog:
+// v0.4.0
+//  - You can now have the torrent file be uploaded automatically without 
+//    having to navigate to it
 // v0.3.0
 //  - Add ability to toggle anonymous uploading
 // v0.2.0
@@ -83,6 +86,26 @@ var graphql = {
 if (STASH_API_KEY !== null) {
   graphql.headers.apiKey = STASH_API_KEY;
 }
+
+const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
+  const byteCharacters = atob(b64Data);
+  const byteArrays = [];
+
+  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+    const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+
+  const blob = new Blob(byteArrays, { type: contentType });
+  return blob;
+};
 
 (function () {
   "use strict";
@@ -168,6 +191,16 @@ if (STASH_API_KEY !== null) {
     XPathResult.ANY_UNORDERED_NODE_TYPE,
     null
   ).singleNodeValue.value;
+
+  const submitForm = document.getElementById("upload_table");
+  const submitRow = submitForm.querySelector(
+    ".border > tbody > tr:last-child > td"
+  );
+  let submitBtn = document.createElement("input");
+  submitBtn.id = "autoupload";
+  submitBtn.type = "button";
+  submitBtn.value = "Upload with File";
+  submitRow.appendChild(submitBtn);
 
   fillButton.addEventListener("click", () => {
     let suggestionsHead = document.getElementById("suggestions-head");
@@ -266,17 +299,43 @@ if (STASH_API_KEY !== null) {
                       }
                     }
 
-                    let submitBtn = unsafeWindow.document.getElementById("post");
-                    submitBtn.addEventListener("click", () => {
+                    // Temporary for debugging. Replace the button each time
+                    // so that we don't add multiple copies of the listener
+                    // function to the same button.
+                    let newBtn = submitBtn.cloneNode();
+                    submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+                    newBtn.addEventListener("click", () => {
+                      newBtn.disabled = true;
+                      let formel = document.getElementById("upload_table");
+                      let formdata = new FormData(formel);
+                      if ("file" in j.data) {
+                        formdata.set(
+                          "file_input",
+                          b64toBlob(
+                            j.data.file.content,
+                            "application/x-bittorrent"
+                          ),
+                          j.data.file.name
+                        );
+                        console.debug(formdata);
+                        const r = new XMLHttpRequest();
+                        r.open(
+                          "POST",
+                          new URL("/upload.php", window.location).href
+                        );
+                        r.responseType = "document";
+                        r.send(formdata);
+                      }
+
                       GM_xmlhttpRequest({
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         url: new URL("/submit", BACKEND).href,
                         responseType: "json",
                         data: JSON.stringify({
-                          torrent_path: j.data.fill.torrent_path
-                        })
-                      })
+                          torrent_path: j.data.fill.torrent_path,
+                        }),
+                      });
                     });
 
                     if ("suggestions" in j.data) {
