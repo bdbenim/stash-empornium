@@ -611,8 +611,9 @@ def generate():
     for client in config.torrent_clients:
         try:
             client.add(torrent_paths[0], stash_file["path"])
-        except:
+        except Exception as e:
             logger.error(f"Error attempting to add torrent to {client.name}")
+            logger.debug(e)
 
     time.sleep(1)
 
@@ -621,6 +622,12 @@ def generate():
 def submit():
     j = request.get_json()
     logger.debug(f"Torrent submitted: {j}")
+    for client in config.torrent_clients:
+        try:
+            client.start(j["torrent_path"])
+        except Exception as e:
+            logger.error(f"Error attempting to start torrent in {client.name}")
+            logger.debug(e)
     return json.dumps({"status": "success"})
 
 
