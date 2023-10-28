@@ -37,7 +37,7 @@ class ImageHandler:
     overwrite: bool = False
 
     cookies = None
-    img_host_token: str
+    img_host_token: str = ""
 
     def __init__(
         self,
@@ -171,9 +171,16 @@ class ImageHandler:
         }
         url = "https://jerking.empornium.ph/json"
         response = requests.post(url, files=files, data=request_body, cookies=self.cookies, headers=headers)
-        if "error" in response.json():
-            logger.error(f"Error uploading image: {response.json()['error']['message']}")
-            return default,None
+        try:
+            j = response.json()
+            assert "error" not in j
+        except:
+            logger.debug(f"Error uploading image, retrying connection")
+            self.__connectionInit()
+            response = requests.post(url, files=files, data=request_body, cookies=self.cookies, headers=headers)
+            if "error" in response.json():
+                logger.error(f"Error uploading image: {response.json()['error']['message']}")
+                return default,None
         # Cache and return url
         url = response.json()["image"]["image"]["url"]
         self.add(digest, url)
