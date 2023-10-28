@@ -9,6 +9,7 @@ import requests
 class TorrentClient:
     "Base torrent client class"
     pathmaps: dict[str, str] = {}
+    hashes: dict[str, str] = {}
     logger: logging.Logger
     label: str = ""
     name: str = "Torrent Client"
@@ -21,9 +22,14 @@ class TorrentClient:
             self.label = settings["label"]
 
     def add(self, torrent_path: str, file_path: str) -> None:
-        raise NotImplementedError()
+        if torrent_path not in TorrentClient.hashes:
+            with open(torrent_path, "rb") as f:
+                TorrentClient.hashes[torrent_path] = bencoder.infohash(f.read())
 
     def start(self, torrent_path: str) -> None:
+        raise NotImplementedError()
+    
+    def resume(self, infohash: str):
         raise NotImplementedError()
 
 
@@ -59,6 +65,7 @@ class RTorrent(TorrentClient):
         self.logger.debug(f"Connecting to rtorrent at '{uri}'")
 
     def add(self, torrent_path: str, file_path: str) -> None:
+        super().add(torrent_path, file_path)
         file_path = mapPath(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
         self.logger.debug(f"Adding torrent {torrent_path} to directory {dir}")
@@ -72,8 +79,16 @@ class RTorrent(TorrentClient):
             )
         self.logger.info("Torrent added to rTorrent")
 
+    def start(self, torrent_path: str) -> None:
+        if torrent_path in RTorrent.hashes:
+            self.resume(RTorrent.hashes[torrent_path])
+    
+    def resume(self, infohash: str):
+        self.server.d.start(infohash)
+
 
 class Qbittorrent(TorrentClient):
+    "Implements qBittorrent's WebUI API for adding torrents"
     url: str
     username: str
     password: str
@@ -96,15 +111,14 @@ class Qbittorrent(TorrentClient):
         self.__login()
 
     def __login(self):
-        path = "/auth/login"
-        data = {"username": self.username, "password": self.password}
-        r = requests.post(self.url + path, cookies=self.cookies, data=data)
+        r = self._post("/auth/login", {"username": self.username, "password": self.password})
         self.cookies = r.cookies
         self.logged_in = r.content.decode() == "Ok."
         if not self.logged_in:
             self.logger.error("Failed to login to qBittorrent")
 
     def add(self, torrent_path: str, file_path: str) -> None:
+        super().add(torrent_path, file_path)
         if not self.logged_in:
             return
         with open(torrent_path, "rb") as f:
@@ -112,18 +126,12 @@ class Qbittorrent(TorrentClient):
         file_path = mapPath(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
         torrent_name = os.path.basename(torrent_path)
-        path = "/torrents/add"
         options = {"paused": "true", "savepath": dir}
         if len(self.label) > 0:
             options["category"] = self.label
         with open(torrent_path, "rb") as f:
-            r = requests.post(
-                self.url + path,
-                data=options,
-                files={"torrents": (torrent_name, f, "application/x-bittorrent")},
-                cookies=self.cookies,
-                timeout=30,
-            )
+            files={"torrents": (torrent_name, f, "application/x-bittorrent")}
+            r = self._post("/torrents/add", options, files=files, timeout=15)
         if r.ok and r.content.decode() != "Fails.":
             self.recheck(hash)
             self.logger.info("Torrent added to qBittorrent")
@@ -133,11 +141,23 @@ class Qbittorrent(TorrentClient):
     def recheck(self, infohash: str):
         if not self.logged_in:
             return
-        path = "/torrents/recheck"
-        requests.post(self.url + path, data={"hashes": infohash}, cookies=self.cookies, timeout=5)
+        self._post("/torrents/recheck", {"hashes": infohash})
+
+    def start(self, torrent_path: str) -> None:
+        if not self.logged_in or torrent_path not in Qbittorrent.hashes:
+            return
+        self.resume(Qbittorrent.hashes[torrent_path])
+    
+    def resume(self, infohash: str):
+        self._post("/torrents/start", {"hashes": infohash})
+    
+    def _post(self, path: str, data: dict, files:dict|None = None, timeout: int = 5) -> requests.Response:
+        r = requests.post(self.url+path, data=data, cookies=self.cookies, timeout=timeout, files=files)
+        return r
 
 
 class Deluge(TorrentClient):
+    "Implements Deluge's JSON RPC API for adding torrents"
     url: str
     password: str
     cookies = None
@@ -197,6 +217,7 @@ class Deluge(TorrentClient):
         return False
 
     def add(self, torrent_path: str, file_path: str) -> None:
+        super().add(torrent_path, file_path)
         file_path = mapPath(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
         torrent_name = os.path.basename(torrent_path)
@@ -237,3 +258,15 @@ class Deluge(TorrentClient):
     def recheck(self, infohash: str):
         body = {"method": "core.force_recheck", "params": [[infohash]], "id": 1}
         requests.post(self.url, json=body, cookies=self.cookies, timeout=5)
+
+    def resume(self, infohash: str) -> None:
+        body = {
+            "method": "core.resume_torrent",
+            "params": [[infohash]],
+            "id": 1
+        }
+        requests.post(self.url, json=body, cookies=self.cookies, timeout=5)
+
+    def start(self, torrent_path: str) -> None:
+        if torrent_path in Deluge.hashes:
+            self.resume(Deluge.hashes[torrent_path])

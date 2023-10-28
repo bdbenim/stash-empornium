@@ -89,9 +89,9 @@ def decode(s):
 
 
 def infohash(f: bytes) -> str:
-    info = decode(f)
+    data = decode(f)
     try:
-        assert isinstance(info, dict) and b"info" in info
+        assert isinstance(data, dict) and b"info" in data
+        return hashlib.sha1(encode(data[b"info"])).hexdigest()
     except:
         return ""
-    return hashlib.sha1(encode(info)).hexdigest()
