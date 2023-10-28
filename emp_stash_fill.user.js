@@ -19,7 +19,7 @@
 
 // Changelog:
 // v0.4.0
-//  - You can now have the torrent file be uploaded automatically without 
+//  - You can now have the torrent file be uploaded automatically without
 //    having to navigate to it
 // v0.3.0
 //  - Add ability to toggle anonymous uploading
@@ -200,6 +200,7 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
   submitBtn.id = "autoupload";
   submitBtn.type = "button";
   submitBtn.value = "Upload with File";
+  submitBtn.disabled = true;
   submitRow.appendChild(submitBtn);
 
   fillButton.addEventListener("click", () => {
@@ -299,16 +300,17 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
                       }
                     }
 
-                    // Temporary for debugging. Replace the button each time
-                    // so that we don't add multiple copies of the listener
-                    // function to the same button.
-                    let newBtn = submitBtn.cloneNode();
-                    submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-                    newBtn.addEventListener("click", () => {
-                      newBtn.disabled = true;
-                      let formel = document.getElementById("upload_table");
-                      let formdata = new FormData(formel);
-                      if ("file" in j.data) {
+                    if ("file" in j.data) {
+                      // Temporary for debugging. Replace the button each time
+                      // so that we don't add multiple copies of the listener
+                      // function to the same button.
+                      let newBtn = submitBtn.cloneNode();
+                      newBtn.disabled = false;
+                      submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+                      newBtn.addEventListener("click", () => {
+                        newBtn.disabled = true;
+                        let formel = document.getElementById("upload_table");
+                        let formdata = new FormData(formel);
                         formdata.set(
                           "file_input",
                           b64toBlob(
@@ -319,24 +321,31 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
                         );
                         console.debug(formdata);
                         const r = new XMLHttpRequest();
+                        r.onreadystatechange = function() {
+                          if (r.readyState == XMLHttpRequest.DONE) {
+                            document.open();
+                            document.write(r.responseText);
+                            document.close();
+                          }
+                        }
                         r.open(
                           "POST",
                           new URL("/upload.php", window.location).href
                         );
-                        r.responseType = "document";
+                        r.responseType = "text";
                         r.send(formdata);
-                      }
 
-                      GM_xmlhttpRequest({
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        url: new URL("/submit", BACKEND).href,
-                        responseType: "json",
-                        data: JSON.stringify({
-                          torrent_path: j.data.fill.torrent_path,
-                        }),
+                        GM_xmlhttpRequest({
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          url: new URL("/submit", BACKEND).href,
+                          responseType: "json",
+                          data: JSON.stringify({
+                            torrent_path: j.data.fill.torrent_path,
+                          }),
+                        });
                       });
-                    });
+                    }
 
                     if ("suggestions" in j.data) {
                       let parent = document.getElementsByClassName("thin")[0];
