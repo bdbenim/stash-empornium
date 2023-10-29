@@ -42,6 +42,8 @@ import datetime
 import json
 import logging
 import math
+import multiprocessing as mp
+from multiprocessing.connection import Connection
 import os
 import shutil
 import string
@@ -70,7 +72,6 @@ config.configure()
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
-
 
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
@@ -158,9 +159,6 @@ def generate():
         headers=config.stash_headers,
     )
 
-    # if not stash_response.status_code == 200:
-    #     return jsonify({ "status": "error" })
-
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
     if scene is None:
@@ -231,6 +229,19 @@ def generate():
 
     if resolution is not None and config.tag_resolution:
         tags.add(resolution)
+    
+    ###########
+    # TORRENT #
+    ###########
+
+    yield info("Making torrent")
+    receive_pipe, send_pipe = mp.Pipe(False)
+    torrent_proc = mp.Process(target=genTorrent, args=(send_pipe, stash_file, announce_url))
+    torrent_proc.start()
+    # torrent_proc.join()
+    # torrent_paths = genTorrent(stash_file, announce_url)
+    # if torrent_paths is None:
+    #     return error("Failed to generate torrent")
 
     #########
     # COVER #
@@ -269,6 +280,7 @@ def generate():
             "-y",
         ]
         proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # cover_gen_proc = subprocess.Popen(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
     else:
         with open(cover_file[1], "wb") as fp:
@@ -396,43 +408,6 @@ def generate():
     except:
         logger.warning("Unable to determine audio bitrate")
         audio_bitrate = "UNK"
-
-    ###########
-    # TORRENT #
-    ###########
-
-    yield info("Making torrent")
-    piece_size = int(math.log(stash_file["size"] / 2**10, 2))
-    tempdir = tempfile.TemporaryDirectory()
-    basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
-    # logger.debug(f"Sanitized filename: {basename}")
-    # basename = stash_file["basename"]
-    temppath = os.path.join(tempdir.name, basename + ".torrent")
-    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
-    logger.debug(f"Saving torrent to {temppath}")
-    cmd = [
-        "mktorrent",
-        "-l",
-        str(piece_size),
-        "-s",
-        "Emp",
-        "-a",
-        announce_url,
-        "-p",
-        "-v",
-        "-o",
-        temppath,
-        stash_file["path"],
-    ]
-    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    logger.debug(f"mktorrent output:\n{process.stdout}")
-    if process.returncode != 0:
-        tempdir.cleanup()
-        return error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
-    for path in torrent_paths:
-        shutil.copy(temppath, path)
-    tempdir.cleanup()
-    logger.debug(f"Moved torrent to {torrent_paths}")
 
     #############
     # MEDIAINFO #
@@ -577,6 +552,9 @@ def generate():
 
     tag_suggestions = tags.tag_suggestions
 
+    torrent_proc.join()
+    torrent_paths = receive_pipe.recv()
+
     result = {
         "status": "success",
         "data": {
@@ -614,6 +592,41 @@ def generate():
 
     time.sleep(1)
 
+def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[str] | None:
+    piece_size = int(math.log(stash_file["size"] / 2**10, 2))
+    tempdir = tempfile.TemporaryDirectory()
+    basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
+    # logger.debug(f"Sanitized filename: {basename}")
+    # basename = stash_file["basename"]
+    temppath = os.path.join(tempdir.name, basename + ".torrent")
+    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
+    logger.debug(f"Saving torrent to {temppath}")
+    cmd = [
+        "mktorrent",
+        "-l",
+        str(piece_size),
+        "-s",
+        "Emp",
+        "-a",
+        announce_url,
+        "-p",
+        "-v",
+        "-o",
+        temppath,
+        stash_file["path"],
+    ]
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    logger.debug(f"mktorrent output:\n{process.stdout}")
+    if process.returncode != 0:
+        tempdir.cleanup()
+        logger.error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
+        return None
+    for path in torrent_paths:
+        shutil.copy(temppath, path)
+    tempdir.cleanup()
+    logger.debug(f"Moved torrent to {torrent_paths}")
+    pipe.send(torrent_paths)
+    # return torrent_paths
 
 @app.route("/submit", methods=["POST"])
 def submit():
