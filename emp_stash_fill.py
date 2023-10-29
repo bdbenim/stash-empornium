@@ -62,7 +62,7 @@ import utils.confighandler
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
 
-config = utils.confighandler.ConfigHandler()
+config = utils.confighandler.ConfigHandler(__version__)
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=config.log_level)
 logger = logging.getLogger(__name__)
 config.logging_init()
@@ -102,9 +102,6 @@ def mapPaths(f: dict) -> dict:
         f["path"] = local + f["path"].removeprefix(remote)
         break
     return f
-
-
-tags = taghandler.TagHandler(config)
 
 images = None
 try:
@@ -147,7 +144,7 @@ def generate():
     screens_urls = []
     studio_tag = ""
 
-    tags.clear()
+    tags = taghandler.TagHandler(config)
 
     #################
     # STASH REQUEST #
@@ -646,6 +643,7 @@ def processSuggestions():
         logger.info(f"Ignoring {len(j['ignore'])} tags")
         for tag in j["ignore"]:
             ignoredTags.append(tag)
+    tags = taghandler.TagHandler(config)
     success = tags.acceptSuggestions(acceptedTags)
     success = success and tags.rejectSuggestions(ignoredTags)
     if success:

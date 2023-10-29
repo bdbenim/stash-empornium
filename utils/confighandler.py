@@ -7,8 +7,6 @@ import shutil
 from utils.structures import CaseInsensitiveDict
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 
-__version__ = "0.13.1"
-
 
 class ConfigHandler(tomlkit.TOMLDocument):
     logger: logging.Logger
@@ -101,7 +99,8 @@ class ConfigHandler(tomlkit.TOMLDocument):
     }}
     """
 
-    def __init__(self) -> None:
+    def __init__(self, version: str) -> None:
+        self.__version__ = version
         self.parse_args()
         self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
 
@@ -128,7 +127,7 @@ class ConfigHandler(tomlkit.TOMLDocument):
         flags.add_argument("-d", action="store_true", help="include date as tag")
         flags.add_argument("-f", action="store_true", help="include framerate as tag")
         flags.add_argument("-r", action="store_true", help="include resolution as tag")
-        parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
+        parser.add_argument("--version", action="version", version=f"stash-empornium {self.__version__}")
         parser.add_argument("--anon", action="store_true", help="upload anonymously")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
         mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
