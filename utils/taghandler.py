@@ -85,7 +85,6 @@ class TagHandler:
                                 op = 1
                             size = self.processTits(size)
                             self.cup_sizes[tag] = (size, op)
-                        self.logger.debug(self.cup_sizes)
 
         assert "sex_acts" in self.TAG_LISTS
         with open("countries.json") as c:

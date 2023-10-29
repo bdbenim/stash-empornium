@@ -1,5 +1,5 @@
+from genericpath import isfile
 import tomlkit
-import configupdater
 import argparse
 import os
 import logging
@@ -15,6 +15,7 @@ class ConfigHandler(tomlkit.TOMLDocument):
     log_level: int
     args: argparse.Namespace
     conf: tomlkit.TOMLDocument
+    tagconf: tomlkit.TOMLDocument
     default_template: str
     anon: bool
     port: int
@@ -34,6 +35,7 @@ class ConfigHandler(tomlkit.TOMLDocument):
     title_template: str
     template_names: dict[str, str]
     config_file: str
+    tag_config_file: str
     torrent_clients: list[TorrentClient] = []
 
     stash_headers = {
@@ -157,94 +159,104 @@ class ConfigHandler(tomlkit.TOMLDocument):
 
         self.args = parser.parse_args()
 
-    def renameKey(self, section: str, oldkey: str, newkey: str) -> None:
-        if oldkey in self.conf[section]:  # type: ignore
-            self.conf[section][newkey] = self.conf[section][oldkey]  # type: ignore
-            del self.conf[section][oldkey]  # type: ignore
+    def renameKey(self, section: str, oldkey: str, newkey: str, conf: tomlkit.TOMLDocument) -> None:
+        if oldkey in conf[section]:  # type: ignore
+            conf[section][newkey] = self.conf[section][oldkey]  # type: ignore
+            del conf[section][oldkey]  # type: ignore
             self.update_file()
             self.logger.info(f"Key '{oldkey}' renamed to '{newkey}'")
 
     def update_file(self) -> None:
         with open(self.config_file, "w") as f:
             tomlkit.dump(self.conf, f)
+        with open(self.tag_config_file, "w") as f:
+            tomlkit.dump(self.tagconf, f)
+    
+    def backup_config(self) -> None:
+        conf_bak = self.config_file+".bak"
+        tags_bak = self.tag_config_file+".bak"
+        if os.path.isfile(self.config_file):
+            shutil.copy(self.config_file, conf_bak)
+        if os.path.isfile(self.tag_config_file):
+            shutil.copy(self.tag_config_file, tags_bak)
 
     def configure(self) -> None:
         config_dir = self.args.configdir[0]
 
         self.template_dir = os.path.join(config_dir, "templates")
         self.config_file = os.path.join(config_dir, "config.toml")
+        self.tag_config_file = os.path.join(config_dir, "tags.toml")
 
         # Ensure config file is present
         if not os.path.isfile(self.config_file):
             self.logger.info(f"Config file not found at {self.config_file}, creating")
             if not os.path.exists(config_dir):
                 os.makedirs(config_dir)
-            oldconf_file = os.path.join(config_dir, "config.ini")
-            if os.path.isfile(oldconf_file):
-                # TODO convert ini to toml
-                self.logger.info("Translating config from ini")
-                oldconf = configupdater.ConfigUpdater()
-                oldconf.read(oldconf_file)
-
-                self.conf = tomlkit.document()
-                for section in oldconf.sections():
-                    table = tomlkit.table(True)
-                    for item in oldconf[section].iter_blocks():
-                        match type(item):
-                            case configupdater.Comment:
-                                tomlitem = tomlkit.comment(str(item))
-                                table.add(tomlitem)
-                            case configupdater.Option:
-                                value = str(item.value)  # type: ignore
-                                if section in ["empornium", "demonyms"] or (section == "backend" and item.key == "torrent_directories"):  # type: ignore
-                                    value = [x.strip() for x in value.split(",")]  # type: ignore
-                                elif value.lower() == "true":
-                                    value = True
-                                elif value.lower() == "false":
-                                    value = False
-                                elif str.isdigit(value):
-                                    value = int(value)
-                                table.append(item.key, value)  # type: ignore
-                    self.conf.append(section, table)
-                self.update_file()
-            else:
-                shutil.copyfile("default.toml", self.config_file)
-
-        # Ensure config file properly ends with a '\n' character
-        fstr = ""
-        with open(self.config_file, "r") as f:
-            fstr = f.read()
-        if fstr[-1] != "\n":
-            with open(self.config_file, "w") as f:
-                f.write(fstr + "\n")
-        del fstr
-
-        self.logger.info(f"Reading config from {self.config_file}")
-        try:
-            with open(self.config_file) as f:
+            with open("default.toml") as f:
                 self.conf = tomlkit.load(f)
-        except Exception as e:
-            self.logger.critical(f"Failed to read config file: {e}")
-            exit(1)
-        self.renameKey("backend", "torrent_directory", "torrent_directories")
+        else:
+            self.logger.info(f"Reading config from {self.config_file}")
+            try:
+                with open(self.config_file) as f:
+                    self.conf = tomlkit.load(f)
+            except Exception as e:
+                self.logger.critical(f"Failed to read config file: {e}")
+                exit(1)
         with open("default.toml") as f:
             default_conf = tomlkit.load(f)
-        skip_sections = ["empornium", "empornium.tags"]
         for section in default_conf:
             if section not in self.conf:
                 s = tomlkit.table(True)
                 s.add(tomlkit.comment("Section added from default.toml"))
                 self.conf.append(section, s)
-            if section not in skip_sections:
-                for option in default_conf[section]:  # type: ignore
-                    if option not in self.conf[section]:
-                        self.conf[section].add(tomlkit.comment("Option imported automatically:"))  # type: ignore
-                        value = default_conf[section][option]  # type: ignore
-                        self.conf[section][option] = value  # type: ignore
-                        self.logger.info(
-                            f"Automatically added option '{option}' to section [{section}] with value '{value}'"
-                        )
+            for option in default_conf[section]:  # type: ignore
+                if option not in self.conf[section]:
+                    self.conf[section].add(tomlkit.comment("Option imported automatically:"))  # type: ignore
+                    value = default_conf[section][option]  # type: ignore
+                    self.conf[section][option] = value  # type: ignore
+                    self.logger.info(
+                        f"Automatically added option '{option}' to section [{section}] with value '{value}'"
+                    )
         try:
+            if os.path.isfile(self.tag_config_file):
+                self.logger.debug(f"Found tag config at {self.tag_config_file}")
+                with open(self.tag_config_file) as f:
+                    self.tagconf = tomlkit.load(f)
+            else:
+                self.logger.info(f"Config file not found at {self.tag_config_file}, creating")
+                self.tagconf = tomlkit.document()
+                if "empornium" in self.conf:
+                    emp = self.conf["empornium"]
+                    self.tagconf.append("empornium", emp) # type: ignore
+                    del self.conf["empornium"]
+                if "empornium.tags" in self.conf:
+                    emptags = self.conf["empornium.tags"]
+                    if "empornium" not in self.tagconf:
+                        self.tagconf.append("empornium", tomlkit.table(True))
+                    self.tagconf["empornium"].append("tags", emptags) # type: ignore
+                    del self.conf["empornium.tags"]
+                else:
+                    with open("default-tags.toml") as f:
+                        self.tagconf = tomlkit.load(f)
+            with open("default-tags.toml") as f:
+                default_tags = tomlkit.load(f)
+            if "empornium" not in self.tagconf:
+                emp = tomlkit.table(True)
+                emp.append("tags", tomlkit.table(False))
+                self.tagconf.append("empornium", emp)
+            for option in default_tags["empornium"]: # type: ignore
+                if option not in self.tagconf["empornium"]:
+                    self.tagconf["empornium"].add(tomlkit.comment("Option imported automatically")) # type: ignore
+                    value = default_tags["empornium"][option] # type: ignore
+                    self.tagconf["empornium"][option] = value # type: ignore
+            for tag in default_tags["empornium"]["tags"]: # type: ignore
+                if tag not in self.tagconf["empornium"]["ignored_tags"] and tag not in self.tagconf["empornium"]["tags"]: # type: ignore
+                    value = default_tags["empornium"]["tags"][tag] # type: ignore
+                    self.tagconf["empornium"]["tags"][tag] = value # type: ignore
+        except Exception as e:
+            self.logger.error(f"Failed to read tag config file: {e}")
+        try:
+            self.backup_config()
             self.update_file()
         except:
             self.logger.error("Unable to save updated config")
@@ -362,29 +374,27 @@ class ConfigHandler(tomlkit.TOMLDocument):
         if section in self.conf:
             if key in self.conf[section]:  # type: ignore
                 return self.conf[section][key]  # type: ignore
+        if section in self.tagconf and key in self.tagconf[section]: # type: ignore
+            return self.tagconf[section][key] # type: ignore
         return default
 
     def set(self, section: str, key: str, value) -> None:
         if section not in self.conf:
+            if section in self.tagconf:
+                self.tagconf[section][key] = value  # type: ignore
+                return
             self.conf[section] = {}
         self.conf[section][key] = value  # type: ignore
-
-    # def append(self, section: str, key: str, value) -> None:
-    #     if section not in self.conf:
-    #         self.conf[section] = {}
-    #     if key in self.conf[section]: # type: ignore
-    #         self.conf[section][key].append(value) # type: ignore
-    #     else:
-    #         self.conf[section][key] = [value] # type: ignore
-    #     self.update_file()
 
     def items(self, section: str) -> dict:
         if section in self.conf:
             return CaseInsensitiveDict(self.conf[section])  # type: ignore
+        if section in self.tagconf:
+            return CaseInsensitiveDict(self.tagconf[section])  # type: ignore
         return {}
 
     def __contains__(self, __key: object) -> bool:
-        return self.conf.__contains__(__key)
+        return self.conf.__contains__(__key) or self.tagconf.__contains__(__key)
     
     def __getitem__(self, key: str):
-        return self.conf.__getitem__(key)
+        return self.conf.__getitem__(key) if self.conf.__contains__(key) else self.tagconf.__getitem__(key)
