@@ -84,7 +84,7 @@ class RTorrent(TorrentClient):
             self.resume(RTorrent.hashes[torrent_path])
     
     def resume(self, infohash: str):
-        self.server.d.start(infohash)
+        self.server.d.start(infohash.upper())
 
 
 class Qbittorrent(TorrentClient):
