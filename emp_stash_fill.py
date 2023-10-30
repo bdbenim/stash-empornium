@@ -56,6 +56,7 @@ import time
 from utils import taghandler, imagehandler
 from utils.paths import mapPath
 import utils.confighandler
+from webui.webui import simple_page
 
 #############
 # CONSTANTS #
@@ -681,8 +682,8 @@ def suggestions():
 def templates():
     return json.dumps(config.template_names)
 
-
 if __name__ == "__main__":
+    app.register_blueprint(simple_page)
     try:
         from waitress import serve
 
