@@ -1,15 +1,12 @@
 import hashlib
-from hmac import digest
 import logging
 from multiprocessing import Pool
-import multiprocessing
 import os
 import re
 import requests
 import subprocess
 import tempfile
 import time
-from token import OP
 from typing import Any, Optional, Sequence
 import uuid
 
@@ -324,7 +321,6 @@ def img_host_upload(
         if j and "error" in j:
             logger.error(f"Error uploading image: {response.json()['error']['message']}")
             return default
-    # Cache and return url
     url: str = response.json()["image"]["image"]["url"]
     return url
 
