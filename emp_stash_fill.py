@@ -42,6 +42,8 @@ import datetime
 import json
 import logging
 import math
+import multiprocessing as mp
+from multiprocessing.connection import Connection
 import os
 import shutil
 import string
@@ -62,7 +64,7 @@ import utils.confighandler
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
 
-config = utils.confighandler.ConfigHandler()
+config = utils.confighandler.ConfigHandler(__version__)
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=config.log_level)
 logger = logging.getLogger(__name__)
 config.logging_init()
@@ -71,6 +73,7 @@ logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
 
+MEDIA_INFO = shutil.which("mediainfo")
 
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
@@ -103,26 +106,6 @@ def mapPaths(f: dict) -> dict:
         break
     return f
 
-
-tags = taghandler.TagHandler(config)
-
-images = None
-try:
-    images = imagehandler.ImageHandler(
-        config.host,
-        config.rport,
-        config.username,
-        config.password,
-        config.ssl,
-        config.args.no_cache,
-        config.args.overwrite,
-    )
-except Exception as e:
-    logger.critical("Failed to initialize image handler")
-    exit(1)
-if config.args.flush:
-    images.clear()
-
 app = Flask(__name__, template_folder=config.template_dir)
 
 
@@ -147,7 +130,7 @@ def generate():
     screens_urls = []
     studio_tag = ""
 
-    tags.clear()
+    tags = taghandler.TagHandler(config)
 
     #################
     # STASH REQUEST #
@@ -160,9 +143,6 @@ def generate():
         json=stash_request_body,
         headers=config.stash_headers,
     )
-
-    # if not stash_response.status_code == 200:
-    #     return jsonify({ "status": "error" })
 
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
@@ -234,6 +214,19 @@ def generate():
 
     if resolution is not None and config.tag_resolution:
         tags.add(resolution)
+    
+    ###########
+    # TORRENT #
+    ###########
+
+    yield info("Making torrent")
+    receive_pipe, send_pipe = mp.Pipe(False)
+    torrent_proc = mp.Process(target=genTorrent, args=(send_pipe, stash_file, announce_url))
+    torrent_proc.start()
+    # torrent_proc.join()
+    # torrent_paths = genTorrent(stash_file, announce_url)
+    # if torrent_paths is None:
+    #     return error("Failed to generate torrent")
 
     #########
     # COVER #
@@ -272,17 +265,33 @@ def generate():
             "-y",
         ]
         proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # cover_gen_proc = subprocess.Popen(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
     else:
         with open(cover_file[1], "wb") as fp:
             fp.write(cover_response.content)
 
-    yield info("Uploading cover")
-    time.sleep(0.1)
-    cover_remote_url = images.img_host_upload(cover_file[1], cover_mime_type, cover_ext)[0]
+    yield info("Uploading images")
+    images = None
+    try:
+        images = imagehandler.ImageHandler(
+            config.host,
+            config.rport,
+            config.username,
+            config.password,
+            config.ssl,
+            config.args.no_cache,
+            config.args.overwrite,
+        )
+    except Exception as e:
+        return error("Failed to initialize image handler")
+    if config.args.flush:
+        images.clear()
+    
+    cover_remote_url = images.getURL(cover_file[1], cover_mime_type, cover_ext)[0]
     if cover_remote_url is None:
         return error("Failed to upload cover")
-    cover_resized_url = images.img_host_upload(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
+    cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
     os.remove(cover_file[1])
 
     ###############
@@ -393,66 +402,24 @@ def generate():
     ]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        logger.debug(f"ffprobe output:\n{proc.stdout}")
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
 
     except:
         logger.warning("Unable to determine audio bitrate")
         audio_bitrate = "UNK"
 
-    ###########
-    # TORRENT #
-    ###########
-
-    yield info("Making torrent")
-    piece_size = int(math.log(stash_file["size"] / 2**10, 2))
-    tempdir = tempfile.TemporaryDirectory()
-    basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
-    # logger.debug(f"Sanitized filename: {basename}")
-    # basename = stash_file["basename"]
-    temppath = os.path.join(tempdir.name, basename + ".torrent")
-    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
-    logger.debug(f"Saving torrent to {temppath}")
-    cmd = [
-        "mktorrent",
-        "-l",
-        str(piece_size),
-        "-s",
-        "Emp",
-        "-a",
-        announce_url,
-        "-p",
-        "-v",
-        "-o",
-        temppath,
-        stash_file["path"],
-    ]
-    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    logger.debug(f"mktorrent output:\n{process.stdout}")
-    if process.returncode != 0:
-        tempdir.cleanup()
-        return error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
-    for path in torrent_paths:
-        shutil.copy(temppath, path)
-    tempdir.cleanup()
-    logger.debug(f"Moved torrent to {torrent_paths}")
-
     #############
     # MEDIAINFO #
     #############
 
     mediainfo = ""
-    if shutil.which("mediainfo"):
-        yield info("Generating media info")
-        time.sleep(0.1)
-        CMD = ["mediainfo", stash_file["path"]]
-        try:
-            mediainfo = subprocess.check_output(CMD, text=True)
-        except subprocess.CalledProcessError as e:
-            yield error(f"mediainfo exited with code {e.returncode}", "Error generating mediainfo")
-            time.sleep(0.1)
-            mediainfo = ""
-            logger.debug(f"mediainfo output:\n{e.output}")
+    info_proc = None
+    info_recv = None
+    if MEDIA_INFO:
+        info_recv, info_send = mp.Pipe(False)
+        info_proc = mp.Process(target=genMediaInfo, args=(info_send, stash_file["path"]))
+        info_proc.start()
+        logger.debug(mediainfo)
 
     #########
     # TITLE #
@@ -507,11 +474,9 @@ def generate():
     # UPLOAD #
     ##########
 
-    yield json.dumps({"status": "success", "data": {"message": "Uploading images"}})
-
     logger.info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = images.img_host_upload(
+        performers[performer_name]["image_remote_url"] = images.getURL(
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
@@ -525,7 +490,7 @@ def generate():
     logo_url = imagehandler.STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
-        logo_url = images.img_host_upload(
+        logo_url = images.getURL(
             studio_img_file[1],
             sudio_img_mime_type,
             studio_img_ext,
@@ -546,6 +511,11 @@ def generate():
         date = datetime.datetime.fromisoformat(date).strftime(config.date_format)
 
     yield info("Rendering template")
+
+    if info_proc is not None:
+        info_proc.join()
+        mediainfo = info_recv.recv() # type: ignore
+
     time.sleep(0.1)
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
@@ -576,9 +546,10 @@ def generate():
 
     description = render_template(template, **template_context)
 
-    logger.info("Done")
-
     tag_suggestions = tags.tag_suggestions
+
+    torrent_proc.join()
+    torrent_paths = receive_pipe.recv()
 
     result = {
         "status": "success",
@@ -615,8 +586,49 @@ def generate():
             logger.error(f"Error attempting to add torrent to {client.name}")
             logger.debug(e)
 
+    logger.info("Done")
     time.sleep(1)
 
+
+def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[str] | None:
+    piece_size = int(math.log(stash_file["size"] / 2**10, 2))
+    tempdir = tempfile.TemporaryDirectory()
+    basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
+    # logger.debug(f"Sanitized filename: {basename}")
+    # basename = stash_file["basename"]
+    temppath = os.path.join(tempdir.name, basename + ".torrent")
+    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
+    logger.debug(f"Saving torrent to {temppath}")
+    cmd = [
+        "mktorrent",
+        "-l",
+        str(piece_size),
+        "-s",
+        "Emp",
+        "-a",
+        announce_url,
+        "-p",
+        "-v",
+        "-o",
+        temppath,
+        stash_file["path"],
+    ]
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    logger.debug(f"mktorrent output:\n{process.stdout}")
+    if process.returncode != 0:
+        tempdir.cleanup()
+        logger.error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
+        return None
+    for path in torrent_paths:
+        shutil.copy(temppath, path)
+    tempdir.cleanup()
+    logger.debug(f"Moved torrent to {torrent_paths}")
+    pipe.send(torrent_paths)
+    # return torrent_paths
+
+def genMediaInfo(pipe: Connection, path: str) -> None:
+    cmd = [MEDIA_INFO, path]
+    pipe.send(subprocess.check_output(cmd, text=True))
 
 @app.route("/submit", methods=["POST"])
 def submit():
@@ -646,6 +658,7 @@ def processSuggestions():
         logger.info(f"Ignoring {len(j['ignore'])} tags")
         for tag in j["ignore"]:
             ignoredTags.append(tag)
+    tags = taghandler.TagHandler(config)
     success = tags.acceptSuggestions(acceptedTags)
     success = success and tags.rejectSuggestions(ignoredTags)
     if success:
