@@ -132,7 +132,6 @@ class ImageHandler:
         screens = []
         digests = []
 
-        p = Pool()
         cmds: list[tuple] = []
 
         for seek in map(
@@ -140,16 +139,17 @@ class ImageHandler:
             range(num_frames),
         ):
             cmds.append((stash_file["path"], str(seek)))
-        paths = p.starmap(generate_screen, cmds)
+        with Pool() as p:
+            paths = p.starmap(generate_screen, cmds)
         logger.debug(paths)
         cmds.clear()
         for path in paths:
             digests.append(getDigest(path))
             cmds.append((path, "image/jpeg", "jpg", self.img_host_token, self.cookies, ""))
         logger.debug(f"Digests: {digests}")
-        screens = p.starmap(img_host_upload, cmds)
+        with Pool() as p:
+            screens = p.starmap(img_host_upload, cmds)
         for url, digest in zip(screens, digests):
-            # screens.append(url)
             if url != "":
                 self.add(digest, url)
             else:
