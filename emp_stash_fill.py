@@ -73,6 +73,8 @@ logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
 
+MEDIA_INFO = shutil.which("mediainfo")
+
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
     return json.dumps({"status": "error", "message": altMessage if altMessage else message})
@@ -103,23 +105,6 @@ def mapPaths(f: dict) -> dict:
         f["path"] = local + f["path"].removeprefix(remote)
         break
     return f
-
-images = None
-try:
-    images = imagehandler.ImageHandler(
-        config.host,
-        config.rport,
-        config.username,
-        config.password,
-        config.ssl,
-        config.args.no_cache,
-        config.args.overwrite,
-    )
-except Exception as e:
-    logger.critical("Failed to initialize image handler")
-    exit(1)
-if config.args.flush:
-    images.clear()
 
 app = Flask(__name__, template_folder=config.template_dir)
 
@@ -286,12 +271,27 @@ def generate():
         with open(cover_file[1], "wb") as fp:
             fp.write(cover_response.content)
 
-    yield info("Uploading cover")
-    time.sleep(0.1)
-    cover_remote_url = images.img_host_upload(cover_file[1], cover_mime_type, cover_ext)[0]
+    yield info("Uploading images")
+    images = None
+    try:
+        images = imagehandler.ImageHandler(
+            config.host,
+            config.rport,
+            config.username,
+            config.password,
+            config.ssl,
+            config.args.no_cache,
+            config.args.overwrite,
+        )
+    except Exception as e:
+        return error("Failed to initialize image handler")
+    if config.args.flush:
+        images.clear()
+    
+    cover_remote_url = images.getURL(cover_file[1], cover_mime_type, cover_ext)[0]
     if cover_remote_url is None:
         return error("Failed to upload cover")
-    cover_resized_url = images.img_host_upload(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
+    cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
     os.remove(cover_file[1])
 
     ###############
@@ -402,7 +402,6 @@ def generate():
     ]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        logger.debug(f"ffprobe output:\n{proc.stdout}")
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
 
     except:
@@ -414,17 +413,13 @@ def generate():
     #############
 
     mediainfo = ""
-    if shutil.which("mediainfo"):
-        yield info("Generating media info")
-        time.sleep(0.1)
-        CMD = ["mediainfo", stash_file["path"]]
-        try:
-            mediainfo = subprocess.check_output(CMD, text=True)
-        except subprocess.CalledProcessError as e:
-            yield error(f"mediainfo exited with code {e.returncode}", "Error generating mediainfo")
-            time.sleep(0.1)
-            mediainfo = ""
-            logger.debug(f"mediainfo output:\n{e.output}")
+    info_proc = None
+    info_recv = None
+    if MEDIA_INFO:
+        info_recv, info_send = mp.Pipe(False)
+        info_proc = mp.Process(target=genMediaInfo, args=(info_send, stash_file["path"]))
+        info_proc.start()
+        logger.debug(mediainfo)
 
     #########
     # TITLE #
@@ -479,11 +474,9 @@ def generate():
     # UPLOAD #
     ##########
 
-    yield json.dumps({"status": "success", "data": {"message": "Uploading images"}})
-
     logger.info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = images.img_host_upload(
+        performers[performer_name]["image_remote_url"] = images.getURL(
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
@@ -497,7 +490,7 @@ def generate():
     logo_url = imagehandler.STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
-        logo_url = images.img_host_upload(
+        logo_url = images.getURL(
             studio_img_file[1],
             sudio_img_mime_type,
             studio_img_ext,
@@ -518,6 +511,11 @@ def generate():
         date = datetime.datetime.fromisoformat(date).strftime(config.date_format)
 
     yield info("Rendering template")
+
+    if info_proc is not None:
+        info_proc.join()
+        mediainfo = info_recv.recv() # type: ignore
+
     time.sleep(0.1)
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
@@ -547,8 +545,6 @@ def generate():
         template_context[key] = ", ".join(tmpTagLists[key])
 
     description = render_template(template, **template_context)
-
-    logger.info("Done")
 
     tag_suggestions = tags.tag_suggestions
 
@@ -590,7 +586,9 @@ def generate():
             logger.error(f"Error attempting to add torrent to {client.name}")
             logger.debug(e)
 
+    logger.info("Done")
     time.sleep(1)
+
 
 def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[str] | None:
     piece_size = int(math.log(stash_file["size"] / 2**10, 2))
@@ -627,6 +625,10 @@ def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[st
     logger.debug(f"Moved torrent to {torrent_paths}")
     pipe.send(torrent_paths)
     # return torrent_paths
+
+def genMediaInfo(pipe: Connection, path: str) -> None:
+    cmd = [MEDIA_INFO, path]
+    pipe.send(subprocess.check_output(cmd, text=True))
 
 @app.route("/submit", methods=["POST"])
 def submit():
