@@ -4,11 +4,11 @@ import argparse
 import os
 import logging
 import shutil
-from utils.structures import CaseInsensitiveDict
+from customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 
-
-class ConfigHandler(tomlkit.TOMLDocument):
+class ConfigHandler(tomlkit.TOMLDocument, Singleton):
+    initialized = False
     logger: logging.Logger
     log_level: int
     args: argparse.Namespace
@@ -99,10 +99,12 @@ class ConfigHandler(tomlkit.TOMLDocument):
     }}
     """
 
-    def __init__(self, version: str) -> None:
-        self.__version__ = version
-        self.parse_args()
-        self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
+    def __init__(self, version: str = ""):
+        if not (self.initialized):
+            self.__version__ = version
+            self.parse_args()
+            self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
+            self.initialized = True
 
     def logging_init(self) -> None:
         self.logger = logging.getLogger(__name__)

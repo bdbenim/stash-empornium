@@ -29,7 +29,7 @@ waitress
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.13.1"
+__version__ = "0.14.0"
 
 # external
 import requests
@@ -131,7 +131,7 @@ def generate():
     screens_urls = []
     studio_tag = ""
 
-    tags = taghandler.TagHandler(config)
+    tags = taghandler.TagHandler()
 
     #################
     # STASH REQUEST #
@@ -659,7 +659,7 @@ def processSuggestions():
         logger.info(f"Ignoring {len(j['ignore'])} tags")
         for tag in j["ignore"]:
             ignoredTags.append(tag)
-    tags = taghandler.TagHandler(config)
+    tags = taghandler.TagHandler()
     success = tags.acceptSuggestions(acceptedTags)
     success = success and tags.rejectSuggestions(ignoredTags)
     if success:
