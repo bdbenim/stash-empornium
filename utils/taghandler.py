@@ -8,7 +8,7 @@ from utils.confighandler import ConfigHandler
 import json
 import re
 import logging
-from customtypes import CaseInsensitiveDict
+from utils.customtypes import CaseInsensitiveDict
 from collections.abc import MutableMapping
 
 HAIR_COLOR_MAP = CaseInsensitiveDict(

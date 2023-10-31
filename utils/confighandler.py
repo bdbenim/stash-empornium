@@ -4,8 +4,9 @@ import argparse
 import os
 import logging
 import shutil
-from customtypes import CaseInsensitiveDict, Singleton
+from utils.customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
+from __main__ import __version__
 
 class ConfigHandler(tomlkit.TOMLDocument, Singleton):
     initialized = False
@@ -99,14 +100,16 @@ class ConfigHandler(tomlkit.TOMLDocument, Singleton):
     }}
     """
 
-    def __init__(self, version: str = ""):
+    def __init__(self):
         if not (self.initialized):
-            self.__version__ = version
             self.parse_args()
-            self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
+            self.logging_init()
+            self.configure()
             self.initialized = True
 
     def logging_init(self) -> None:
+        self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
+        logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=self.log_level)
         self.logger = logging.getLogger(__name__)
 
     def parse_args(self) -> None:
@@ -129,7 +132,7 @@ class ConfigHandler(tomlkit.TOMLDocument, Singleton):
         flags.add_argument("-d", action="store_true", help="include date as tag")
         flags.add_argument("-f", action="store_true", help="include framerate as tag")
         flags.add_argument("-r", action="store_true", help="include resolution as tag")
-        parser.add_argument("--version", action="version", version=f"stash-empornium {self.__version__}")
+        parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
         parser.add_argument("--anon", action="store_true", help="upload anonymously")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
         mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")

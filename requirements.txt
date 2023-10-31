@@ -6,3 +6,5 @@ configupdater
 cairosvg
 redis[hiredis]
 tomlkit
+Flask-WTF
+bootstrap-Flask

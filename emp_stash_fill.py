@@ -36,6 +36,9 @@ import requests
 from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
 from cairosvg import svg2png
 
+from flask_bootstrap import Bootstrap5
+from flask_wtf import CSRFProtect
+
 # built-in
 import base64
 import datetime
@@ -58,6 +61,7 @@ from utils.paths import mapPath
 import utils.confighandler
 from webui.webui import simple_page
 
+
 #############
 # CONSTANTS #
 #############
@@ -65,11 +69,10 @@ from webui.webui import simple_page
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
 
-config = utils.confighandler.ConfigHandler(__version__)
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=config.log_level)
+config = utils.confighandler.ConfigHandler()
 logger = logging.getLogger(__name__)
-config.logging_init()
-config.configure()
+# config.logging_init()
+# config.configure()
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
@@ -108,7 +111,10 @@ def mapPaths(f: dict) -> dict:
     return f
 
 app = Flask(__name__, template_folder=config.template_dir)
-
+app.secret_key = "secret"
+app.config['BOOTSTRAP_BOOTSWATCH_THEME'] = 'cyborg'
+bootstrap = Bootstrap5(app)
+csrf = CSRFProtect(app)
 
 @stream_with_context
 def generate():
