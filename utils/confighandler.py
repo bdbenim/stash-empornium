@@ -397,6 +397,10 @@ class ConfigHandler(tomlkit.TOMLDocument, Singleton):
             return CaseInsensitiveDict(self.tagconf[section])  # type: ignore
         return {}
 
+    def __iter__(self):
+        for section in self.conf:
+            yield section
+
     def __contains__(self, __key: object) -> bool:
         return self.conf.__contains__(__key) or self.tagconf.__contains__(__key)
     

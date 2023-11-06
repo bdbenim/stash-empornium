@@ -33,7 +33,7 @@ __version__ = "0.14.0"
 
 # external
 import requests
-from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
+from flask import Flask, Response, request, stream_with_context, render_template, render_template_string, redirect, url_for
 from cairosvg import svg2png
 
 from flask_bootstrap import Bootstrap5
@@ -687,6 +687,10 @@ def suggestions():
 @app.route("/templates")
 def templates():
     return json.dumps(config.template_names)
+
+@app.route("/favicon.ico", methods=["GET"])
+def favicon():
+    return redirect(url_for("static", filename="favicon.ico"))
 
 if __name__ == "__main__":
     app.register_blueprint(simple_page)

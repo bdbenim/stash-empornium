@@ -8,3 +8,4 @@ redis[hiredis]
 tomlkit
 Flask-WTF
 bootstrap-Flask
+flask-nav

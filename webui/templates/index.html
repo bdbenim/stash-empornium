@@ -1,8 +1,36 @@
-<html>
-    <head>
-        <title>{{ title }}</title>
-    </head>
-    <body>
-        <h1>Hello {{ username }}</h1>
-    </body>
-</html>
+{% extends 'base.html' %} {% from 'bootstrap5/form.html' import render_form %}
+{% block title %}Settings{% endblock %} {% block content %}
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-10 col-lg-8 mx-lg-auto mx-md-auto">
+      <h1 class="pt-5 pb-2">stash-empornium settings</h1>
+
+      <p class="lead">
+        Here you can configure the settings for {{ settings_option }}.
+      </p>
+      {{ render_form(form, extra_classes='form-floating') }}
+    </div>
+    <p class="pt-5"><strong>{{ message }}</strong></p>
+  </div>
+</div>
+
+{% endblock %} {% block scripts %}
+<script>
+  try {
+    document.getElementById("enable_form").onchange = function () {
+      const form = document.getElementsByTagName("form")[0];
+      for (el of form.querySelectorAll("input")) {
+        if (
+          el.id != "formid" &&
+          el.id != "csrf_token" &&
+          el.id != "submit" &&
+          el.id != this.id
+        ) {
+          el.disabled = !this.checked;
+        }
+      }
+    };
+  } catch {}
+</script>
+{% endblock %}

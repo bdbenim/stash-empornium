@@ -2,6 +2,8 @@
 ](https://hub.docker.com/repository/docker/bdbenim/stash-empornium) [![GitHub release](https://img.shields.io/github/v/release/bdbenim/stash-empornium?logo=github)
 ](https://github.com/bdbenim/stash-empornium/releases) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/stash-empornium) ![GitHub](https://img.shields.io/github/license/bdbenim/stash-empornium)
 
+![logo](webui/logo.svg)
+
 # stash-empornium
 
 This script by user humbaba allows torrent files and associated presentations to be created for empornium based on scenes from a local [stash][1] instance.
