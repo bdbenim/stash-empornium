@@ -33,8 +33,11 @@ __version__ = "0.14.0"
 
 # external
 import requests
-from flask import Flask, Response, request, stream_with_context, render_template, render_template_string
+from flask import Flask, Response, request, stream_with_context, render_template, render_template_string, redirect, url_for
 from cairosvg import svg2png
+
+from flask_bootstrap import Bootstrap5
+from flask_wtf import CSRFProtect
 
 # built-in
 import base64
@@ -56,6 +59,8 @@ import time
 from utils import taghandler, imagehandler
 from utils.paths import mapPath
 import utils.confighandler
+from webui.webui import settings_page
+
 
 #############
 # CONSTANTS #
@@ -64,11 +69,10 @@ import utils.confighandler
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
 
-config = utils.confighandler.ConfigHandler(__version__)
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=config.log_level)
+config = utils.confighandler.ConfigHandler()
 logger = logging.getLogger(__name__)
-config.logging_init()
-config.configure()
+# config.logging_init()
+# config.configure()
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
@@ -107,7 +111,10 @@ def mapPaths(f: dict) -> dict:
     return f
 
 app = Flask(__name__, template_folder=config.template_dir)
-
+app.secret_key = "secret"
+app.config['BOOTSTRAP_BOOTSWATCH_THEME'] = 'cyborg'
+bootstrap = Bootstrap5(app)
+csrf = CSRFProtect(app)
 
 @stream_with_context
 def generate():
@@ -130,7 +137,7 @@ def generate():
     screens_urls = []
     studio_tag = ""
 
-    tags = taghandler.TagHandler(config)
+    tags = taghandler.TagHandler()
 
     #################
     # STASH REQUEST #
@@ -658,7 +665,7 @@ def processSuggestions():
         logger.info(f"Ignoring {len(j['ignore'])} tags")
         for tag in j["ignore"]:
             ignoredTags.append(tag)
-    tags = taghandler.TagHandler(config)
+    tags = taghandler.TagHandler()
     success = tags.acceptSuggestions(acceptedTags)
     success = success and tags.rejectSuggestions(ignoredTags)
     if success:
@@ -681,8 +688,12 @@ def suggestions():
 def templates():
     return json.dumps(config.template_names)
 
+@app.route("/favicon.ico", methods=["GET"])
+def favicon():
+    return redirect(url_for("static", filename="favicon.ico"))
 
 if __name__ == "__main__":
+    app.register_blueprint(settings_page)
     try:
         from waitress import serve
 

@@ -4,11 +4,12 @@ import argparse
 import os
 import logging
 import shutil
-from utils.structures import CaseInsensitiveDict
+from utils.customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
+from __main__ import __version__
 
-
-class ConfigHandler(tomlkit.TOMLDocument):
+class ConfigHandler(tomlkit.TOMLDocument, Singleton):
+    initialized = False
     logger: logging.Logger
     log_level: int
     args: argparse.Namespace
@@ -99,12 +100,16 @@ class ConfigHandler(tomlkit.TOMLDocument):
     }}
     """
 
-    def __init__(self, version: str) -> None:
-        self.__version__ = version
-        self.parse_args()
-        self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
+    def __init__(self):
+        if not (self.initialized):
+            self.parse_args()
+            self.logging_init()
+            self.configure()
+            self.initialized = True
 
     def logging_init(self) -> None:
+        self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
+        logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=self.log_level)
         self.logger = logging.getLogger(__name__)
 
     def parse_args(self) -> None:
@@ -127,7 +132,7 @@ class ConfigHandler(tomlkit.TOMLDocument):
         flags.add_argument("-d", action="store_true", help="include date as tag")
         flags.add_argument("-f", action="store_true", help="include framerate as tag")
         flags.add_argument("-r", action="store_true", help="include resolution as tag")
-        parser.add_argument("--version", action="version", version=f"stash-empornium {self.__version__}")
+        parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
         parser.add_argument("--anon", action="store_true", help="upload anonymously")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
         mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
@@ -357,7 +362,7 @@ class ConfigHandler(tomlkit.TOMLDocument):
         self.configureTorrents()
 
     def configureTorrents(self) -> None:
-        # rtorrent:
+        self.torrent_clients.clear()
         clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent}
         for client in clients:
             try:
@@ -385,12 +390,30 @@ class ConfigHandler(tomlkit.TOMLDocument):
             self.conf[section] = {}
         self.conf[section][key] = value  # type: ignore
 
+    def delete(self, section: str, key: str|None = None) -> None:
+        if section in self.conf:
+            if key:
+                if key in self.conf[section]: # type: ignore
+                    del self.conf[section][key] # type: ignore
+            else:
+                del self.conf[section]
+        elif section in self.tagconf:
+            if key:
+                if key in self.tagconf[section]: # type: ignore
+                    del self.tagconf[section][key] # type: ignore
+            else:
+                del self.tagconf[section]
+
     def items(self, section: str) -> dict:
         if section in self.conf:
             return CaseInsensitiveDict(self.conf[section])  # type: ignore
         if section in self.tagconf:
             return CaseInsensitiveDict(self.tagconf[section])  # type: ignore
         return {}
+
+    def __iter__(self):
+        for section in self.conf:
+            yield section
 
     def __contains__(self, __key: object) -> bool:
         return self.conf.__contains__(__key) or self.tagconf.__contains__(__key)
