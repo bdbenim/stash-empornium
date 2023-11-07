@@ -1,13 +1,13 @@
-from typing import Any
 from flask import Blueprint, render_template, redirect, abort
 
 from flask_bootstrap import SwitchField
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, SelectField, URLField, widgets
-from wtforms.validators import DataRequired, Optional, URL, StopValidation, ValidationError
+from wtforms import StringField, SubmitField, SelectField, URLField
+from wtforms.validators import DataRequired, Optional, URL
 
 from utils.confighandler import ConfigHandler
+from webui.forms import ButtonField, ConditionallyRequired, PasswordField, PortRange
 
 
 conf = ConfigHandler()
@@ -181,53 +181,13 @@ def settings(page):
     return render_template("settings.html", **template_context)
 
 
-class PasswordField(StringField):
-    """
-    Original source: https://github.com/wtforms/wtforms/blob/2.0.2/wtforms/fields/simple.py#L35-L42
-
-    A StringField, except renders an ``<input type="password">``.
-    Also, whatever value is accepted by this field is not rendered back
-    to the browser like normal fields.
-    """
-
-    widget = widgets.PasswordInput(hide_value=False)
-
-
-class PortRange:
-    def __init__(self, min=0, max=65535, message=None) -> None:
-        self.min = min
-        self.max = max
-        if not message:
-            message = f"Value must be an integer between {min} and {max}"
-        self.message = message
-
-    def __call__(self, form, field) -> Any:
-        try:
-            value = int(field.data)
-            assert value >= self.min and value <= self.max
-        except:
-            raise ValidationError(self.message)
-
-
-class ConditionallyRequired:
-    def __init__(self, fieldname="enable_form", message="This field is required") -> None:
-        self.fieldname = fieldname
-        self.message = message
-
-    def __call__(self, form, field) -> Any:
-        if form.data[self.fieldname]:
-            if len(field.data) == 0:
-                raise ValidationError(self.message)
-        else:
-            field.errors[:] = []
-            raise StopValidation()
-
-
 class BackendSettings(FlaskForm):
     default_template = SelectField("Default Template", choices=[opt for opt in conf["templates"]])  # type: ignore
     torrent_directories = StringField("Torrent Directories")
     port = StringField("Port", validators=[PortRange(1024), DataRequired()])
     date_format = StringField()
+    # help = ButtonField(render_kw={'class':'btn btn-secondary btn-md col-1'})
+    example = StringField("Date Example:",render_kw={'readonly': True})
     title_template = StringField()
     anon = SwitchField("Upload Anonymously")
     save = SubmitField()
@@ -241,12 +201,6 @@ class RedisSettings(FlaskForm):
     password = PasswordField(validators=[Optional()])
     ssl = SwitchField("SSL")
     save = SubmitField()
-
-    # def validate(self, extra_validators: Mapping[str, Sequence[Any]] | None = None) -> bool:
-    #     if self.data['enable_form']:
-    #         if not (self.data['host'] and self.data['port']):
-    #             return False
-    #     return super().validate(extra_validators)
 
 
 class RTorrentSettings(FlaskForm):
@@ -276,7 +230,7 @@ class DelugeSettings(FlaskForm):
     enable_form = SwitchField("Use Deluge")
     host = StringField(validators=[ConditionallyRequired()])
     port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    password = PasswordField(validators=[Optional()])  # type: ignore
+    password = PasswordField(validators=[Optional()])
     ssl = SwitchField("SSL")
     save = SubmitField()
 
