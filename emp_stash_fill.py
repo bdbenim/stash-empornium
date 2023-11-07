@@ -59,7 +59,7 @@ import time
 from utils import taghandler, imagehandler
 from utils.paths import mapPath
 import utils.confighandler
-from webui.webui import simple_page
+from webui.webui import settings_page
 
 
 #############
@@ -693,7 +693,7 @@ def favicon():
     return redirect(url_for("static", filename="favicon.ico"))
 
 if __name__ == "__main__":
-    app.register_blueprint(simple_page)
+    app.register_blueprint(settings_page)
     try:
         from waitress import serve
 

@@ -11,26 +11,34 @@
       </p>
       {{ render_form(form, extra_classes='form-floating') }}
     </div>
-    <p class="pt-5"><strong>{{ message }}</strong></p>
   </div>
+  {% if message %}
+  <div class="row">
+    <div class="col-md-10 col-lg-8 mx-lg-auto mx-md-auto">
+      <div class="alert alert-success mt-2 mb-2" role="alert">{{ message }}</div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
 {% endblock %} {% block scripts %}
 <script>
   try {
-    document.getElementById("enable_form").onchange = function () {
+    let enabled = document.getElementById("enable_form");
+    function toggle() {
       const form = document.getElementsByTagName("form")[0];
       for (el of form.querySelectorAll("input")) {
         if (
-          el.id != "formid" &&
           el.id != "csrf_token" &&
-          el.id != "submit" &&
-          el.id != this.id
+          el.id != "save" &&
+          el.id != enabled.id
         ) {
-          el.disabled = !this.checked;
+          el.disabled = !enabled.checked;
         }
       }
-    };
+    }
+    enabled.onchange = toggle;
+    toggle();
   } catch {}
 </script>
 {% endblock %}

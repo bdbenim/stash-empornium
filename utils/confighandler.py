@@ -362,7 +362,7 @@ class ConfigHandler(tomlkit.TOMLDocument, Singleton):
         self.configureTorrents()
 
     def configureTorrents(self) -> None:
-        # rtorrent:
+        self.torrent_clients.clear()
         clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent}
         for client in clients:
             try:
@@ -389,6 +389,20 @@ class ConfigHandler(tomlkit.TOMLDocument, Singleton):
                 return
             self.conf[section] = {}
         self.conf[section][key] = value  # type: ignore
+
+    def delete(self, section: str, key: str|None = None) -> None:
+        if section in self.conf:
+            if key:
+                if key in self.conf[section]: # type: ignore
+                    del self.conf[section][key] # type: ignore
+            else:
+                del self.conf[section]
+        elif section in self.tagconf:
+            if key:
+                if key in self.tagconf[section]: # type: ignore
+                    del self.tagconf[section][key] # type: ignore
+            else:
+                del self.tagconf[section]
 
     def items(self, section: str) -> dict:
         if section in self.conf:

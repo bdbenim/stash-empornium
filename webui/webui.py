@@ -1,61 +1,185 @@
-from collections.abc import Mapping, Sequence
 from typing import Any
-from flask import Blueprint, render_template, redirect, url_for, send_from_directory
+from flask import Blueprint, render_template, redirect, abort
 
-from flask_bootstrap import SwitchField, HiddenField
+from flask_bootstrap import SwitchField
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, SelectField, FormField, URLField, IntegerField, widgets
-from wtforms.validators import DataRequired, Length, NumberRange, Optional, URL, ValidationError
+from wtforms import StringField, SubmitField, SelectField, URLField, widgets
+from wtforms.validators import DataRequired, Optional, URL, StopValidation, ValidationError
 
 from utils.confighandler import ConfigHandler
 
-import re
 
 conf = ConfigHandler()
 
-simple_page = Blueprint("simple_page", __name__, template_folder="templates")
+settings_page = Blueprint("settings_page", __name__, template_folder="templates")
 
 
-@simple_page.route("/", methods=["GET"])
+@settings_page.route("/", methods=["GET"])
 def index():
     return redirect("/settings/backend")
 
 
-@simple_page.route("/settings/<page>", methods=["GET", "POST"])
+@settings_page.route("/settings/<page>", methods=["GET", "POST"])
 def settings(page):
     template_context = {}
     match page:
         case "backend":
             template_context["settings_option"] = "your stash-empornium backend"
-            form = BackendSettings()
+            form = BackendSettings(
+                default_template=conf.get(page, "default_template", ""),
+                torrent_directories=", ".join(conf.get(page, "torrent_directories", "")),  # type: ignore
+                port=conf.get(page, "port", ""),
+                date_format=conf.get(page, "date_format", ""),
+                title_template=conf.get(page, "title_template", ""),
+                anon=conf.get(page, "anon", False),
+            )
         case "stash":
             template_context["settings_option"] = "your stash server"
-            form = StashSettings()
+            form = StashSettings(url=conf.get(page, "url", ""), api_key=conf.get(page, "api_key", ""))
         case "redis":
             template_context["settings_option"] = "your redis server"
-            form = RedisSettings()
+            enable = "redis" in conf
+            form = RedisSettings(
+                enable_form=enable,
+                host=conf.get(page, "host", ""),
+                port=conf.get(page, "port", ""),
+                username=conf.get(page, "username", ""),
+                password=conf.get(page, "password", ""),
+                ssl=conf.get(page, "ssl", False),
+            )
         case "rtorrent":
             template_context["settings_option"] = "your rTorrent client"
-            form = RTorrentSettings()
+            enable = "rtorrent" in conf
+            form = RTorrentSettings(
+                enable_form=enable,
+                host=conf.get(page, "host", ""),
+                port=conf.get(page, "port", ""),
+                username=conf.get(page, "username", ""),
+                password=conf.get(page, "password", ""),
+                path=conf.get(page, "path", "RPC2"),
+                label=conf.get(page, "label", ""),
+                ssl=conf.get(page, "ssl", False),
+            )
         case "deluge":
             template_context["settings_option"] = "your Deluge client"
-            form = DelugeSettings()
+            enable = "deluge" in conf
+            form = DelugeSettings(
+                enable_form=enable,
+                host=conf.get(page, "host", ""),
+                port=conf.get(page, "port", ""),
+                password=conf.get(page, "password", ""),
+                ssl=conf.get(page, "ssl", False),
+            )
         case "qbittorrent":
             template_context["settings_option"] = "your qBittorrent client"
-            form = QBittorrentSettings()
+            enable = "qbittorrent" in conf
+            form = QBittorrentSettings(
+                enable_form=enable,
+                host=conf.get(page, "host", ""),
+                port=conf.get(page, "port", ""),
+                username=conf.get(page, "username", ""),
+                password=conf.get(page, "password", ""),
+                label=conf.get(page, "label", ""),
+                ssl=conf.get(page, "ssl", False),
+            )
         case _:
-            template_context["settings_option"] = "your stash-empornium backend"
-            form = SettingsForm()
+            abort(404)
     if form.validate_on_submit():
-        if form.data['formid'] == 'redis':
-            print('Redis settings')
-            print(form.data)
-    template_context['form'] = form
-    return render_template("index.html", **template_context)
+        template_context["message"] = "Settings saved"
+        match page:
+            case "backend":
+                conf.set(page, "default_template", form.data["default_template"])
+                conf.set(page, "torrent_directories", [x.strip() for x in form.data["torrent_directories"].split(",")])
+                conf.set(page, "port", int(form.data["port"]))
+                conf.set(page, "title_template", form.data["title_template"])
+                conf.set(page, "date_format", form.data["date_format"])
+                conf.set(page, "anon", form.data["anon"])
+                conf.update_file()
+            case "stash":
+                conf.set(page, "url", form.data["url"])
+                if form.data["api_key"]:
+                    conf.set(page, "api_key", form.data["api_key"])
+                else:
+                    conf.delete(page, "api_key")
+                conf.update_file()
+            case "redis":
+                if form.data["enable_form"]:
+                    conf.set(page, "host", form.data["host"])
+                    conf.set(page, "port", int(form.data["port"]))
+                    conf.set(page, "ssl", form.data["ssl"])
+                    if form.data["username"]:
+                        conf.set(page, "username", form.data["username"])
+                    else:
+                        conf.delete(page, "username")
+                    if form.data["password"]:
+                        conf.set(page, "password", form.data["password"])
+                    else:
+                        conf.delete(page, "password")
+                else:
+                    conf.delete(page)
+                conf.update_file()
+            case "rtorrent":
+                if form.data["enable_form"]:
+                    conf.set(page, "host", form.data["host"])
+                    conf.set(page, "port", int(form.data["port"]))
+                    conf.set(page, "ssl", form.data["ssl"])
+                    conf.set(page, "path", form.data["path"])
+                    if form.data["username"]:
+                        conf.set(page, "username", form.data["username"])
+                    else:
+                        conf.delete(page, "username")
+                    if form.data["password"]:
+                        conf.set(page, "password", form.data["password"])
+                    else:
+                        conf.delete(page, "password")
+                    if form.data["label"]:
+                        conf.set(page, "label", form.data["label"])
+                    else:
+                        conf.delete(page, "label")
+                else:
+                    conf.delete(page)
+                conf.configureTorrents()
+                conf.update_file()
+            case "deluge":
+                if form.data["enable_form"]:
+                    conf.set(page, "host", form.data["host"])
+                    conf.set(page, "port", int(form.data["port"]))
+                    conf.set(page, "ssl", form.data["ssl"])
+                    if form.data["password"]:
+                        conf.set(page, "password", form.data["password"])
+                    else:
+                        conf.delete(page, "password")
+                else:
+                    conf.delete(page)
+                conf.configureTorrents()
+                conf.update_file()
+            case "qbittorrent":
+                if form.data["enable_form"]:
+                    conf.set(page, "host", form.data["host"])
+                    conf.set(page, "port", int(form.data["port"]))
+                    conf.set(page, "ssl", form.data["ssl"])
+                    if form.data["username"]:
+                        conf.set(page, "username", form.data["username"])
+                    else:
+                        conf.delete(page, "username")
+                    if form.data["password"]:
+                        conf.set(page, "password", form.data["password"])
+                    else:
+                        conf.delete(page, "password")
+                    if form.data["label"]:
+                        conf.set(page, "label", form.data["label"])
+                    else:
+                        conf.delete(page, "label")
+                else:
+                    conf.delete(page)
+                conf.configureTorrents()
+                conf.update_file()
+            case _:
+                abort(404)
+    template_context["form"] = form
+    return render_template("settings.html", **template_context)
 
-class SEForm(FlaskForm):
-    formid = HiddenField()
 
 class PasswordField(StringField):
     """
@@ -65,89 +189,99 @@ class PasswordField(StringField):
     Also, whatever value is accepted by this field is not rendered back
     to the browser like normal fields.
     """
+
     widget = widgets.PasswordInput(hide_value=False)
 
-def Integer(form, field):
-    if not re.match(r"^\d+$", field.data):
-        raise ValidationError("Input must be an integer")
-    
-class PortRange():
+
+class PortRange:
     def __init__(self, min=0, max=65535, message=None) -> None:
         self.min = min
         self.max = max
         if not message:
             message = f"Value must be an integer between {min} and {max}"
         self.message = message
-    
+
     def __call__(self, form, field) -> Any:
-        if not re.match(r"^\d+$", field.data):
-            raise ValidationError(self.message)
-        if int(field.data) < self.min or int(field.data) > self.max:
+        try:
+            value = int(field.data)
+            assert value >= self.min and value <= self.max
+        except:
             raise ValidationError(self.message)
 
-class BackendSettings(SEForm):
-    formid = HiddenField(default="backend")
+
+class ConditionallyRequired:
+    def __init__(self, fieldname="enable_form", message="This field is required") -> None:
+        self.fieldname = fieldname
+        self.message = message
+
+    def __call__(self, form, field) -> Any:
+        if form.data[self.fieldname]:
+            if len(field.data) == 0:
+                raise ValidationError(self.message)
+        else:
+            field.errors[:] = []
+            raise StopValidation()
+
+
+class BackendSettings(FlaskForm):
     default_template = SelectField("Default Template", choices=[opt for opt in conf["templates"]])  # type: ignore
     torrent_directories = StringField("Torrent Directories")
-    port = StringField("Port", validators=[PortRange(1024)])
+    port = StringField("Port", validators=[PortRange(1024), DataRequired()])
     date_format = StringField()
     title_template = StringField()
     anon = SwitchField("Upload Anonymously")
-    submit = SubmitField()
+    save = SubmitField()
 
 
-class RedisSettings(SEForm):
-    formid = HiddenField(default="redis")
-    enable_form = SwitchField("Use Redis",default=("redis" in conf))
-    host = StringField(default=conf.get("redis", "host", ""))  # type: ignore
-    port = StringField(default=conf.get("redis", "port", ""), validators=[PortRange(), Optional()])  # type: ignore
-    username = StringField(default=conf.get("redis", "username", ""), validators=[Optional()])  # type: ignore
-    password = PasswordField(default=conf.get("redis", "password", ""), validators=[Optional()])  # type: ignore
-    ssl = SwitchField("SSL", default=conf.get("redis", "ssl", False))
-    submit = SubmitField()
+class RedisSettings(FlaskForm):
+    enable_form = SwitchField("Use Redis")
+    host = StringField()
+    port = StringField(validators=[PortRange(), ConditionallyRequired()])
+    username = StringField(validators=[Optional()])
+    password = PasswordField(validators=[Optional()])
+    ssl = SwitchField("SSL")
+    save = SubmitField()
+
+    # def validate(self, extra_validators: Mapping[str, Sequence[Any]] | None = None) -> bool:
+    #     if self.data['enable_form']:
+    #         if not (self.data['host'] and self.data['port']):
+    #             return False
+    #     return super().validate(extra_validators)
 
 
-class RTorrentSettings(SEForm):
-    formid = HiddenField(default="rtorrent")
-    enable_form = SwitchField("Use rTorrent",default=("redis" in conf))
-    host = StringField(default=conf.get("rtorrent", "host", ""))  # type: ignore
-    port = StringField(default=conf.get("rtorrent", "port", ""), validators=[PortRange(), Optional()])  # type: ignore
-    path = StringField(default=conf.get("rtorrent", "path", ""))  # type: ignore
-    username = StringField(default=conf.get("rtorrent", "username", ""), validators=[Optional()])  # type: ignore
-    password = PasswordField(default=conf.get("rtorrent", "password", ""), validators=[Optional()])  # type: ignore
-    label = StringField(default=conf.get("rtorrent", "label", ""))  # type: ignore
-    ssl = SwitchField("SSL", default=conf.get("rtorrent", "ssl", False))
+class RTorrentSettings(FlaskForm):
+    enable_form = SwitchField("Use rTorrent")
+    host = StringField(validators=[ConditionallyRequired()])
+    port = StringField(validators=[PortRange(), ConditionallyRequired()])
+    path = StringField(validators=[ConditionallyRequired("Please specify the API path (typically XMLRPC or RPC2)")])
+    username = StringField(validators=[Optional()])
+    password = PasswordField(validators=[Optional()])
+    label = StringField()
+    ssl = SwitchField("SSL")
+    save = SubmitField()
 
 
-class QBittorrentSettings(SEForm):
-    formid = HiddenField(default="qbittorrent")
-    enable_form = SwitchField("Use qBittorrent",default=("redis" in conf))
-    host = StringField(default=conf.get("qbittorrent", "host", ""))  # type: ignore
-    port = StringField(default=conf.get("qbittorrent", "port", ""), validators=[PortRange(), Optional()])  # type: ignore
-    username = StringField(default=conf.get("qbittorrent", "username", ""), validators=[Optional()])  # type: ignore
-    password = PasswordField(default=conf.get("qbittorrent", "password", ""), validators=[Optional()])  # type: ignore
-    label = StringField(default=conf.get("qbittorrent", "label", ""))  # type: ignore
-    ssl = SwitchField("SSL", default=conf.get("qbittorrent", "ssl", False))
+class QBittorrentSettings(FlaskForm):
+    enable_form = SwitchField("Use qBittorrent", default=("redis" in conf))
+    host = StringField(validators=[ConditionallyRequired()])
+    port = StringField(validators=[PortRange(), ConditionallyRequired()])
+    username = StringField(validators=[Optional()])
+    password = PasswordField(validators=[Optional()])
+    label = StringField()
+    ssl = SwitchField("SSL")
+    save = SubmitField()
 
 
-class DelugeSettings(SEForm):
-    formid = HiddenField(default="deluge")
-    enable_form = SwitchField("Use Deluge",default=("redis" in conf))
-    host = StringField(default=conf.get("deluge", "host", ""))  # type: ignore
-    port = StringField(default=conf.get("deluge", "port", ""), validators=[PortRange(), Optional()])  # type: ignore
-    password = PasswordField(default=conf.get("deluge", "password", ""), validators=[Optional()])  # type: ignore
-    ssl = SwitchField("SSL", default=conf.get("deluge", "ssl", False))
+class DelugeSettings(FlaskForm):
+    enable_form = SwitchField("Use Deluge")
+    host = StringField(validators=[ConditionallyRequired()])
+    port = StringField(validators=[PortRange(), ConditionallyRequired()])
+    password = PasswordField(validators=[Optional()])  # type: ignore
+    ssl = SwitchField("SSL")
+    save = SubmitField()
 
 
-class StashSettings(SEForm):
-    formid = HiddenField(default="stash")
-    url = URLField("URL", default=conf.get("stash", "url", ""), validators=[URL(require_tld=False), DataRequired()])  # type: ignore
-    api_key = PasswordField("API Key", default=conf.get("stash", "api_key", ""), validators=[Optional()])  # type: ignore
-    submit = SubmitField()
-
-
-class SettingsForm(SEForm):
-    backend = FormField(BackendSettings)
-    stash = FormField(StashSettings)
-    if "redis" in conf:
-        redis = FormField(RedisSettings)
+class StashSettings(FlaskForm):
+    url = URLField("URL", validators=[URL(require_tld=False), DataRequired()])
+    api_key = PasswordField("API Key", validators=[Optional()])
+    save = SubmitField()
