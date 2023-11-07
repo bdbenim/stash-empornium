@@ -366,7 +366,7 @@ class ConfigHandler(tomlkit.TOMLDocument, Singleton):
         clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent}
         for client in clients:
             try:
-                if client in self.conf:
+                if client in self.conf and not self.get(client, "disable", False):
                     settings = dict(self.conf[client])  # type: ignore
                     clientType = clients[client]
                     self.torrent_clients.append(clientType(settings))
