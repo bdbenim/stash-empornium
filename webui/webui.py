@@ -115,7 +115,8 @@ def settings(page):
                     else:
                         conf.delete(page, "password")
                 else:
-                    conf.delete(page)
+                    if page in conf:
+                        conf.set(page, "disable", True)
                 conf.update_file()
             case "rtorrent":
                 if form.data["enable_form"]:

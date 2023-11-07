@@ -39,6 +39,7 @@ from flask import Flask, Response, request, stream_with_context, render_template
 from cairosvg import svg2png
 
 from flask_bootstrap import Bootstrap5
+from flask_wtf import CSRFProtect
 
 # built-in
 import base64
@@ -116,6 +117,7 @@ app = Flask(__name__, template_folder=config.template_dir)
 app.secret_key = "secret"
 app.config['BOOTSTRAP_BOOTSWATCH_THEME'] = 'cyborg'
 bootstrap = Bootstrap5(app)
+csrf = CSRFProtect(app)
 
 @stream_with_context
 def generate():
@@ -639,6 +641,7 @@ def genMediaInfo(pipe: Connection, path: str) -> None:
     pipe.send(subprocess.check_output(cmd, text=True))
 
 @app.route("/submit", methods=["POST"])
+@csrf.exempt
 def submit():
     j = request.get_json()
     logger.debug(f"Torrent submitted: {j}")
@@ -652,6 +655,7 @@ def submit():
 
 
 @app.route("/suggestions", methods=["POST"])
+@csrf.exempt
 def processSuggestions():
     j = request.get_json()
     logger.debug(f"Got json {j}")
@@ -676,20 +680,23 @@ def processSuggestions():
 
 
 @app.route("/fill", methods=["POST"])
+@csrf.exempt
 def fill():
     return Response(generate(), mimetype="application/json")  # type: ignore
 
 
-@app.route("/suggestions", methods=["POST"])
-def suggestions():
-    return Response(processSuggestions(), mimetype="application/json")
+# @app.route("/suggestions", methods=["POST"])
+# @csrf.exempt
+# def suggestions():
+#     return Response(processSuggestions(), mimetype="application/json")
 
 
 @app.route("/templates")
+@csrf.exempt
 def templates():
     return json.dumps(config.template_names)
 
-@app.route("/favicon.ico", methods=["GET"])
+@app.route("/favicon.ico")
 def favicon():
     return redirect(url_for("static", filename="favicon.ico"))
 
