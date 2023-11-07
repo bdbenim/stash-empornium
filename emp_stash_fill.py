@@ -39,7 +39,6 @@ from flask import Flask, Response, request, stream_with_context, render_template
 from cairosvg import svg2png
 
 from flask_bootstrap import Bootstrap5
-from flask_wtf import CSRFProtect
 
 # built-in
 import base64
@@ -117,7 +116,6 @@ app = Flask(__name__, template_folder=config.template_dir)
 app.secret_key = "secret"
 app.config['BOOTSTRAP_BOOTSWATCH_THEME'] = 'cyborg'
 bootstrap = Bootstrap5(app)
-csrf = CSRFProtect(app)
 
 @stream_with_context
 def generate():

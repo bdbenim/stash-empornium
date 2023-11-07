@@ -65,7 +65,7 @@ class TagHandler:
             newkey = key.lower()
             if newkey == "tags":
                 continue
-            self.TAG_LISTS[newkey] = list(conf.get("empornium", key))  # type: ignore
+            self.TAG_LISTS[newkey] = list(self.conf.get("empornium", key))  # type: ignore
             self.TAG_LISTS[newkey].sort()
             self.conf.set("empornium", key, self.TAG_LISTS[newkey])
             self.tag_sets[newkey] = set()
