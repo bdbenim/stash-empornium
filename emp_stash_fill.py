@@ -31,7 +31,7 @@ waitress
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.15.0"
+__version__ = "0.15.1"
 
 # external
 import requests
