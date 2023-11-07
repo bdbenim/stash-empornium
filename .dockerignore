@@ -1,0 +1,12 @@
+config/
+Dockerfile
+.dockerignore
+emp_stash_fill.user.js
+.git/
+.gitignore
+*.md
+__pycache__/
+.vscode/
+.pytests_cache/
+dist/
+tests/

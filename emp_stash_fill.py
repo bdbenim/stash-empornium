@@ -7,173 +7,167 @@ the EMP upload form.
 
 Required external utilities:
 ffmpeg
-vcsi
 mktorrent
 
 Required Python modules:
+bootstrap-Flask
+cairosvg
+configupdater
 Flask
+Flask-WTF
+Pillow
 requests
+tomlkit
+vcsi
+
+Optional external utilities:
+mediainfo
+redis
+
+Optional Python modules:
+redis
+waitress
 """
 
-__author__    = "An EMP user"
-__license__   = "unlicense"
-__version__   = "0.1.0"
+__author__ = "An EMP user"
+__license__ = "unlicense"
+__version__ = "0.15.1"
 
 # external
 import requests
-from flask import Flask, Response, jsonify, request, stream_with_context, render_template
+from flask import (
+    Flask,
+    Response,
+    request,
+    stream_with_context,
+    render_template,
+    render_template_string,
+    redirect,
+    url_for,
+)
+from cairosvg import svg2png
+
+from flask_bootstrap import Bootstrap5
+from flask_wtf import CSRFProtect
 
 # built-in
-import configparser
+import base64
 import datetime
 import json
 import logging
 import math
+import multiprocessing as mp
+from multiprocessing.connection import Connection
 import os
-import pathlib
-import re
 import shutil
+import string
 import subprocess
 import tempfile
 import urllib.parse
 import time
-import uuid
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+# included
+from utils import taghandler, imagehandler
+from utils.paths import mapPath
+import utils.confighandler
+from webui.webui import settings_page
+from webui.errorpages import error_page
 
-##########
-# CONFIG #
-##########
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
-template_dir = os.path.join(dir_path, "config/templates")
+#############
+# CONSTANTS #
+#############
 
-conf = configparser.ConfigParser()
-if not os.path.isfile("config/config.ini"):
-    logging.info("Config file not found, creating")
-    if not os.path.exists("config"):
-        os.makedirs("config")
-    shutil.copyfile("default.ini", "config/config.ini")
-else:
-    conf.read("config/config.ini")
+FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
+ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
 
-if not os.path.exists(template_dir):
-    shutil.copytree("default-templates",template_dir,copy_function=shutil.copyfile)
-installed_templates = os.listdir(template_dir)
-for filename in os.listdir("default-templates"):
-    src = os.path.join("default-templates", filename)
-    if os.path.isfile(src):
-        dst = os.path.join(template_dir, filename)
-        if os.path.isfile(dst):
-            try:
-                with open(src) as srcFile, open(dst) as dstFile:
-                    srcVer = int("".join(filter(str.isdigit,"0"+srcFile.readline())))
-                    dstVer = int("".join(filter(str.isdigit,"0"+dstFile.readline())))
-                    if srcVer > dstVer:
-                        logging.info(f"Template \"{filename}\" has a new version available in the default-templates directory")
-            except:
-                logging.error(f"Couldn't compare version of {src} and {dst}")
-        else:
-            shutil.copyfile(src, dst)
-            logging.info(f"Template {filename} has a been added. To use it, add it to config.ini under [templates]")
-            #TODO add template to config.ini
+config = utils.confighandler.ConfigHandler()
+logger = logging.getLogger(__name__)
+logger.info(f"stash-empornium version {__version__}.")
+logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
+logger.info(ODBL_NOTICE)
 
-STASH_URL = conf["stash"].get("url", "http://localhost:9999")
-PORT = int(conf["backend"].get("port", "9932"))
-DEFAULT_TEMPLATE = conf["backend"].get("default_template", "fakestash-v2")
-TORRENT_DIR = conf["backend"].get("torrent_directory", str(pathlib.Path.home()))
-TAG_LISTS = {}
-TAG_SETS = {}
-for key in conf["empornium"]:
-    TAG_LISTS[key] = list(map(lambda x: x.strip(), conf["empornium"][key].split(",")))
-    TAG_SETS[key] = set()
-assert "sex_acts" in TAG_LISTS # This is the only non-optional key because it is used by the default templates
-TAGS_MAP = conf["empornium.tags"]
+MEDIA_INFO = shutil.which("mediainfo")
 
-template_names = {}
-for k,v in conf.items("templates"):
-    template_names[k] = v
 
-stash_headers = {
-    "Content-type": "application/json",
-}
+def error(message: str, altMessage: str | None = None) -> str:
+    logger.error(message)
+    return json.dumps({"status": "error", "message": altMessage if altMessage else message})
 
-if conf["stash"].get("api_key"):
-    stash_headers["apiKey"] = conf["stash"].get("api_key")
 
-stash_query = '''
-findScene(id: "{}") {{
-  title details director date studio {{ name url image_path parent_studio {{ url }} }} tags {{ name parents {{ name }} }} performers {{ name image_path tags {{ name }} }} paths {{ screenshot }}
-  files {{ id path basename width height format duration video_codec audio_codec frame_rate bit_rate size }}
-}}
-'''
+def warning(message: str, altMessage: str | None = None) -> str:
+    logger.warning(message)
+    return json.dumps({"status": "error", "message": altMessage if altMessage else message})
 
-app = Flask(__name__, template_folder=template_dir)
 
-def img_host_upload(token: str, cookies: requests.models.cookies.RequestsCookieJar, img_path: str, img_mime_type: str, image_ext: str) -> str | None:
-    # Quick and dirty resize for images above max filesize
-    if os.path.getsize(img_path) > 5000000:
-        CMD = ['ffmpeg','-i',img_path,'-vf','scale=iw:ih','-y',img_path]
-        subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        while os.path.getsize(img_path) > 5000000:
-            CMD = ['ffmpeg','-i',img_path,'-vf','scale="-1:ih*0.95"','-y',img_path]
-            subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        logging.info(f"Resized {img_path}")
+def info(message: str, altMessage: str | None = None) -> str:
+    logger.info(message)
+    return json.dumps({"status": "success", "data": {"message": altMessage if altMessage else message}})
 
-    files = { "source": (str(uuid.uuid4()) + "." + image_ext, open(img_path, 'rb'), img_mime_type) }
-    request_body = {
-        "thumb_width": 160,
-        "thumb_height": 160,
-        "thumb_crop": False,
-        "medium_width": 800,
-        "medium_crop": "false",
-        "type": "file",
-        "action": "upload",
-        "timestamp": int(time.time() * 1e3), # ??
-        "auth_token": token,
-        "nsfw": 0
-    }
-    headers = {
-        "accept": "application/json",
-        "origin": "https://jerking.empornium.ph",
-        "referer": "https://jerking.empornium.ph/",
-    }
-    url = "https://jerking.empornium.ph/json"
-    response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
-    if "error" in response.json():
-        logging.error(f"Error uploading image: {response.json()['error']['message']}")
-        return None
-    return response.json()["image"]["image"]["url"]
+
+def mapPaths(f: dict) -> dict:
+    # Apply remote path mappings
+    logger.debug(f"Got path {f['path']} from stash")
+    for remote in config.items("file.maps"):
+        local = config.get("file.maps", remote)
+        assert isinstance(local, str)
+        if not f["path"].startswith(remote):
+            continue
+        if remote[-1] != "/":
+            remote += "/"
+        if local[-1] != "/":
+            local += "/"
+        f["path"] = local + f["path"].removeprefix(remote)
+        break
+    return f
+
+
+app = Flask(__name__, template_folder=config.template_dir)
+app.secret_key = "secret"
+app.config["BOOTSTRAP_BOOTSWATCH_THEME"] = "cyborg"
+bootstrap = Bootstrap5(app)
+csrf = CSRFProtect(app)
 
 @stream_with_context
 def generate():
     j = request.get_json()
     scene_id = j["scene_id"]
-    file_id  = j["file_id"]
+    file_id = j["file_id"]
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
     include_gallery = j["gallery"]
 
-    template = j["template"] if "template" in j and j["template"] in os.listdir(app.template_folder) else DEFAULT_TEMPLATE
+    logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
 
-    tags = set()
+    template = (
+        j["template"]
+        if "template" in j and j["template"] in os.listdir(app.template_folder)
+        else config.default_template
+    )
+    assert template is not None
+
     performers = {}
-    screens = []
+    screens_urls = []
     studio_tag = ""
 
+    tags = taghandler.TagHandler()
 
     #################
     # STASH REQUEST #
     #################
 
-    stash_request_body = { "query": "{" + stash_query.format(scene_id) + "}" }
-    stash_response = requests.post(urllib.parse.urljoin(STASH_URL, "/graphql"), json=stash_request_body, headers=stash_headers)
-
-    # if not stash_response.status_code == 200:
-    #     return jsonify({ "status": "error" })
+    logger.info("Querying stash")
+    stash_request_body = {"query": "{" + config.stash_query.format(scene_id) + "}"}
+    stash_response = requests.post(
+        urllib.parse.urljoin(config.stash_url, "/graphql"),
+        json=stash_request_body,
+        headers=config.stash_headers,
+    )
 
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
+    if scene is None:
+        return error(f"Scene {scene_id} does not exist")
 
     # Ensure that all expected string keys are present
     str_keys = ["title", "details", "date"]
@@ -185,35 +179,26 @@ def generate():
 
     stash_file = None
     for f in scene["files"]:
+        logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
-            # Apply remote path mappings
-            logging.debug(f"Got path {f['path']} from stash")
-            for remote,local in conf.items("file.maps"):
-                if not f["path"].startswith(remote):
-                    continue
-                if remote[-1] != "/":
-                    remote += "/"
-                if local[-1] != "/":
-                    local += "/"
-                f["path"] = local + f["path"].removeprefix(remote)
-                break
             stash_file = f
+            # stash_file = mapPaths(stash_file)
+            stash_file["path"] = mapPath(stash_file["path"], config.items("file.maps"))
             break
 
     if stash_file is None:
-        yield json.dumps({
-            "status": "error",
-            "message": "Couldn't find file"
-        })
-        logging.error("No file exists")
-        return
+        tmp_file = scene["files"][0]
+        if tmp_file is None:
+            return error("No file exists")
+        # stash_file = mapPaths(tmp_file)
+        stash_file = tmp_file
+        stash_file["path"] = mapPath(stash_file["path"], config.items("file.maps"))
+        logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
-        yield json.dumps({
-            "status": "error",
-            "message": "Couldn't find file"
-        })
-        logging.error(f"Couldn't find file {stash_file['path']}")
-        return
+        return error(f"Couldn't find file {stash_file['path']}")
+
+    if len(scene["title"]) == 0:
+        scene["title"] = stash_file["basename"]
 
     ht = stash_file["height"]
     resolution = None
@@ -234,35 +219,92 @@ def generate():
         resolution = "1080p"
     elif ht >= 1440 and ht < 1920:
         resolution = "1440p"
-    elif ht >= 1920 and ht < 2160:
-        resolution = "1920p"
-    elif ht >= 2160 and ht < 2880:
+    elif ht >= 1920 and ht < 2560:
         resolution = "2160p"
-    elif ht >= 2880 and ht < 3384:
-        resolution = "2880p"
-    elif ht >= 3384 and ht < 4320:
+    elif ht >= 2560 and ht < 3000:
+        resolution = "5K"
+    elif ht >= 3000 and ht < 3584:
         resolution = "6K"
-    elif ht >= 4320 and ht < 8639:
+    elif ht >= 3584 and ht < 3840:
+        resolution = "7K"
+    elif ht >= 3840 and ht < 6143:
         resolution = "8K"
+    elif ht >= 6143:
+        resolution = "8K+"
 
-    if resolution is not None:
+    if resolution is not None and config.tag_resolution:
         tags.add(resolution)
 
+    ###########
+    # TORRENT #
+    ###########
+
+    yield info("Making torrent")
+    receive_pipe, send_pipe = mp.Pipe(False)
+    torrent_proc = mp.Process(target=genTorrent, args=(send_pipe, stash_file, announce_url))
+    torrent_proc.start()
+    # torrent_proc.join()
+    # torrent_paths = genTorrent(stash_file, announce_url)
+    # if torrent_paths is None:
+    #     return error("Failed to generate torrent")
 
     #########
     # COVER #
     #########
 
-    cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
+    cover_response = requests.get(scene["paths"]["screenshot"], headers=config.stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
+    logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
     cover_ext = ""
-    if cover_mime_type == "image/jpeg":
-        cover_ext = "jpg"
-    elif cover_mime_type == "image/png":
-        cover_ext = "png"
-    cover_file = tempfile.mkstemp(suffix="." + cover_ext)
-    with open(cover_file[1], "wb") as fp:
-        fp.write(cover_response.content)
+    cover_gen = False
+    match cover_mime_type:
+        case "image/jpeg":
+            cover_ext = "jpg"
+        case "image/png":
+            cover_ext = "png"
+        case "image/webp":
+            cover_ext = "webp"
+        case _:
+            cover_gen = True
+            cover_ext = "png"
+            cover_mime_type = "image/png"
+            logger.warning(f"Unrecognized cover format")  # TODO return warnings to client
+    cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
+    if cover_gen:
+        CMD = [
+            "ffmpeg",
+            "-ss",
+            "30",
+            "-i",
+            stash_file["path"],
+            "-vf",
+            "thumbnail=300",
+            "-frames:v",
+            "1",
+            cover_file[1],
+            "-y",
+        ]
+        proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # cover_gen_proc = subprocess.Popen(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        logger.debug(f"ffmpeg output:\n{proc.stdout}")
+    else:
+        with open(cover_file[1], "wb") as fp:
+            fp.write(cover_response.content)
+
+    yield info("Uploading images")
+    images = None
+    try:
+        images = imagehandler.ImageHandler()
+    except Exception as e:
+        return error("Failed to initialize image handler")
+    if config.args.flush:
+        images.clear()
+
+    cover_remote_url = images.getURL(cover_file[1], cover_mime_type, cover_ext)[0]
+    if cover_remote_url is None:
+        return error("Failed to upload cover")
+    cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
+    os.remove(cover_file[1])
 
     ###############
     # STUDIO LOGO #
@@ -271,8 +313,9 @@ def generate():
     studio_img_ext = ""
     sudio_img_mime_type = ""
     studio_img_file = None
-    if "default=true" not in scene["studio"]["image_path"]:
-        studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
+    if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
+        logger.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
+        studio_img_response = requests.get(scene["studio"]["image_path"], headers=config.stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
         match sudio_img_mime_type:
             case "image/jpeg":
@@ -281,16 +324,20 @@ def generate():
                 studio_img_ext = "png"
             case "image/svg+xml":
                 studio_img_ext = "svg"
-                # TODO: convert to png for upload
+            case "image/webp":
+                studio_img_ext = "webp"
             case _:
-                logging.error(f"Unknown studio logo file type: {sudio_img_mime_type}")
-        studio_img_file = tempfile.mkstemp(suffix="." + studio_img_ext)
+                studio_img_ext = "unk"
+                yield warning(
+                    f"Unknown studio logo file type: {sudio_img_mime_type}", "Unrecognized studio image file type"
+                )
+                time.sleep(0.1)
+        studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
-        if studio_img_ext == "svg" and shutil.which("rsvg-convert") is not None:
-            png_file = tempfile.mkstemp(suffix=".png")
-            CMD = ['rsvg-convert','-w','200',studio_img_file[1],'-o',png_file[1]]
-            subprocess.run(CMD)
+        if studio_img_ext == "svg":
+            png_file = tempfile.mkstemp(suffix="-studio.png")
+            svg2png(url=studio_img_file[1], write_to=png_file[1])
             os.remove(studio_img_file[1])
             studio_img_file = png_file
             sudio_img_mime_type = "image/png"
@@ -301,26 +348,27 @@ def generate():
     ##############
 
     for performer in scene["performers"]:
-        # tag
-        performer_tag = re.sub(r"[^\w\s]", "", performer["name"]).lower()
-        performer_tag = re.sub(r"\s+", ".", performer_tag)
-        tags.add(performer_tag)
-        # also include alias tags?
-
-        for tag in performer["tags"]:
-            emp_tag = TAGS_MAP.get(tag["name"])
-            if emp_tag is not None:
-                tags.add(emp_tag)
+        performer_tag = tags.processPerformer(performer)
 
         # image
-        performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
-        performer_image_mime_type = cover_response.headers["Content-Type"]
+        logger.debug(f'Downloading performer image from {performer["image_path"]}')
+        performer_image_response = requests.get(performer["image_path"], headers=config.stash_headers)
+        performer_image_mime_type = performer_image_response.headers["Content-Type"]
+        logger.debug(f"Got image with mime type {performer_image_mime_type}")
         performer_image_ext = ""
-        if performer_image_mime_type == "image/jpeg":
-            performer_image_ext = "jpg"
-        elif performer_image_mime_type == "image/png":
-            performer_image_ext = "png"
-        performer_image_file = tempfile.mkstemp(suffix=performer_image_ext)
+        match performer_image_mime_type:
+            case "image/jpeg":
+                performer_image_ext = "jpg"
+            case "image/png":
+                performer_image_ext = "png"
+            case "image/webp":
+                performer_image_ext = "webp"
+            case _:
+                return error(
+                    f"Unrecognized performer image mime type: {performer_image_mime_type}",
+                    "Unrecognized performer image format",
+                )
+        performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
 
@@ -330,287 +378,340 @@ def generate():
             "image_mime_type": performer_image_mime_type,
             "image_ext": performer_image_ext,
             "image_remote_url": None,
-            "tag": performer_tag
+            "tag": performer_tag,
         }
-
 
     #################
     # CONTACT SHEET #
     #################
 
     # upload images and paste in description
-    contact_sheet_file = tempfile.mkstemp(suffix=".jpg")
-    cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    yield json.dumps({
-        "status": "success",
-        "data": { "message": "Generating contact sheet" }
-    })
-    process.wait()
-    if (process.returncode != 0):
-        logging.error("vcsi failed")
-        yield json.dumps({
-            "status": "error",
-            "message": "Couldn't generate contact sheet"
-        })
-        return
-
+    contact_sheet_remote_url = images.generate_contact_sheet(stash_file)
+    if contact_sheet_remote_url is None:
+        return error("Failed to generate contact sheet")
 
     ###########
     # SCREENS #
     ###########
 
-    num_frames = 10
-    if (gen_screens):
-        logging.info(f"Generating screens for {stash_file['path']}")
-        yield json.dumps({
-            "status": "success",
-            "data": { "message": "Generating screenshots" }
-        })
-
-        for seek in map(lambda i: stash_file["duration"]*(0.05 + i/(num_frames-1)*0.9), range(num_frames)):
-            screen_file = tempfile.mkstemp(suffix=".jpg")
-            screens.append(screen_file[1])
-            cmd = ["ffmpeg","-v","error","-y","-ss",str(seek),"-i",stash_file["path"],"-frames:v","1","-vf","scale=960:-2",screen_file[1]]
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            process.wait()
+    if gen_screens:
+        screens_urls = images.generate_screens(stash_file=stash_file)  # TODO customize number of screens from config
+        if screens_urls is None or None in screens_urls:
+            return error("Failed to generate screens")
 
     audio_bitrate = ""
-    cmd = ["ffprobe", "-v", "0", "-select_streams", "a:0", "-show_entries", "stream=bit_rate", "-of", "compact=p=0:nk=1", stash_file["path"]]
+    cmd = [
+        "ffprobe",
+        "-v",
+        "0",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=bit_rate",
+        "-of",
+        "compact=p=0:nk=1",
+        stash_file["path"],
+    ]
     try:
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         audio_bitrate = f"{int(proc.stdout)//1000} kbps"
-        
+
     except:
-        logging.error("Unable to determine audio bitrate")
+        logger.warning("Unable to determine audio bitrate")
         audio_bitrate = "UNK"
 
-    ###########
-    # TORRENT #
-    ###########
+    #############
+    # MEDIAINFO #
+    #############
 
-    yield json.dumps({
-        "status": "success",
-        "data": { "message": "Making torrent" }
-    })
-    piece_size = int(math.log(stash_file["size"]/2**10,2))
-    tempdir = tempfile.TemporaryDirectory()
-    temppath = os.path.join(tempdir.name, stash_file["basename"] + ".torrent")
-    torrent_path = os.path.join(TORRENT_DIR, stash_file["basename"] + ".torrent")
-    logging.info(f"Saving torrent to {temppath}")
-    cmd = ["mktorrent", "-l", str(piece_size), "-s", "Emp", "-a", announce_url, "-p", "-v", "-o", temppath, stash_file["path"]]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    process.wait()
-    if (process.returncode != 0):
-        logging.error("mktorrent failed, command: " + " ".join(cmd))
-        yield json.dumps({
-            "status": "error",
-            "message": "Couldn't generate torrent (does it already exist?)"
-        })
-        tempdir.cleanup()
-        return
-    shutil.move(temppath, torrent_path)
-    tempdir.cleanup()
-    logging.info(f"Moved torrent to {torrent_path}")
-
+    mediainfo = ""
+    info_proc = None
+    info_recv = None
+    if MEDIA_INFO:
+        info_recv, info_send = mp.Pipe(False)
+        info_proc = mp.Process(target=genMediaInfo, args=(info_send, stash_file["path"]))
+        info_proc.start()
+        logger.debug(mediainfo)
 
     #########
     # TITLE #
     #########
 
-    title = "[{studio}] {performers} - {title} ({date}){resolution}".format(
-        studio = scene["studio"]["name"],
-        performers = ", ".join([p["name"] for p in scene["performers"]]),
-        title = scene["title"],
-        date = scene["date"],
-        resolution = f" [{resolution}]" if resolution is not None else ""
+    title = render_template_string(
+        config.title_template,
+        **{
+            "studio": scene["studio"]["name"] if scene["studio"] else "",
+            "performers": [p["name"] for p in scene["performers"]],
+            "title": scene["title"],
+            "date": scene["date"],
+            "resolution": resolution if resolution is not None else "",
+            "codec": stash_file["video_codec"],
+            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+            "framerate": stash_file["frame_rate"],
+        },
     )
-
 
     ########
     # TAGS #
     ########
 
     for tag in scene["tags"]:
-        for key in TAG_LISTS:
-            if tag["name"] in TAG_LISTS[key]:
-                TAG_SETS[key].add(tag["name"])
-        emp_tag = TAGS_MAP.get(tag["name"])
-        if emp_tag is not None:
-            tags.add(emp_tag)
+        tags.processTag(tag["name"])
         for parent in tag["parents"]:
-            for key in TAG_LISTS:
-                if parent["name"] in TAG_LISTS[key]:
-                    TAG_SETS[key].add(parent["name"])
-            emp_tag = TAGS_MAP.get(parent["name"])
-            if emp_tag is not None:
-                tags.add(emp_tag)
+            tags.processTag(parent["name"])
 
-    if scene["studio"]["url"] is not None:
+    if config.tag_codec and stash_file["video_codec"] is not None:
+        tags.add(stash_file["video_codec"])
+
+    if config.tag_codec and scene["date"] is not None and len(scene["date"]) > 0:
+        year, month, day = scene["date"].split("-")
+        tags.add(year)
+        tags.add(f"{year}.{month}")
+        tags.add(f"{year}.{month}.{day}")
+
+    if config.tag_framerate:
+        tags.add(str(round(stash_file["frame_rate"])) + ".fps")
+
+    if scene["studio"] and scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
         tags.add(studio_tag)
-    if scene["studio"]["parent_studio"] is not None and scene["studio"]["parent_studio"]["url"] is not None:
+    if (
+        scene["studio"] is not None
+        and scene["studio"]["parent_studio"] is not None
+        and scene["studio"]["parent_studio"]["url"] is not None
+    ):
         tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
-
 
     ##########
     # UPLOAD #
     ##########
 
-    yield json.dumps({
-        "status": "success",
-        "data": { "message": "Uploading images" }
-    })
-
-    img_host_request = requests.get("https://jerking.empornium.ph/json")
-    m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
-    if m is None:
-        yield json.dumps({
-            "status": "success",
-            "data": { "message": "Uploading images" }
-        })
-        logging.error("Unable to get auth token for image host.")
-        return
-    img_host_token = m.group(1)
-    cookies = img_host_request.cookies
-    cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
-    cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
-
-    logging.info("Uploading cover")
-    cover_remote_url = img_host_upload(img_host_token, cookies, cover_file[1], cover_mime_type, cover_ext)
-    if cover_remote_url is None:
-        yield json.dumps({
-            "status": "error",
-            "data": { "message": "Failed to upload cover" }
-        })
-        return
-    os.remove(cover_file[1])
-    cover_url_parts = cover_remote_url.split(".")
-    cover_resized_url = ".".join(cover_url_parts[:-1])+".md."+cover_url_parts[-1]
-    logging.info("Uploading contact sheet")
-    contact_sheet_remote_url = img_host_upload(img_host_token, cookies, contact_sheet_file[1], "image/jpeg", "jpg")
-    if contact_sheet_remote_url is None:
-        yield json.dumps({
-            "status": "error",
-            "data": { "message": "Failed to upload contact sheet" }
-        })
-        return
-    os.remove(contact_sheet_file[1])
-    logging.info("Uploading performer images")
+    logger.info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = img_host_upload(img_host_token,
-                                                                         cookies,
-                                                                         performers[performer_name]["image_path"],
-                                                                         performers[performer_name]["image_mime_type"],
-                                                                         performers[performer_name]["image_ext"])
+        performers[performer_name]["image_remote_url"] = images.getURL(
+            performers[performer_name]["image_path"],
+            performers[performer_name]["image_mime_type"],
+            performers[performer_name]["image_ext"],
+            default=imagehandler.PERFORMER_DEFAULT_IMAGE,
+        )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            yield json.dumps({
-                "status": "error",
-                "data": { "message": f"Failed to upload image of {performer_name}" }
-            })
-            return
+            performers[performer_name]["image_remote_url"] = imagehandler.PERFORMER_DEFAULT_IMAGE
+            logger.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
-    if studio_img_file is not None and studio_img_ext != "" and sudio_img_mime_type != "image/svg+xml":
-        logging.info("Uploading studio logo")
-        logo_url = img_host_upload(img_host_token, cookies, studio_img_file[1], sudio_img_mime_type, studio_img_ext)
+    logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+    if studio_img_file is not None and studio_img_ext != "":
+        logger.info("Uploading studio logo")
+        logo_url = images.getURL(
+            studio_img_file[1],
+            sudio_img_mime_type,
+            studio_img_ext,
+        )[0]
         if logo_url is None:
-            yield json.dumps({
-                "status": "error",
-                "data": { "message": "Failed to upload studio logo" }
-            })
-            return
-
-    logging.info("Uploading screens")
-    screens_urls = []
-    a = 1
-    b = len(screens)
-    for screen in screens:
-        logging.info(f"Uploading screens ({a} of {b})")
-        a += 1
-        scrn_url = img_host_upload(img_host_token, cookies, screen, "image/jpeg", "jpg")
-        if scrn_url is None:
-            yield json.dumps({
-                "status": "error",
-                "data": { "message": "Failed to upload screens" }
-            })
-            return
-        screens_urls.append(scrn_url)
-        os.remove(screen)
+            logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+            logger.warning("Unable to upload studio image")
 
     ############
     # TEMPLATE #
     ############
 
-    # Sort tag sets into lists
-    for key in TAG_SETS:
-        TAG_SETS[key] = list(TAG_SETS[key])
-        TAG_SETS[key].sort()
+    tmpTagLists = tags.sortTagLists()
 
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
-        date = datetime.datetime.fromisoformat(date).strftime("%B %-d, %Y")
+        date = datetime.datetime.fromisoformat(date).strftime(config.date_format)
 
-    logging.info("Rendering template")
+    yield info("Rendering template")
+
+    if info_proc is not None:
+        info_proc.join()
+        mediainfo = info_recv.recv()  # type: ignore
+
+    time.sleep(0.1)
     template_context = {
-        "studio":        scene["studio"]["name"],
-        "studio_logo":   logo_url,
-        "studiotag":     studio_tag,
-        "director":      scene["director"],
-        "title":         scene["title"],
-        "date":          date,
-        "details":       scene["details"] if scene["details"] != "" else None,
-        "duration":      str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-        "container":     stash_file["format"],
-        "video_codec":   stash_file["video_codec"], 
-        "audio_codec":   stash_file["audio_codec"],
+        "studio": scene["studio"]["name"] if scene["studio"] else "",
+        "studio_logo": logo_url,
+        "studiotag": studio_tag,
+        "director": scene["director"],
+        "title": scene["title"],
+        "date": date,
+        "details": scene["details"] if scene["details"] != "" else None,
+        "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+        "container": stash_file["format"],
+        "video_codec": stash_file["video_codec"],
+        "audio_codec": stash_file["audio_codec"],
         "audio_bitrate": audio_bitrate,
-        "resolution":    "{}×{}".format(stash_file["width"], stash_file["height"]),
-        "bitrate":       "{:.2f} Mb/s".format(stash_file["bit_rate"] / 2**20),
-        "framerate":     "{} fps".format(stash_file["frame_rate"]),
-        "screens":       screens_urls if len(screens_urls) else None,
+        "resolution": "{}×{}".format(stash_file["width"], stash_file["height"]),
+        "bitrate": "{:.2f} Mb/s".format(stash_file["bit_rate"] / 2**20),
+        "framerate": "{} fps".format(stash_file["frame_rate"]),
+        "screens": screens_urls if len(screens_urls) else None,
         "contact_sheet": contact_sheet_remote_url,
-        "performers":    performers,
-        "cover":         cover_resized_url,
-        "image_count":   0 #TODO
+        "performers": performers,
+        "cover": cover_resized_url,
+        "image_count": 0,  # TODO
+        "media_info": mediainfo,
     }
 
-    for key in TAG_SETS:
-        template_context[key] = ", ".join(TAG_SETS[key])
+    for key in tmpTagLists:
+        template_context[key] = ", ".join(tmpTagLists[key])
 
     description = render_template(template, **template_context)
 
-    yield json.dumps({
+    tag_suggestions = tags.tag_suggestions
+
+    torrent_proc.join()
+    torrent_paths = receive_pipe.recv()
+
+    result = {
         "status": "success",
         "data": {
             "message": "Done",
             "fill": {
                 "title": title,
                 "cover": cover_remote_url,
-                "tags": " ".join(tags),
+                "tags": " ".join(tags.tags),
                 "description": description,
-                "torrent_path": torrent_path,
-                "file_path": stash_file["path"]
-            }
+                "torrent_path": torrent_paths[0],
+                "file_path": stash_file["path"],
+                "anon": config.anon,
+            },
+        },
+    }
+
+    with open(torrent_paths[0], "rb") as f:
+        result["data"]["file"] = {
+            "name": os.path.basename(f.name),
+            "content": str(base64.b64encode(f.read()).decode("ascii")),
         }
-    })
-    logging.info("Done")
 
-@app.route('/fill', methods=["POST"])
+    logger.debug(f"Sending {len(tag_suggestions)} suggestions")
+    if len(tag_suggestions) > 0:
+        result["data"]["suggestions"] = dict(tag_suggestions)
+
+    yield json.dumps(result)
+
+    for client in config.torrent_clients:
+        try:
+            client.add(torrent_paths[0], stash_file["path"])
+        except Exception as e:
+            logger.error(f"Error attempting to add torrent to {client.name}")
+            logger.debug(e)
+
+    logger.info("Done")
+    time.sleep(1)
+
+
+def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[str] | None:
+    piece_size = int(math.log(stash_file["size"] / 2**10, 2))
+    tempdir = tempfile.TemporaryDirectory()
+    basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
+    # logger.debug(f"Sanitized filename: {basename}")
+    # basename = stash_file["basename"]
+    temppath = os.path.join(tempdir.name, basename + ".torrent")
+    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
+    logger.debug(f"Saving torrent to {temppath}")
+    cmd = [
+        "mktorrent",
+        "-l",
+        str(piece_size),
+        "-s",
+        "Emp",
+        "-a",
+        announce_url,
+        "-p",
+        "-v",
+        "-o",
+        temppath,
+        stash_file["path"],
+    ]
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    logger.debug(f"mktorrent output:\n{process.stdout}")
+    if process.returncode != 0:
+        tempdir.cleanup()
+        logger.error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
+        return None
+    for path in torrent_paths:
+        shutil.copy(temppath, path)
+    tempdir.cleanup()
+    logger.debug(f"Moved torrent to {torrent_paths}")
+    pipe.send(torrent_paths)
+    # return torrent_paths
+
+
+def genMediaInfo(pipe: Connection, path: str) -> None:
+    cmd = [MEDIA_INFO, path]
+    pipe.send(subprocess.check_output(cmd, text=True))
+
+
+@app.route("/submit", methods=["POST"])
+@csrf.exempt
+def submit():
+    j = request.get_json()
+    logger.debug(f"Torrent submitted: {j}")
+    for client in config.torrent_clients:
+        try:
+            client.start(j["torrent_path"])
+        except Exception as e:
+            logger.error(f"Error attempting to start torrent in {client.name}")
+            logger.debug(e)
+    return json.dumps({"status": "success"})
+
+
+@app.route("/suggestions", methods=["POST"])
+@csrf.exempt
+def processSuggestions():
+    j = request.get_json()
+    logger.debug(f"Got json {j}")
+    acceptedTags = {}
+    if "accept" in j:
+        logger.info(f"Accepting {len(j['accept'])} tag suggestions")
+        for tag in j["accept"]:
+            if "name" in tag:
+                acceptedTags[tag["name"]] = tag["emp"]
+    ignoredTags = []
+    if "ignore" in j:
+        logger.info(f"Ignoring {len(j['ignore'])} tags")
+        for tag in j["ignore"]:
+            ignoredTags.append(tag)
+    tags = taghandler.TagHandler()
+    success = tags.acceptSuggestions(acceptedTags)
+    success = success and tags.rejectSuggestions(ignoredTags)
+    if success:
+        return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
+    else:
+        return json.dumps({"status": "error", "data": {"message": "Failed to save tags"}})
+
+
+@app.route("/fill", methods=["POST"])
+@csrf.exempt
 def fill():
-    return Response(generate(), mimetype="application/json") # type: ignore
+    return Response(generate(), mimetype="application/json")  # type: ignore
 
-@app.route('/templates')
+
+# @app.route("/suggestions", methods=["POST"])
+# @csrf.exempt
+# def suggestions():
+#     return Response(processSuggestions(), mimetype="application/json")
+
+
+@app.route("/templates")
+@csrf.exempt
 def templates():
-    return json.dumps(template_names)
+    return json.dumps(config.template_names)
+
+@app.route("/favicon.ico")
+def favicon():
+    return redirect(url_for("static", filename="favicon.ico"))
+
 
 if __name__ == "__main__":
+    app.register_blueprint(settings_page)
+    app.register_blueprint(error_page)
     try:
         from waitress import serve
-        serve(app, host='0.0.0.0', port=PORT)
-    except:
-        logging.info("Waitress not installed, using builtin server")
-        app.run(host='0.0.0.0',port=PORT)
 
+        serve(app, host="0.0.0.0", port=config.port)
+    except:
+        logging.getLogger(__name__).info("Waitress not installed, using builtin server")
+        app.run(host="0.0.0.0", port=config.port)

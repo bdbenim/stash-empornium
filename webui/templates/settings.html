@@ -1,0 +1,44 @@
+{% extends 'base.html' %} {% from 'bootstrap5/form.html' import render_form %}
+{% block title %}Settings{% endblock %} {% block content %}
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-10 col-lg-8 mx-lg-auto mx-md-auto">
+      <h1 class="pt-5 pb-2">stash-empornium settings</h1>
+
+      <p class="lead">
+        Here you can configure the settings for {{ settings_option }}.
+      </p>
+      {{ render_form(form, extra_classes='form-floating') }}
+    </div>
+  </div>
+  {% if message %}
+  <div class="row">
+    <div class="col-md-10 col-lg-8 mx-lg-auto mx-md-auto">
+      <div class="alert alert-success mt-2 mb-2" role="alert">{{ message }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %} {% block scripts %}
+<script>
+  try {
+    let enabled = document.getElementById("enable_form");
+    function toggle() {
+      const form = document.getElementsByTagName("form")[0];
+      for (el of form.querySelectorAll("input")) {
+        if (
+          el.id != "csrf_token" &&
+          el.id != "save" &&
+          el.id != enabled.id
+        ) {
+          el.disabled = !enabled.checked;
+        }
+      }
+    }
+    enabled.onchange = toggle;
+    toggle();
+  } catch {}
+</script>
+{% endblock %}

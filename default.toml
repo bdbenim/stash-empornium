@@ -1,0 +1,108 @@
+[backend]
+## name of a file in templates/ dir
+default_template = "fakestash-v2"
+## List of directories where torrents are placed
+## Multiple directories can be specified in this format:
+## torrent_directories = ["/torrents", "/downloads"]
+torrent_directories = ["/torrents"]
+## port that the backend listens on
+port = 9932
+## jinja template for title
+## see README.md for available variables
+## Uncomment this title for Whisparr compatibility
+#title_template = {{ studio|replace(' ', '')|replace('[^a-zA-Z0-9]', '') }} - {{ date.split('-')[0][-2:] }}.{{ date.split('-')[1] }}.{{ date.split('-')[2] }} - {{ title }} - {{performers|join(', ')}} - {{ codec }} - WEBDL - {{ resolution }}
+## Uncomment this title for Classic EMP template
+title_template = '{% if studio %}[{{studio}}] {% endif %}{{performers|join(", ")}}{% if performers %} - {% endif %}{{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]'
+# Date format for title release - https://strftime.org/ for reference
+date_format = "%Y-%m-%d"
+## Set to 'true' to enable anonymous uploading
+anon = false
+
+# [rtorrent]
+## Hostname or IP address
+# host = "localhost"
+## Port number
+# port = 8080
+## Set to true for https
+# ssl = false
+## API path, typically "XMLRPC" or "RPC2"
+# path = "RPC2"
+## Username for XMLRPC if applicable (may be different from webui)
+# username = "user"
+## Password for XMLRPC if applicable (may be different from webui)
+# password = "password"
+# label = "stash-empornium"
+
+# [rtorrent.pathmaps]
+# "/stash-empornium/path" = "/rtorrent/path"
+
+# [deluge]
+## Hostname or IP address
+# host = "127.0.0.1"
+## Port number
+# port = 8112
+## Set to true for https
+# ssl = false
+## Password for API
+# password = "deluge"
+
+# [deluge.pathmaps]
+# "/stash-empornium/path" = "/deluge/path"
+
+# [qbittorrent]
+## Hostname or IP address
+# host = "127.0.0.1"
+## Port number
+# port = 8080
+## Set to true for https
+# ssl = false
+## Username for API
+# username = "admin"
+## Password for API
+# password = "adminadmin"
+## Equivalent to QBittorrent "category"
+# label = "stash-empornium"
+
+# [qbittorrent.pathmaps]
+# "/stash-empornium/path" = "/qbittorrent/path"
+
+#[redis]
+#host = "localhost"
+#port = 6379
+#username = "stash-empornium"
+#password = "stash-empornium"
+#ssl = false
+
+#[file.maps]
+## For Docker, this should be configured using mount points
+
+[metadata]
+## various optional metadata attributes to include as tags
+tag_codec = false
+tag_date = true
+tag_framerate = true
+tag_resolution = true
+
+[performers]
+tag_ethnicity = false
+tag_hair_color = false
+tag_eye_color = false
+
+# [performers.cup_sizes]
+## Map EMP tags to cup sizes. Add a '-' to match sizes less than or equal to the specified
+## size, or a '+' to match sizes greater or equal. Add neither for exact matches only.
+# "tiny.tits" = "A-"
+# "small.tits" = "B-"
+# "big.tits" = "D+"
+# "huge.tits" = "DD+"
+# "a.cup" = "A"
+
+[templates]
+fakestash-v2 = "Stash / Fake video player v2 (by warblcoffin)"
+tushy = "Tushy video page lookalike (by dickon)"
+
+[stash]
+## url of your stash instance
+url = "http://localhost:9999"
+## only needed if you set up authentication for stash
+#api_key = 123abc.xyz
