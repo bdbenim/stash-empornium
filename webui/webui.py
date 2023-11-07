@@ -23,6 +23,7 @@ def index():
 @settings_page.route("/settings/<page>", methods=["GET", "POST"])
 def settings(page):
     template_context = {}
+    enable = page in conf and not conf.get(page, "disable", False)
     match page:
         case "backend":
             template_context["settings_option"] = "your stash-empornium backend"
@@ -39,7 +40,6 @@ def settings(page):
             form = StashSettings(url=conf.get(page, "url", ""), api_key=conf.get(page, "api_key", ""))
         case "redis":
             template_context["settings_option"] = "your redis server"
-            enable = "redis" in conf
             form = RedisSettings(
                 enable_form=enable,
                 host=conf.get(page, "host", ""),
@@ -50,7 +50,6 @@ def settings(page):
             )
         case "rtorrent":
             template_context["settings_option"] = "your rTorrent client"
-            enable = "rtorrent" in conf
             form = RTorrentSettings(
                 enable_form=enable,
                 host=conf.get(page, "host", ""),
@@ -63,7 +62,6 @@ def settings(page):
             )
         case "deluge":
             template_context["settings_option"] = "your Deluge client"
-            enable = "deluge" in conf
             form = DelugeSettings(
                 enable_form=enable,
                 host=conf.get(page, "host", ""),
@@ -73,7 +71,6 @@ def settings(page):
             )
         case "qbittorrent":
             template_context["settings_option"] = "your qBittorrent client"
-            enable = "qbittorrent" in conf
             form = QBittorrentSettings(
                 enable_form=enable,
                 host=conf.get(page, "host", ""),
@@ -105,6 +102,7 @@ def settings(page):
                 conf.update_file()
             case "redis":
                 if form.data["enable_form"]:
+                    conf.set(page, "disable", False)
                     conf.set(page, "host", form.data["host"])
                     conf.set(page, "port", int(form.data["port"]))
                     conf.set(page, "ssl", form.data["ssl"])
@@ -121,6 +119,7 @@ def settings(page):
                 conf.update_file()
             case "rtorrent":
                 if form.data["enable_form"]:
+                    conf.set(page, "disable", False)
                     conf.set(page, "host", form.data["host"])
                     conf.set(page, "port", int(form.data["port"]))
                     conf.set(page, "ssl", form.data["ssl"])
@@ -138,11 +137,13 @@ def settings(page):
                     else:
                         conf.delete(page, "label")
                 else:
-                    conf.delete(page)
+                    if page in conf:
+                        conf.set(page, "disable", True)
                 conf.configureTorrents()
                 conf.update_file()
             case "deluge":
                 if form.data["enable_form"]:
+                    conf.set(page, "disable", False)
                     conf.set(page, "host", form.data["host"])
                     conf.set(page, "port", int(form.data["port"]))
                     conf.set(page, "ssl", form.data["ssl"])
@@ -151,11 +152,13 @@ def settings(page):
                     else:
                         conf.delete(page, "password")
                 else:
-                    conf.delete(page)
+                    if page in conf:
+                        conf.set(page, "disable", True)
                 conf.configureTorrents()
                 conf.update_file()
             case "qbittorrent":
                 if form.data["enable_form"]:
+                    conf.set(page, "disable", False)
                     conf.set(page, "host", form.data["host"])
                     conf.set(page, "port", int(form.data["port"]))
                     conf.set(page, "ssl", form.data["ssl"])
@@ -172,7 +175,8 @@ def settings(page):
                     else:
                         conf.delete(page, "label")
                 else:
-                    conf.delete(page)
+                    if page in conf:
+                        conf.set(page, "disable", True)
                 conf.configureTorrents()
                 conf.update_file()
             case _:
