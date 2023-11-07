@@ -35,10 +35,20 @@ __version__ = "0.15.1"
 
 # external
 import requests
-from flask import Flask, Response, request, stream_with_context, render_template, render_template_string, redirect, url_for
+from flask import (
+    Flask,
+    Response,
+    request,
+    stream_with_context,
+    render_template,
+    render_template_string,
+    redirect,
+    url_for,
+)
 from cairosvg import svg2png
 
 from flask_bootstrap import Bootstrap5
+from flask_wtf import CSRFProtect
 
 # built-in
 import base64
@@ -73,13 +83,12 @@ ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries wh
 
 config = utils.confighandler.ConfigHandler()
 logger = logging.getLogger(__name__)
-# config.logging_init()
-# config.configure()
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
 
 MEDIA_INFO = shutil.which("mediainfo")
+
 
 def error(message: str, altMessage: str | None = None) -> str:
     logger.error(message)
@@ -112,10 +121,12 @@ def mapPaths(f: dict) -> dict:
         break
     return f
 
+
 app = Flask(__name__, template_folder=config.template_dir)
 app.secret_key = "secret"
-app.config['BOOTSTRAP_BOOTSWATCH_THEME'] = 'cyborg'
+app.config["BOOTSTRAP_BOOTSWATCH_THEME"] = "cyborg"
 bootstrap = Bootstrap5(app)
+csrf = CSRFProtect(app)
 
 @stream_with_context
 def generate():
@@ -222,7 +233,7 @@ def generate():
 
     if resolution is not None and config.tag_resolution:
         tags.add(resolution)
-    
+
     ###########
     # TORRENT #
     ###########
@@ -282,20 +293,12 @@ def generate():
     yield info("Uploading images")
     images = None
     try:
-        images = imagehandler.ImageHandler(
-            config.host,
-            config.rport,
-            config.username,
-            config.password,
-            config.ssl,
-            config.args.no_cache,
-            config.args.overwrite,
-        )
+        images = imagehandler.ImageHandler()
     except Exception as e:
         return error("Failed to initialize image handler")
     if config.args.flush:
         images.clear()
-    
+
     cover_remote_url = images.getURL(cover_file[1], cover_mime_type, cover_ext)[0]
     if cover_remote_url is None:
         return error("Failed to upload cover")
@@ -522,7 +525,7 @@ def generate():
 
     if info_proc is not None:
         info_proc.join()
-        mediainfo = info_recv.recv() # type: ignore
+        mediainfo = info_recv.recv()  # type: ignore
 
     time.sleep(0.1)
     template_context = {
@@ -578,7 +581,7 @@ def generate():
     with open(torrent_paths[0], "rb") as f:
         result["data"]["file"] = {
             "name": os.path.basename(f.name),
-            "content": str(base64.b64encode(f.read()).decode('ascii'))
+            "content": str(base64.b64encode(f.read()).decode("ascii")),
         }
 
     logger.debug(f"Sending {len(tag_suggestions)} suggestions")
@@ -634,11 +637,14 @@ def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[st
     pipe.send(torrent_paths)
     # return torrent_paths
 
+
 def genMediaInfo(pipe: Connection, path: str) -> None:
     cmd = [MEDIA_INFO, path]
     pipe.send(subprocess.check_output(cmd, text=True))
 
+
 @app.route("/submit", methods=["POST"])
+@csrf.exempt
 def submit():
     j = request.get_json()
     logger.debug(f"Torrent submitted: {j}")
@@ -652,6 +658,7 @@ def submit():
 
 
 @app.route("/suggestions", methods=["POST"])
+@csrf.exempt
 def processSuggestions():
     j = request.get_json()
     logger.debug(f"Got json {j}")
@@ -676,22 +683,26 @@ def processSuggestions():
 
 
 @app.route("/fill", methods=["POST"])
+@csrf.exempt
 def fill():
     return Response(generate(), mimetype="application/json")  # type: ignore
 
 
-@app.route("/suggestions", methods=["POST"])
-def suggestions():
-    return Response(processSuggestions(), mimetype="application/json")
+# @app.route("/suggestions", methods=["POST"])
+# @csrf.exempt
+# def suggestions():
+#     return Response(processSuggestions(), mimetype="application/json")
 
 
 @app.route("/templates")
+@csrf.exempt
 def templates():
     return json.dumps(config.template_names)
 
-@app.route("/favicon.ico", methods=["GET"])
+@app.route("/favicon.ico")
 def favicon():
     return redirect(url_for("static", filename="favicon.ico"))
+
 
 if __name__ == "__main__":
     app.register_blueprint(settings_page)

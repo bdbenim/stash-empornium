@@ -289,8 +289,8 @@ class Singleton(object):
             return it
         it = object.__new__(cls)
         setattr(cls, it_id, it)
-        it.init(*args, **kwds)
+        it.__init__(*args, **kwds)
         return it
 
-    def init(self, *args, **kwds):
+    def __init__(self, *args, **kwds):
         pass
