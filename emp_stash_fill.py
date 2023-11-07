@@ -62,6 +62,7 @@ from utils import taghandler, imagehandler
 from utils.paths import mapPath
 import utils.confighandler
 from webui.webui import settings_page
+from webui.errorpages import error_page
 
 
 #############
@@ -696,6 +697,7 @@ def favicon():
 
 if __name__ == "__main__":
     app.register_blueprint(settings_page)
+    app.register_blueprint(error_page)
     try:
         from waitress import serve
 
