@@ -10,6 +10,8 @@ import time
 from typing import Any, Optional, Sequence
 import uuid
 
+from utils.confighandler import ConfigHandler
+
 from PIL import Image, ImageSequence
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,8 @@ STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25
 PREFIX = "stash-empornium"
 HASH_PREFIX = f"{PREFIX}-file"
 
+conf = ConfigHandler()
+
 
 class ImageHandler:
     urls: dict = {}
@@ -35,26 +39,31 @@ class ImageHandler:
     no_cache: bool = False
     overwrite: bool = False
 
-    def __init__(
-        self,
-        redisHost: str | None = None,
-        redisPort: int = 6379,
-        user: str | None = None,
-        password: str | None = None,
-        use_ssl: bool = False,
-        no_cache: bool = False,
-        overwrite: bool = False,
-    ) -> None:
+    def __init__(self) -> None:
+        self.configureCache()
+        self.img_host_token, self.cookies = connectionInit()
+
+    def configureCache(self) -> None:
+        redisHost:str = conf.get("redis", "host", "") # type: ignore
+        redisPort:int = conf.get("redis", "port", 6379) # type: ignore
+        user = conf.get("redis", "username", "")
+        password = conf.get("redis", "password", "")
+        use_ssl:bool = conf.get("redis", "ssl", False) # type: ignore
+        no_cache = conf.args.no_cache
+        overwrite = conf.args.overwrite
+
+        enable = use_redis and not conf.get("redis", "disable", False)
         self.overwrite = overwrite
-        if not no_cache and redisHost is not None and use_redis and self.redis is None:
-            self.redis = redis.Redis(
-                redisHost, redisPort, username=user, password=password, ssl=use_ssl, decode_responses=True
-            )
+        self.no_cache = no_cache
+        if not no_cache and redisHost is not None and enable and self.redis is None:
             try:
+                self.redis = redis.Redis(
+                    redisHost, redisPort, username=user, password=password, ssl=use_ssl, decode_responses=True
+                )
                 # It doesn't matter if this exists or not. An exception will be raised if not connected,
                 # so we can "check" for any arbitrary value to see if connected
                 self.redis.exists("connectioncheck")
-                logger.info(
+                logger.debug(
                     f"Successfully connected to redis at {redisHost}:{redisPort}{' using ssl' if use_ssl else ''}"
                 )
             except Exception as e:
@@ -62,8 +71,6 @@ class ImageHandler:
                 self.redis = None
         else:
             logger.debug("Not connecting to redis")
-        self.no_cache = no_cache
-        self.img_host_token, self.cookies = connectionInit()
 
     def exists(self, key: str) -> bool:
         if key in self.urls:

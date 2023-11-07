@@ -92,14 +92,12 @@ def settings(page):
                 conf.set(page, "title_template", form.data["title_template"])
                 conf.set(page, "date_format", form.data["date_format"])
                 conf.set(page, "anon", form.data["anon"])
-                conf.update_file()
             case "stash":
                 conf.set(page, "url", form.data["url"])
                 if form.data["api_key"]:
                     conf.set(page, "api_key", form.data["api_key"])
                 else:
                     conf.delete(page, "api_key")
-                conf.update_file()
             case "redis":
                 if form.data["enable_form"]:
                     conf.set(page, "disable", False)
@@ -117,7 +115,6 @@ def settings(page):
                 else:
                     if page in conf:
                         conf.set(page, "disable", True)
-                conf.update_file()
             case "rtorrent":
                 if form.data["enable_form"]:
                     conf.set(page, "disable", False)
@@ -141,7 +138,6 @@ def settings(page):
                     if page in conf:
                         conf.set(page, "disable", True)
                 conf.configureTorrents()
-                conf.update_file()
             case "deluge":
                 if form.data["enable_form"]:
                     conf.set(page, "disable", False)
@@ -156,7 +152,6 @@ def settings(page):
                     if page in conf:
                         conf.set(page, "disable", True)
                 conf.configureTorrents()
-                conf.update_file()
             case "qbittorrent":
                 if form.data["enable_form"]:
                     conf.set(page, "disable", False)
@@ -179,9 +174,9 @@ def settings(page):
                     if page in conf:
                         conf.set(page, "disable", True)
                 conf.configureTorrents()
-                conf.update_file()
             case _:
                 abort(404)
+        conf.update_file()
     template_context["form"] = form
     return render_template("settings.html", **template_context)
 
