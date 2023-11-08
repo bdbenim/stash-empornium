@@ -33,6 +33,8 @@ def settings(page):
                 port=conf.get(page, "port", ""),
                 date_format=conf.get(page, "date_format", ""),
                 title_template=conf.get(page, "title_template", ""),
+                media_directory=conf.get(page, "media_directory", ""),
+                move_method=conf.get(page, "move_method", "copy"),
                 anon=conf.get(page, "anon", False),
             )
         case "stash":
@@ -91,6 +93,9 @@ def settings(page):
                 conf.set(page, "port", int(form.data["port"]))
                 conf.set(page, "title_template", form.data["title_template"])
                 conf.set(page, "date_format", form.data["date_format"])
+                if form.data['media_directory']:
+                    conf.set(page, "media_directory", form.data["media_directory"])
+                conf.set(page, "move_method", form.data["move_method"])
                 conf.set(page, "anon", form.data["anon"])
             case "stash":
                 conf.set(page, "url", form.data["url"])
@@ -190,6 +195,8 @@ class BackendSettings(FlaskForm):
     example = StringField("Date Example:",render_kw={'readonly': True})
     title_template = StringField()
     anon = SwitchField("Upload Anonymously")
+    media_directory = StringField()
+    move_method = SelectField(choices=['copy', 'hardlink', 'symlink'])
     save = SubmitField()
 
 

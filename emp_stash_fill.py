@@ -194,6 +194,8 @@ def generate():
             gallery_proc.start()
         except ValueError as ve:
             return error(str(ve))
+        except TypeError:
+            logger.warning("Unable to include gallery in torrent")
         except Exception as e:
             logger.debug(e)
             return error("An unexpected error occurred")
@@ -267,10 +269,6 @@ def generate():
     receive_pipe, send_pipe = mp.Pipe(False)
     torrent_proc = mp.Process(target=genTorrent, args=(send_pipe, stash_file, announce_url, new_dir))
     torrent_proc.start()
-    # torrent_proc.join()
-    # torrent_paths = genTorrent(stash_file, announce_url)
-    # if torrent_paths is None:
-    #     return error("Failed to generate torrent")
 
     #########
     # COVER #
@@ -539,6 +537,7 @@ def generate():
         shutil.rmtree(image_dir)
         logger.debug(f"Deleted {image_dir}")
     
+    gallery_contact_url = None
     if gallery_proc:
         gallery_proc.join()
         gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]
@@ -599,6 +598,7 @@ def generate():
     #     gal = gal_recv.recv()
         #TODO
 
+    logger.info("Waiting for torrent generation to complete")
     torrent_proc.join()
     torrent_paths = receive_pipe.recv()
 
