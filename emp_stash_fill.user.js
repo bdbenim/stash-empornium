@@ -182,7 +182,7 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
   galleryToggle.setAttribute("type", "checkbox");
   galleryToggle.setAttribute("name", "gallerytoggle");
   galleryToggle.setAttribute("id", "gallery_toggle");
-  galleryToggle.setAttribute("checked", false);
+  galleryToggle.checked = false;
   moreOptions.appendChild(document.createElement("br"));
   moreOptions.appendChild(galleryToggleLabel);
   moreOptions.appendChild(galleryToggle);
