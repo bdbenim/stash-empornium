@@ -186,7 +186,8 @@ def generate():
             new_dir, image_dir, image_temp = readGallery(scene)
         except ValueError as ve:
             return error(str(ve))
-        except:
+        except Exception as e:
+            logger.debug(e)
             return error("An unexpected error occurred")
 
     stash_file = None

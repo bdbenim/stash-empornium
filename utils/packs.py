@@ -79,9 +79,9 @@ def readGallery(scene: dict) -> tuple[str, str, bool] | None:
     if gallery['folder']:
         source_dir = mapPath(gallery['folder']['path'], conf.items("file.maps"))
         image_dir = os.path.join(dirname, 'Images')
-        os.makedirs(image_dir)
+        os.makedirs(image_dir, exist_ok=True)
         for file in os.listdir(source_dir):
-            link(file, image_dir)
+            link(os.path.join(source_dir, file), image_dir)
     elif gallery['files']:
         temp = True
         zip = mapPath(gallery['files'][0]['path'], conf.items("file.maps"))
