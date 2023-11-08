@@ -1,4 +1,4 @@
-{# 20230919 -#}
+{# 20231107 -#}
 [bg=#000000]
 [table=100%,nball]
 [tr][td] [table=95%,nball]
@@ -110,7 +110,13 @@
 {%- endif %}
 [table=nball,95%]
 [tr][td=nopad][color=#FFFFFF][spoiler=Contact sheet][align=center][img]{{contact_sheet}}[/img][/align][/spoiler][/color][/td][/tr]
-[/table] [/td][/tr]
+[/table]
+{% if gallery_contact %}
+[table=nball,95%]
+[tr][td=nopad][color=#FFFFFF][spoiler=Image Contact sheet][align=center][img]{{gallery_contact}}[/img][/align][/spoiler][/color][/td][/tr]
+[/table]
+{% endif %}
+[/td][/tr]
 [/table]
 
 

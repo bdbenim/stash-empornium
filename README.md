@@ -191,13 +191,29 @@ Currently there is one limitation with the qBittorrent API integration which pre
 6. You still need to load the torrent file (the location on your filesystem will be given to you) into the form, set a category, optionally check for dupes if you didn't do so manually. Also load the torrent file into your client (you can configure the torrent output directory to be a watch dir for your torrent client) and make sure the media file is visible to your torrent client
 7. When you're satisfied everything is ready, upload
 
+### Including Galleries
+
+Uploads can optionally include a gallery associated with a scene by checking the box labeled "Include Gallery?" on the upload page. In order to generate a torrent with multiple files, they must be saved in a directory together, which requires some additional configuration options:
+
+```toml
+[backend]
+## Where to save media for torrents with more than one file:
+media_directory = "/torrents"
+## How to move files to media_directory. Must be 'copy', 'hardlink', or 'symlink'
+move_method = 'copy'
+```
+
+The `media_directory` option specifies the parent directory where media files will be saved. Each torrent will get an associated subdirectory here, based on the title of the scene.
+
+`move_method` specifies how media files will be added to this new directory. The default is `copy` because it is the most likely to work across different setups, but the downside is that this will create a duplicate of your media. To avoid this, the `hardlink` or `symlink` options can be selected, but these have limitations. Symlinks point to the path of the original file, which means that if your torrent client sees a different path structure than your backend server then it won't be able to follow symlinks created by the backend. Hardlinks do not have this issue, but they can only be created on the same file system as the original file. If you're using Docker, locations from the same file system added via separate mount points will be treated as separate file systems and will not allow hardlinks between them. There are additional pros and cons that are beyond the scope of this readme.
+
 ### Command Line Arguments
 
 The script can be run with optional command line arguments, most of which override a corresponding configuration file option. These can be used to quickly change a setting without needing to modify the config file, such as for temporarily listening on a different port or saving torrent files in a different directory. Not all configuration options can currently be set via the command line. The available options are described in the script's help text below:
 
 ```text
-usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [--anon] [-q | -v | -l LEVEL] [--rhost RHOST] [--rport RPORT]
-                         [--username USERNAME] [--password PASSWORD] [--use-ssl] [--flush] [--no-cache | --overwrite]
+usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [--anon] [-q | -v | -l LEVEL] [--flush]
+                         [--no-cache | --overwrite]
 
 backend server for EMP Stash upload helper userscript
 
@@ -231,15 +247,6 @@ Output:
 redis:
   options for connecting to a redis server
 
-  --rhost RHOST, --redis--host RHOST, --rh RHOST
-                        host redis server is listening on
-  --rport RPORT, --redis-port RPORT, --rp RPORT
-                        port redis server is listening on (default: 6379)
-  --username USERNAME, --redis-user USERNAME
-                        redis username
-  --password PASSWORD, --redis-pass PASSWORD
-                        redis password
-  --use-ssl, -s         use SSL to connect to redis
   --flush               flush redis cache
   --no-cache            do not retrieve cached values
   --overwrite           overwrite cached values
@@ -270,6 +277,7 @@ Templates are written using Jinja syntax. The available variables are:
 - details
 - duration
 - framerate
+- gallery_contact
 - image_count
 - media_info (if `mediainfo` is installed)
 - performers

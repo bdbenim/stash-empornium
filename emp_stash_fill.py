@@ -68,8 +68,9 @@ import time
 
 # included
 from utils import taghandler, imagehandler
+from utils.packs import link, readGallery
 from utils.paths import mapPath
-import utils.confighandler
+from utils.confighandler import ConfigHandler, stash_query, stash_headers
 from webui.webui import settings_page
 from webui.errorpages import error_page
 
@@ -81,7 +82,7 @@ from webui.errorpages import error_page
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
 
-config = utils.confighandler.ConfigHandler()
+config = ConfigHandler()
 logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
@@ -135,8 +136,9 @@ def generate():
     file_id = j["file_id"]
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
+    include_gallery = j["gallery"]
 
-    logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens.")
+    logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{'and including gallery' if include_gallery else ''}.")
 
     template = (
         j["template"]
@@ -156,11 +158,11 @@ def generate():
     #################
 
     logger.info("Querying stash")
-    stash_request_body = {"query": "{" + config.stash_query.format(scene_id) + "}"}
+    stash_request_body = {"query": "{" + stash_query.format(scene_id) + "}"}
     stash_response = requests.post(
         urllib.parse.urljoin(config.stash_url, "/graphql"),
         json=stash_request_body,
-        headers=config.stash_headers,
+        headers=stash_headers,
     )
 
     stash_response_body = stash_response.json()
@@ -175,6 +177,28 @@ def generate():
             scene[key] = ""
         elif scene[key] == None:
             scene[key] = ""
+    
+    new_dir = None
+    image_dir = None
+    image_temp = False
+    gallery_contact = None
+    gallery_proc = None
+    image_count = 0
+    if include_gallery:
+        try:
+            new_dir, image_dir, image_temp = readGallery(scene)
+            gallery_contact = tempfile.mkstemp("-gallery_contact.jpg")[1]
+            files = [os.path.join(image_dir, file) for file in os.listdir(image_dir)]
+            image_count = len(files)
+            gallery_proc = mp.Process(target=imagehandler.createContactSheet, args=(files, 800, 200, gallery_contact))
+            gallery_proc.start()
+        except ValueError as ve:
+            return error(str(ve))
+        except TypeError:
+            logger.warning("Unable to include gallery in torrent")
+        except Exception as e:
+            logger.debug(e)
+            return error("An unexpected error occurred")
 
     stash_file = None
     for f in scene["files"]:
@@ -195,6 +219,9 @@ def generate():
         logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
         return error(f"Couldn't find file {stash_file['path']}")
+
+    if new_dir:
+        link(stash_file['path'], new_dir)
 
     if len(scene["title"]) == 0:
         scene["title"] = stash_file["basename"]
@@ -240,18 +267,14 @@ def generate():
 
     yield info("Making torrent")
     receive_pipe, send_pipe = mp.Pipe(False)
-    torrent_proc = mp.Process(target=genTorrent, args=(send_pipe, stash_file, announce_url))
+    torrent_proc = mp.Process(target=genTorrent, args=(send_pipe, stash_file, announce_url, new_dir))
     torrent_proc.start()
-    # torrent_proc.join()
-    # torrent_paths = genTorrent(stash_file, announce_url)
-    # if torrent_paths is None:
-    #     return error("Failed to generate torrent")
 
     #########
     # COVER #
     #########
 
-    cover_response = requests.get(scene["paths"]["screenshot"], headers=config.stash_headers)
+    cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
     cover_ext = ""
@@ -314,7 +337,7 @@ def generate():
     studio_img_file = None
     if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
         logger.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
-        studio_img_response = requests.get(scene["studio"]["image_path"], headers=config.stash_headers)
+        studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
         sudio_img_mime_type = studio_img_response.headers["Content-Type"]
         match sudio_img_mime_type:
             case "image/jpeg":
@@ -351,7 +374,7 @@ def generate():
 
         # image
         logger.debug(f'Downloading performer image from {performer["image_path"]}')
-        performer_image_response = requests.get(performer["image_path"], headers=config.stash_headers)
+        performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
         performer_image_mime_type = performer_image_response.headers["Content-Type"]
         logger.debug(f"Got image with mime type {performer_image_mime_type}")
         performer_image_ext = ""
@@ -510,6 +533,16 @@ def generate():
             logo_url = imagehandler.STUDIO_DEFAULT_LOGO
             logger.warning("Unable to upload studio image")
 
+    if image_temp:
+        shutil.rmtree(image_dir)
+        logger.debug(f"Deleted {image_dir}")
+    
+    gallery_contact_url = None
+    if gallery_proc:
+        gallery_proc.join()
+        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]
+        os.remove(gallery_contact)
+
     ############
     # TEMPLATE #
     ############
@@ -548,7 +581,8 @@ def generate():
         "contact_sheet": contact_sheet_remote_url,
         "performers": performers,
         "cover": cover_resized_url,
-        "image_count": 0,  # TODO
+        "image_count": image_count,
+        "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
     }
 
@@ -559,6 +593,12 @@ def generate():
 
     tag_suggestions = tags.tag_suggestions
 
+    # if include_gallery:
+    #     gal_proc.join()
+    #     gal = gal_recv.recv()
+        #TODO
+
+    logger.info("Waiting for torrent generation to complete")
     torrent_proc.join()
     torrent_paths = receive_pipe.recv()
 
@@ -592,7 +632,8 @@ def generate():
 
     for client in config.torrent_clients:
         try:
-            client.add(torrent_paths[0], stash_file["path"])
+            path = new_dir if new_dir else stash_file['path']
+            client.add(torrent_paths[0], path)
         except Exception as e:
             logger.error(f"Error attempting to add torrent to {client.name}")
             logger.debug(e)
@@ -601,12 +642,13 @@ def generate():
     time.sleep(1)
 
 
-def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[str] | None:
+def genTorrent(pipe: Connection, stash_file: dict, announce_url: str, directory:str|None=None) -> list[str] | None:
     piece_size = int(math.log(stash_file["size"] / 2**10, 2))
     tempdir = tempfile.TemporaryDirectory()
     basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
-    # logger.debug(f"Sanitized filename: {basename}")
-    # basename = stash_file["basename"]
+
+    target = directory if directory else stash_file['path']
+
     temppath = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
     logger.debug(f"Saving torrent to {temppath}")
@@ -622,7 +664,7 @@ def genTorrent(pipe: Connection, stash_file: dict, announce_url: str) -> list[st
         "-v",
         "-o",
         temppath,
-        stash_file["path"],
+        target,
     ]
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     logger.debug(f"mktorrent output:\n{process.stdout}")
