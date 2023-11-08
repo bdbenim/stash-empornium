@@ -1,4 +1,4 @@
-{# 20230924 -#}
+{# 20231107 -#}
 [bg=#202b33][color=#F5F8FA][font=Helvetica][table=nopad,nball,vat][tr][td=#202b33][/td]
 
 
@@ -58,6 +58,14 @@
 [spoiler=Click to view]
 [img]{{contact_sheet}}[/img]
 [/spoiler]
+
+{% if gallery_contact %}
+[b]Image Contact Sheet[/b]
+
+[spoiler=Click to view]
+[img]{{gallery_contact}}[/img]
+[/spoiler]
+{% endif %}
 
 [/size]
 [img]https://fapping.empornium.sx/images/2022/02/24/space.png[/img]

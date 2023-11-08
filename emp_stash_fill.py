@@ -181,9 +181,17 @@ def generate():
     new_dir = None
     image_dir = None
     image_temp = False
+    gallery_contact = None
+    gallery_proc = None
+    image_count = 0
     if include_gallery:
         try:
             new_dir, image_dir, image_temp = readGallery(scene)
+            gallery_contact = tempfile.mkstemp("-gallery_contact.jpg")[1]
+            files = [os.path.join(image_dir, file) for file in os.listdir(image_dir)]
+            image_count = len(files)
+            gallery_proc = mp.Process(target=imagehandler.createContactSheet, args=(files, 800, 200, gallery_contact))
+            gallery_proc.start()
         except ValueError as ve:
             return error(str(ve))
         except Exception as e:
@@ -530,6 +538,11 @@ def generate():
     if image_temp:
         shutil.rmtree(image_dir)
         logger.debug(f"Deleted {image_dir}")
+    
+    if gallery_proc:
+        gallery_proc.join()
+        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]
+        os.remove(gallery_contact)
 
     ############
     # TEMPLATE #
@@ -569,7 +582,8 @@ def generate():
         "contact_sheet": contact_sheet_remote_url,
         "performers": performers,
         "cover": cover_resized_url,
-        "image_count": 0,  # TODO
+        "image_count": image_count,
+        "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
     }
 

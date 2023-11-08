@@ -378,7 +378,7 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
                 if (row_width+w)>target_width:
                     delta = target_width / row_width
                     h = int(row_height * delta)
-                    row = Image.new('RGB', (target_width, h))
+                    row = Image.new(img.mode, (target_width, h))
                     left = 0
                     for wfile in row_files:
                         with Image.open(wfile) as wimg:
@@ -406,6 +406,6 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
         top += row.height
         row.close()
     sheet.save(output)
-    sheet.show()
+    # sheet.show()
     sheet.close()
     return output
