@@ -8,6 +8,78 @@ from utils.customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 from __main__ import __version__
 
+stash_headers = {
+    "Content-type": "application/json",
+}
+
+stash_query = """
+findScene(id: "{}") {{
+    title
+    details
+    director
+    date
+    galleries {{
+        folder {{
+            path
+        }}
+        files {{
+            path
+        }}
+    }}
+    studio {{
+        name
+        url
+        image_path
+        parent_studio {{
+            url
+        }}
+    }}
+    tags {{
+        name
+        parents {{
+            name
+        }}
+    }}
+    performers {{
+        name
+        circumcised
+        country
+        eye_color
+        fake_tits
+        gender
+        hair_color
+        height_cm
+        measurements
+        piercings
+        image_path
+        tags {{
+            name
+        }}
+        tattoos
+    }}
+    paths {{
+        screenshot
+        preview
+        webp
+    }}
+    files {{
+        id
+        path
+        basename
+        width
+        height
+        format
+        duration
+        video_codec
+        audio_codec
+        frame_rate
+        bit_rate
+        size
+    }}
+}}
+"""
+
+
 class ConfigHandler(Singleton):
     initialized = False
     logger: logging.Logger
@@ -36,69 +108,6 @@ class ConfigHandler(Singleton):
     config_file: str
     tag_config_file: str
     torrent_clients: list[TorrentClient] = []
-
-    stash_headers = {
-        "Content-type": "application/json",
-    }
-
-    stash_query = """
-    findScene(id: "{}") {{
-        title
-        details
-        director
-        date
-        studio {{
-            name
-            url
-            image_path
-            parent_studio {{
-                url
-            }}
-        }}
-        tags {{
-            name
-            parents {{
-                name
-            }}
-        }}
-        performers {{
-            name
-            circumcised
-            country
-            eye_color
-            fake_tits
-            gender
-            hair_color
-            height_cm
-            measurements
-            piercings
-            image_path
-            tags {{
-                name
-            }}
-            tattoos
-        }}
-        paths {{
-            screenshot
-            preview
-            webp
-        }}
-        files {{
-            id
-            path
-            basename
-            width
-            height
-            format
-            duration
-            video_codec
-            audio_codec
-            frame_rate
-            bit_rate
-            size
-        }}
-    }}
-    """
 
     def __init__(self):
         if not (self.initialized):
@@ -175,10 +184,10 @@ class ConfigHandler(Singleton):
             tomlkit.dump(self.conf, f)
         with open(self.tag_config_file, "w") as f:
             tomlkit.dump(self.tagconf, f)
-    
+
     def backup_config(self) -> None:
-        conf_bak = self.config_file+".bak"
-        tags_bak = self.tag_config_file+".bak"
+        conf_bak = self.config_file + ".bak"
+        tags_bak = self.tag_config_file + ".bak"
         if os.path.isfile(self.config_file):
             shutil.copy(self.config_file, conf_bak)
         if os.path.isfile(self.tag_config_file):
@@ -231,13 +240,13 @@ class ConfigHandler(Singleton):
                 self.tagconf = tomlkit.document()
                 if "empornium" in self.conf:
                     emp = self.conf["empornium"]
-                    self.tagconf.append("empornium", emp) # type: ignore
+                    self.tagconf.append("empornium", emp)  # type: ignore
                     del self.conf["empornium"]
                 if "empornium.tags" in self.conf:
                     emptags = self.conf["empornium.tags"]
                     if "empornium" not in self.tagconf:
                         self.tagconf.append("empornium", tomlkit.table(True))
-                    self.tagconf["empornium"].append("tags", emptags) # type: ignore
+                    self.tagconf["empornium"].append("tags", emptags)  # type: ignore
                     del self.conf["empornium.tags"]
                 else:
                     with open("default-tags.toml") as f:
@@ -248,15 +257,15 @@ class ConfigHandler(Singleton):
                 emp = tomlkit.table(True)
                 emp.append("tags", tomlkit.table(False))
                 self.tagconf.append("empornium", emp)
-            for option in default_tags["empornium"]: # type: ignore
+            for option in default_tags["empornium"]:  # type: ignore
                 if option not in self.tagconf["empornium"]:
-                    self.tagconf["empornium"].add(tomlkit.comment("Option imported automatically")) # type: ignore
-                    value = default_tags["empornium"][option] # type: ignore
-                    self.tagconf["empornium"][option] = value # type: ignore
-            for tag in default_tags["empornium"]["tags"]: # type: ignore
-                if tag not in self.tagconf["empornium"]["ignored_tags"] and tag not in self.tagconf["empornium"]["tags"]: # type: ignore
-                    value = default_tags["empornium"]["tags"][tag] # type: ignore
-                    self.tagconf["empornium"]["tags"][tag] = value # type: ignore
+                    self.tagconf["empornium"].add(tomlkit.comment("Option imported automatically"))  # type: ignore
+                    value = default_tags["empornium"][option]  # type: ignore
+                    self.tagconf["empornium"][option] = value  # type: ignore
+            for tag in default_tags["empornium"]["tags"]:  # type: ignore
+                if tag not in self.tagconf["empornium"]["ignored_tags"] and tag not in self.tagconf["empornium"]["tags"]:  # type: ignore
+                    value = default_tags["empornium"]["tags"][tag]  # type: ignore
+                    self.tagconf["empornium"]["tags"][tag] = value  # type: ignore
         except Exception as e:
             self.logger.error(f"Failed to read tag config file: {e}")
         try:
@@ -351,7 +360,7 @@ class ConfigHandler(Singleton):
         if "api_key" in self.conf["stash"]:  # type: ignore
             api_key = self.get("stash", "api_key")
             assert api_key is not None
-            self.stash_headers["apiKey"] = str(api_key)
+            stash_headers["apiKey"] = str(api_key)
 
         # self.rhost = self.args.rhost if self.args.rhost else str(self.get("redis", "host"))
         # self.rhost = self.rhost if len(self.rhost) > 0 else None
@@ -378,8 +387,8 @@ class ConfigHandler(Singleton):
         if section in self.conf:
             if key in self.conf[section]:  # type: ignore
                 return self.conf[section][key]  # type: ignore
-        if section in self.tagconf and key in self.tagconf[section]: # type: ignore
-            return self.tagconf[section][key] # type: ignore
+        if section in self.tagconf and key in self.tagconf[section]:  # type: ignore
+            return self.tagconf[section][key]  # type: ignore
         return default
 
     def set(self, section: str, key: str, value) -> None:
@@ -390,17 +399,17 @@ class ConfigHandler(Singleton):
             self.conf[section] = {}
         self.conf[section][key] = value  # type: ignore
 
-    def delete(self, section: str, key: str|None = None) -> None:
+    def delete(self, section: str, key: str | None = None) -> None:
         if section in self.conf:
             if key:
-                if key in self.conf[section]: # type: ignore
-                    del self.conf[section][key] # type: ignore
+                if key in self.conf[section]:  # type: ignore
+                    del self.conf[section][key]  # type: ignore
             else:
                 del self.conf[section]
         elif section in self.tagconf:
             if key:
-                if key in self.tagconf[section]: # type: ignore
-                    del self.tagconf[section][key] # type: ignore
+                if key in self.tagconf[section]:  # type: ignore
+                    del self.tagconf[section][key]  # type: ignore
             else:
                 del self.tagconf[section]
 
@@ -417,6 +426,6 @@ class ConfigHandler(Singleton):
 
     def __contains__(self, __key: object) -> bool:
         return self.conf.__contains__(__key) or self.tagconf.__contains__(__key)
-    
+
     def __getitem__(self, key: str):
         return self.conf.__getitem__(key) if self.conf.__contains__(key) else self.tagconf.__getitem__(key)

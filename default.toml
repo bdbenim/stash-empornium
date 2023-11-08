@@ -17,6 +17,10 @@ title_template = '{% if studio %}[{{studio}}] {% endif %}{{performers|join(", ")
 date_format = "%Y-%m-%d"
 ## Set to 'true' to enable anonymous uploading
 anon = false
+## Where to save media for torrents with more than one file:
+# media_directory = "/torrents"
+## How to move files to media_directory. Must be 'copy', 'hardlink', or 'symlink'
+move_method = 'copy'
 
 # [rtorrent]
 ## Hostname or IP address

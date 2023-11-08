@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.4.0
+// @version      0.5.0
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -18,6 +18,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v0.5.0
+//  - Add the option to include a scene's gallery
 // v0.4.0
 //  - You can now have the torrent file be uploaded automatically without
 //    having to navigate to it
@@ -172,18 +174,18 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
   moreOptions.appendChild(screensToggle);
   moreOptions.appendChild(templateSelect);
 
-    let galleryToggleLabel = document.createElement("label");
-    galleryToggleLabel.setAttribute("for", "gallerytoggle");
-    galleryToggleLabel.innerText = "Includ gallery?";
-    galleryToggleLabel.style.marginRight = "6pt";
-    let galleryToggle = document.createElement("input");
-    galleryToggle.setAttribute("type", "checkbox");
-    galleryToggle.setAttribute("name", "gallerytoggle");
-    galleryToggle.setAttribute("id", "gallery_toggle");
-    galleryToggle.setAttribute("checked", false);
-    moreOptions.appendChild(document.createElement("br"));
-    moreOptions.appendChild(galleryToggleLabel);
-    moreOptions.appendChild(galleryToggle);
+  let galleryToggleLabel = document.createElement("label");
+  galleryToggleLabel.setAttribute("for", "gallery_toggle");
+  galleryToggleLabel.innerText = "Include gallery?";
+  galleryToggleLabel.style.marginRight = "6pt";
+  let galleryToggle = document.createElement("input");
+  galleryToggle.setAttribute("type", "checkbox");
+  galleryToggle.setAttribute("name", "gallerytoggle");
+  galleryToggle.setAttribute("id", "gallery_toggle");
+  galleryToggle.setAttribute("checked", false);
+  moreOptions.appendChild(document.createElement("br"));
+  moreOptions.appendChild(galleryToggleLabel);
+  moreOptions.appendChild(galleryToggle);
 
   let statusArea = document.createElement("div");
   statusArea.setAttribute("id", "stash_statusarea");
@@ -235,7 +237,8 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
         announce_url: announceURL,
         template: templateSelect.value,
         screens: screensToggle.checked,
-        gallery: galleryToggle.checked }),
+        gallery: galleryToggle.checked,
+      }),
       context: {
         statusArea: statusArea,
         description: document.getElementById("desc"),
@@ -334,13 +337,13 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
                         );
                         console.debug(formdata);
                         const r = new XMLHttpRequest();
-                        r.onreadystatechange = function() {
+                        r.onreadystatechange = function () {
                           if (r.readyState == XMLHttpRequest.DONE) {
                             document.open();
                             document.write(r.responseText);
                             document.close();
                           }
-                        }
+                        };
                         r.open(
                           "POST",
                           new URL("/upload.php", window.location).href
@@ -639,7 +642,11 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
             idInput.value +
             '") { id title performers { id name image_path } files { id basename path format width height video_codec audio_codec duration bit_rate frame_rate } galleries { id } } }',
         }),
-        context: { fileSelect: fileSelect, titleDisplay: titleDisplay, screensToggle: screensToggle },
+        context: {
+          fileSelect: fileSelect,
+          titleDisplay: titleDisplay,
+          screensToggle: screensToggle,
+        },
         onload: function (response) {
           try {
             let scene = JSON.parse(response.responseText).data.findScene;
@@ -673,13 +680,12 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
                 "</option>";
             }
             this.context.fileSelect.innerHTML = optionsAsString;
-                    if (scene.galleries.length == 0) {
-                        this.context.screensToggle.setAttribute("checked", false);
-                        this.context.screensToggle.disabled = true;
-                    }
-                    else {
-                        this.context.screensToggle.disabled = false;
-                    }
+            if (scene.galleries.length == 0) {
+              this.context.screensToggle.setAttribute("checked", false);
+              this.context.screensToggle.disabled = true;
+            } else {
+              this.context.screensToggle.disabled = false;
+            }
           } catch (err) {
             this.context.titleDisplay.value = "";
             this.context.fileSelect.innerHTML = "";
