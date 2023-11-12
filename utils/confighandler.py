@@ -194,17 +194,17 @@ class ConfigHandler(Singleton):
             shutil.copy(self.tag_config_file, tags_bak)
 
     def configure(self) -> None:
-        config_dir = self.args.configdir[0]
+        self.config_dir = self.args.configdir[0]
 
-        self.template_dir = os.path.join(config_dir, "templates")
-        self.config_file = os.path.join(config_dir, "config.toml")
-        self.tag_config_file = os.path.join(config_dir, "tags.toml")
+        self.template_dir = os.path.join(self.config_dir, "templates")
+        self.config_file = os.path.join(self.config_dir, "config.toml")
+        self.tag_config_file = os.path.join(self.config_dir, "tags.toml")
 
         # Ensure config file is present
         if not os.path.isfile(self.config_file):
             self.logger.info(f"Config file not found at {self.config_file}, creating")
-            if not os.path.exists(config_dir):
-                os.makedirs(config_dir)
+            if not os.path.exists(self.config_dir):
+                os.makedirs(self.config_dir)
             with open("default.toml") as f:
                 self.conf = tomlkit.load(f)
         else:

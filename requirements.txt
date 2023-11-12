@@ -8,3 +8,4 @@ redis[hiredis]
 tomlkit
 Flask-WTF
 bootstrap-Flask
+Flask-SQLAlchemy == 3.1.*
