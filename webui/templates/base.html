@@ -1,94 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    {% block head %}
-    <!-- Required meta tags -->
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
-    />
-
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description"
+          content="A userscript and backend server to help with uploading to EMP." />
+    <meta name="keywords" content="settings" />
     {% block styles %}
-    <!-- Bootstrap CSS -->
-    {{ bootstrap.load_css() }} {% endblock %}
-
-    <title>{% block title %}Default{% endblock %} - stash-empornium</title>
-    {% endblock %}
+      <!-- Bootstrap CSS -->
+      {{ bootstrap.load_css() }}
+    {% endblock styles %}
+    <title>
+      {% block title %}
+        Default
+      {% endblock title %}
+    - stash-empornium</title>
+    {% block head %}
+    {% endblock head %}
   </head>
   <body>
     <link rel="shortcut icon" href="/favicon.ico" />
     <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
       <div class="container-fluid">
         <a class="navbar-brand" href="#">
-          <img
-            src="/static/logo.svg"
-            alt=""
-            width="32"
-            height="32"
-            class="d-inline-block align-text-top"
-          />
+          <img src="{{ url_for('static', filename='logo.svg') }}"
+               alt=""
+               width="32"
+               height="32"
+               class="d-inline-block align-text-top" />
           stash-empornium
         </a>
-        <button
-          class="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarSupportedContent"
-          aria-controls="navbarSupportedContent"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
+        <button class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             <li class="nav-item dropdown">
-              <a
-                class="nav-link dropdown-toggle"
-                href="#"
-                id="navbarDropdown"
-                role="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-              >
-                Settings
-              </a>
+              <a class="nav-link dropdown-toggle"
+                 href="#"
+                 id="navbarDropdown"
+                 role="button"
+                 data-bs-toggle="dropdown"
+                 aria-expanded="false">Settings</a>
               <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
                 <li>
-                  <a class="dropdown-item" href="/settings/backend">Backend</a>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='backend') }}">Backend</a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="/settings/stash">Stash</a>
-                </li>
-                <li><hr class="dropdown-divider" /></li>
-                <li>
-                  <a class="dropdown-item" href="/settings/redis">Redis</a>
-                </li>
-                <li><hr class="dropdown-divider" /></li>
-                <li>
-                  <a class="dropdown-item" href="/settings/rtorrent"
-                    >rTorrent</a
-                  >
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='stash') }}">Stash</a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="/settings/deluge">Deluge</a>
+                  <hr class="dropdown-divider" />
                 </li>
                 <li>
-                  <a class="dropdown-item" href="/settings/qbittorrent"
-                    >qBittorrent</a
-                  >
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='redis') }}">Redis</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider" />
+                </li>
+                <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='rtorrent') }}">rTorrent</a>
+                </li>
+                <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='deluge') }}">Deluge</a>
+                </li>
+                <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='qbittorrent') }}">qBittorrent</a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle"
+                 href="#"
+                 id="tagDropdown"
+                 role="button"
+                 data-bs-toggle="dropdown"
+                 aria-expanded="false">Tags</a>
+              <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.tag_settings', page='1') }}">Maps</a>
                 </li>
               </ul>
             </li>
           </ul>
           <!-- <form class="d-flex">
-            <input
-              class="form-control me-2"
-              type="search"
-              placeholder="Search"
-              aria-label="Search"
-            />
+            <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" />
             <button class="btn btn-outline-success" type="submit">
               Search
             </button>
@@ -97,8 +107,11 @@
       </div>
     </nav>
     <!-- Content -->
-    {% block content %}{% endblock %}
+    {% block content %}
+    {% endblock content %}
     <!-- JavaScript -->
-    {{ bootstrap.load_js() }} {% block scripts %}{% endblock %}
+    {{ bootstrap.load_js() }}
+    {% block scripts %}
+    {% endblock scripts %}
   </body>
 </html>

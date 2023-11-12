@@ -1,14 +1,17 @@
-from flask import Blueprint, render_template, redirect, abort
-
-from flask_bootstrap import SwitchField
-
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, SelectField, URLField
-from wtforms.validators import DataRequired, Optional, URL
+from flask import Blueprint, abort, redirect, render_template, url_for
+from webui.forms import (
+    TagMapForm,
+    BackendSettings,
+    RedisSettings,
+    RTorrentSettings,
+    DelugeSettings,
+    QBittorrentSettings,
+    StashSettings,
+)
 
 from utils.confighandler import ConfigHandler
-from webui.forms import ButtonField, ConditionallyRequired, PasswordField, PortRange
-
+from utils.taghandler import TagHandler
+from utils.db import get_or_create, StashTag, EmpTag, db
 
 conf = ConfigHandler()
 
@@ -17,7 +20,35 @@ settings_page = Blueprint("settings_page", __name__, template_folder="templates"
 
 @settings_page.route("/", methods=["GET"])
 def index():
-    return redirect("/settings/backend")
+    return redirect(url_for(".settings", page="backend"))
+
+
+@settings_page.route("/tags")
+def tags():
+    return redirect(url_for(".tag_settings", page="maps"))
+
+
+@settings_page.route("/tags/<page>", methods=["GET", "POST"])
+def tag_settings(page):
+    pagination = TagHandler().queryMaps(page=int(page))
+    form = TagMapForm(s_tags=pagination.items)
+    if form.validate_on_submit():
+        tag = form.update_self()
+        if tag:
+            s_tag = get_or_create(StashTag, tagname=tag["stash_tag"])
+            db.session.delete(s_tag)
+            db.session.commit()
+        if form.data["submit"]:
+            for tag in form.data["tags"]:
+                if not tag["stash_tag"]:
+                    continue  # Ignore empty tag inputs
+                s_tag = get_or_create(StashTag, tagname=tag["stash_tag"])
+                e_tags = []
+                for et in tag["emp_tag"].split():
+                    e_tags.append(get_or_create(EmpTag, tagname=et))
+                s_tag.emp_tags = e_tags
+                db.session.commit()
+    return render_template("tag-settings.html", form=form, pagination=pagination)
 
 
 @settings_page.route("/settings/<page>", methods=["GET", "POST"])
@@ -36,6 +67,7 @@ def settings(page):
                 media_directory=conf.get(page, "media_directory", ""),
                 move_method=conf.get(page, "move_method", "copy"),
                 anon=conf.get(page, "anon", False),
+                choices=[opt for opt in conf["templates"]],  # type: ignore
             )
         case "stash":
             template_context["settings_option"] = "your stash server"
@@ -82,6 +114,8 @@ def settings(page):
                 label=conf.get(page, "label", ""),
                 ssl=conf.get(page, "ssl", False),
             )
+        case "tags":
+            return redirect(url_for(".tag_settings", page="maps"))
         case _:
             abort(404)
     if form.validate_on_submit():
@@ -93,7 +127,7 @@ def settings(page):
                 conf.set(page, "port", int(form.data["port"]))
                 conf.set(page, "title_template", form.data["title_template"])
                 conf.set(page, "date_format", form.data["date_format"])
-                if form.data['media_directory']:
+                if form.data["media_directory"]:
                     conf.set(page, "media_directory", form.data["media_directory"])
                 conf.set(page, "move_method", form.data["move_method"])
                 conf.set(page, "anon", form.data["anon"])
@@ -184,65 +218,3 @@ def settings(page):
         conf.update_file()
     template_context["form"] = form
     return render_template("settings.html", **template_context)
-
-
-class BackendSettings(FlaskForm):
-    default_template = SelectField("Default Template", choices=[opt for opt in conf["templates"]])  # type: ignore
-    torrent_directories = StringField("Torrent Directories")
-    port = StringField("Port", validators=[PortRange(1024), DataRequired()])
-    date_format = StringField()
-    # help = ButtonField(render_kw={'class':'btn btn-secondary btn-md col-1'})
-    example = StringField("Date Example:",render_kw={'readonly': True})
-    title_template = StringField()
-    anon = SwitchField("Upload Anonymously")
-    media_directory = StringField()
-    move_method = SelectField(choices=['copy', 'hardlink', 'symlink'])
-    save = SubmitField()
-
-
-class RedisSettings(FlaskForm):
-    enable_form = SwitchField("Use Redis")
-    host = StringField()
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    username = StringField(validators=[Optional()])
-    password = PasswordField(validators=[Optional()])
-    ssl = SwitchField("SSL")
-    save = SubmitField()
-
-
-class RTorrentSettings(FlaskForm):
-    enable_form = SwitchField("Use rTorrent")
-    host = StringField(validators=[ConditionallyRequired()])
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    path = StringField(validators=[ConditionallyRequired("Please specify the API path (typically XMLRPC or RPC2)")])
-    username = StringField(validators=[Optional()])
-    password = PasswordField(validators=[Optional()])
-    label = StringField()
-    ssl = SwitchField("SSL")
-    save = SubmitField()
-
-
-class QBittorrentSettings(FlaskForm):
-    enable_form = SwitchField("Use qBittorrent", default=("redis" in conf))
-    host = StringField(validators=[ConditionallyRequired()])
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    username = StringField(validators=[Optional()])
-    password = PasswordField(validators=[Optional()])
-    label = StringField()
-    ssl = SwitchField("SSL")
-    save = SubmitField()
-
-
-class DelugeSettings(FlaskForm):
-    enable_form = SwitchField("Use Deluge")
-    host = StringField(validators=[ConditionallyRequired()])
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    password = PasswordField(validators=[Optional()])
-    ssl = SwitchField("SSL")
-    save = SubmitField()
-
-
-class StashSettings(FlaskForm):
-    url = URLField("URL", validators=[URL(require_tld=False), DataRequired()])
-    api_key = PasswordField("API Key", validators=[Optional()])
-    save = SubmitField()

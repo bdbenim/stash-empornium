@@ -67,7 +67,7 @@ import urllib.parse
 import time
 
 # included
-from utils import taghandler, imagehandler
+from utils import taghandler, imagehandler, db
 from utils.packs import link, readGallery
 from utils.paths import mapPath
 from utils.confighandler import ConfigHandler, stash_query, stash_headers
@@ -126,8 +126,15 @@ def mapPaths(f: dict) -> dict:
 app = Flask(__name__, template_folder=config.template_dir)
 app.secret_key = "secret"
 app.config["BOOTSTRAP_BOOTSWATCH_THEME"] = "cyborg"
+db_path = os.path.abspath(os.path.join(config.config_dir, "db.sqlite3"))
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+db.db.init_app(app)
+with app.app_context():
+    db.db.create_all()
+taghandler.setup(app)
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
+
 
 @stream_with_context
 def generate():
@@ -138,7 +145,9 @@ def generate():
     gen_screens = j["screens"]
     include_gallery = j["gallery"]
 
-    logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{'and including gallery' if include_gallery else ''}.")
+    logger.info(
+        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{'and including gallery' if include_gallery else ''}."
+    )
 
     template = (
         j["template"]
@@ -177,7 +186,7 @@ def generate():
             scene[key] = ""
         elif scene[key] == None:
             scene[key] = ""
-    
+
     new_dir = None
     image_dir = None
     image_temp = False
@@ -186,7 +195,7 @@ def generate():
     image_count = 0
     if include_gallery:
         try:
-            new_dir, image_dir, image_temp = readGallery(scene)
+            new_dir, image_dir, image_temp = readGallery(scene)  # type: ignore
             gallery_contact = tempfile.mkstemp("-gallery_contact.jpg")[1]
             files = [os.path.join(image_dir, file) for file in os.listdir(image_dir)]
             image_count = len(files)
@@ -198,7 +207,7 @@ def generate():
             logger.warning("Unable to include gallery in torrent")
         except Exception as e:
             logger.debug(e)
-            return error("An unexpected error occurred")
+            return error("An unexpected error occurred while processing the gallery")
 
     stash_file = None
     for f in scene["files"]:
@@ -221,7 +230,7 @@ def generate():
         return error(f"Couldn't find file {stash_file['path']}")
 
     if new_dir:
-        link(stash_file['path'], new_dir)
+        link(stash_file["path"], new_dir)
 
     if len(scene["title"]) == 0:
         scene["title"] = stash_file["basename"]
@@ -534,14 +543,14 @@ def generate():
             logger.warning("Unable to upload studio image")
 
     if image_temp:
-        shutil.rmtree(image_dir)
+        shutil.rmtree(image_dir)  # type: ignore
         logger.debug(f"Deleted {image_dir}")
-    
+
     gallery_contact_url = None
     if gallery_proc:
         gallery_proc.join()
-        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]
-        os.remove(gallery_contact)
+        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]  # type: ignore
+        os.remove(gallery_contact)  # type: ignore
 
     ############
     # TEMPLATE #
@@ -596,7 +605,7 @@ def generate():
     # if include_gallery:
     #     gal_proc.join()
     #     gal = gal_recv.recv()
-        #TODO
+    # TODO
 
     logger.info("Waiting for torrent generation to complete")
     torrent_proc.join()
@@ -632,7 +641,7 @@ def generate():
 
     for client in config.torrent_clients:
         try:
-            path = new_dir if new_dir else stash_file['path']
+            path = new_dir if new_dir else stash_file["path"]
             client.add(torrent_paths[0], path)
         except Exception as e:
             logger.error(f"Error attempting to add torrent to {client.name}")
@@ -642,12 +651,14 @@ def generate():
     time.sleep(1)
 
 
-def genTorrent(pipe: Connection, stash_file: dict, announce_url: str, directory:str|None=None) -> list[str] | None:
+def genTorrent(
+    pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
+) -> list[str] | None:
     piece_size = int(math.log(stash_file["size"] / 2**10, 2))
     tempdir = tempfile.TemporaryDirectory()
     basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
 
-    target = directory if directory else stash_file['path']
+    target = directory if directory else stash_file["path"]
 
     temppath = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
@@ -715,13 +726,9 @@ def processSuggestions():
         logger.info(f"Ignoring {len(j['ignore'])} tags")
         for tag in j["ignore"]:
             ignoredTags.append(tag)
-    tags = taghandler.TagHandler()
-    success = tags.acceptSuggestions(acceptedTags)
-    success = success and tags.rejectSuggestions(ignoredTags)
-    if success:
-        return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
-    else:
-        return json.dumps({"status": "error", "data": {"message": "Failed to save tags"}})
+    success = taghandler.acceptSuggestions(acceptedTags)
+    success = success and taghandler.rejectSuggestions(ignoredTags)
+    return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
 
 
 @app.route("/fill", methods=["POST"])
@@ -730,16 +737,11 @@ def fill():
     return Response(generate(), mimetype="application/json")  # type: ignore
 
 
-# @app.route("/suggestions", methods=["POST"])
-# @csrf.exempt
-# def suggestions():
-#     return Response(processSuggestions(), mimetype="application/json")
-
-
 @app.route("/templates")
 @csrf.exempt
 def templates():
     return json.dumps(config.template_names)
+
 
 @app.route("/favicon.ico")
 def favicon():
@@ -753,6 +755,7 @@ if __name__ == "__main__":
         from waitress import serve
 
         serve(app, host="0.0.0.0", port=config.port)
+        # app.run(host="0.0.0.0", port=config.port, debug=True)
     except:
-        logging.getLogger(__name__).info("Waitress not installed, using builtin server")
-        app.run(host="0.0.0.0", port=config.port)
+        logger.info("Waitress not installed, using builtin server")
+        app.run(host="0.0.0.0", port=config.port, debug=True)

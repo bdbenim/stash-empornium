@@ -184,11 +184,12 @@ Copyright 2019 Kenneth Reitz
 """
 
 from collections.abc import Mapping, MutableMapping
-from typing import TypeVar
+from typing import TypeVar, Iterable
 
 from tomlkit import key
 
 T = TypeVar("T")
+
 
 class CaseInsensitiveDict(MutableMapping[str, T]):
     """
@@ -221,14 +222,15 @@ class CaseInsensitiveDict(MutableMapping[str, T]):
     https://github.com/kennethreitz/requests/blob/v1.2.3/requests/structures.py
     and is licensed under the Apache License.
     """
+
     def __init__(self, data=None, **kwargs):
-        self._store:dict[str,tuple[str,T]] = dict()
+        self._store: dict[str, tuple[str, T]] = dict()
         if data is None:
             data = {}
         self.update(data, **kwargs)
-    
+
     def __contains__(self, __key: object) -> bool:
-        if hasattr(__key,"lower"):
+        if hasattr(__key, "lower"):
             return super().__contains__(__key)
         return False
 
@@ -251,11 +253,7 @@ class CaseInsensitiveDict(MutableMapping[str, T]):
 
     def lower_items(self):
         """Like iteritems(), but with all lowercase keys."""
-        return (
-            (lowerkey, keyval[1])
-            for (lowerkey, keyval)
-            in self._store.items()
-        )
+        return ((lowerkey, keyval[1]) for (lowerkey, keyval) in self._store.items())
 
     def __eq__(self, other):
         if isinstance(other, Mapping):
@@ -266,15 +264,16 @@ class CaseInsensitiveDict(MutableMapping[str, T]):
         return dict(self.lower_items()) == dict(other.lower_items())
 
     # Copy is required
-    def copy(self)-> 'CaseInsensitiveDict[T]':
-         return CaseInsensitiveDict(self._store.values())
+    def copy(self) -> "CaseInsensitiveDict[T]":
+        return CaseInsensitiveDict(self._store.values())
 
     def __repr__(self) -> str:
-        return '%s(%r)' % (self.__class__.__name__, dict(self.items()))
+        return "%s(%r)" % (self.__class__.__name__, dict(self.items()))
 
 
 class Singleton(object):
     """Use to create a singleton"""
+
     def __new__(cls, *args, **kwds):
         """
         >>> s = Singleton()
@@ -294,3 +293,68 @@ class Singleton(object):
 
     def __init__(self, *args, **kwds):
         pass
+
+
+class Pagination:
+    def __init__(self, items: list, per_page: int = 100, page: int = 1) -> None:
+        self.total = None
+        self.total_items = items
+        self.total = len(items)
+        total_pages = ceildiv(max(self.total, 1), per_page)
+
+        self.has_next = page < total_pages
+        if self.has_next:
+            self.next_num = page + 1
+        else:
+            self.next_num = None
+
+        if self.total == 0:
+            self.first = 0
+        else:
+            self.first = (page - 1) * per_page + 1
+
+        self.items = {x["st"]: x["et"] for x in self.total_items[self.first : self.first + per_page]}
+
+        self.per_page = per_page
+        self.page = page
+        if page == 1:
+            self.has_prev = False
+            self.prev_num = None
+        else:
+            self.has_prev = True
+            self.prev_num = page - 1
+
+    def prev(self, error_out=False) -> "Pagination":
+        return Pagination(self.total_items, self.per_page, self.page - 1)
+
+    def next(self, error_out=False) -> "Pagination":
+        return Pagination(self.total_items, self.per_page, self.page + 1)
+
+    def iter_pages(self, *, left_edge=2, left_current=2, right_current=4, right_edge=2) -> Iterable[int | None]:
+        total = self.total if self.total else 1
+        total_pages = ceildiv(total, self.per_page)
+
+        pages: list[int | None] = [i for i in range(1, 1 + left_edge) if i <= total_pages]
+
+        for i in range(self.page - left_current, self.per_page + right_current + 1):
+            if i in pages or i < 0:
+                continue
+            if i > total_pages:
+                break
+            if pages[-1] and i > pages[-1] + 1:
+                pages.append(None)
+            pages.append(i)
+
+        for i in range(total_pages - right_edge, total_pages + 1):
+            if i in pages:
+                continue
+            if pages[-1] and i > pages[-1] + 1:
+                pages.append(None)
+            pages.append(i)
+
+        return pages
+
+
+def ceildiv(a: int, b: int) -> int:
+    "Same as `a // b` except result is rounded up not down"
+    return -(a // -b)
