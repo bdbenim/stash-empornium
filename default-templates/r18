@@ -1,0 +1,137 @@
+{# 20231112 -#}
+[font=Helvetica][bg=#211e1e][table]
+
+Replace links and everything in {% raw %}{{curly brackets}}{% endraw %}
+
+[/table][bg=#f0f0f0][table=nball,nopad][tr][td=24px][/td]
+[td]
+[size=2][b][url=#screens][color=#262626]SCREENS[/color][/url]     [url=#contact][color=#262626]CONTACT SHEET[/color][/url][/b][/size][/td][td=24px]
+[/td]
+[/tr]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ Cover, title, performers, date, duration - Starting at the `center` tag
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[/table]
+[/bg][bg=800px][size=2][color=White]
+[center][imgnm]{{cover}}[/imgnm][/center][imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{details}}
+[size=3][/size]{% for name, details in performers.items() -%}[url=/torrents.php?taglist={{details["tag"]}}][color=#ff2962]{{name}}[/color][/url]   {% endfor %}{% if date %}   [color=#b2b2b2]{{date}}    {% endif %}{{duration}}[/color]
+
+[/color][/size][/bg][/bg]
+[bg=95%]
+[color=#262626]
+[table=nball,nopad,vat]
+[tr]
+[td=4px,#ff2962,vab][/td][td=8px][/td]
+[td][size=1]MORE DETAILS[/size][br][size=6][/size][size=3]About this movie[/size][/td]
+[/tr]
+[/table]
+[bg=#f4f4f4][size=2][color=#262626][table=nball,nopad][tr]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ Scene info - first column - description, categories, studio
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[td=24px][/td][td=vat]
+[color=#626262]Uploader Description[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]REPLACEME
+
+[color=#626262]Categories[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm][color=#ff2962]{{sex_acts}}[/color]
+
+[color=#626262]Studio[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm][img=100]{{ studio_logo }}[/img]
+[/td]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ Scene info - second column - resolution, bitrate, framerate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[td=24px][/td]
+[td=vat,10%]
+[color=#626262]Resolution[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{resolution}}
+
+[color=#626262]Bitrate[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{bitrate}}
+
+[color=#626262]Framerate[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{framerate}}
+[/td]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ Scene info - third column - codec, dvd id
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[td=24px][/td]
+[td=vat,10%]
+[color=#626262]Codec[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{codec}}
+
+[color=#626262]DVD ID[/color]
+[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{title}}
+[/td]
+
+
+[td=24px][/td][/tr][/table]
+[/color][/size][/bg]
+
+[hr]
+[anchor=performers][/anchor][table=nball,nopad,vat][tr]
+[td=4px,#ff2962,vab][/td][td=8px][/td]
+[td]ACTRESSES[br][size=6][/size][size=3]Appearing in this movie[/size][/td]
+[/tr][/table][size=2][table=nball,nopad][tr=vat]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Performers - Delete starting at above hr to remove section
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{% for name, details in performers.items() -%}
+[td=140px,vac][center]
+[img=130]{% if details["image_remote_url"] %}{{details["image_remote_url"]}}{% else %}https://fapping.empornium.sx/images/2023/04/06/imageR8b7P.png{% endif %}[/img]
+[size=3][/size][url=/torrents.php?taglist={{details["tag"]}}][color=#ff2962]{{name}}[/color][/url]
+[/center][/td]
+{% if loop.last %}[td][/td]{% endif %}{% endfor %}
+[/tr][/table][/size]
+
+{% if screens %}[anchor=screens][/anchor]
+[table=nball,nopad,vat]
+[tr]
+[td=4px,#ff2962,vab][/td][td=8px][/td]
+[td]PREVIEW THIS MOVIE[br][size=6][/size][size=3]Screenshot gallery[/size][/td]
+[/tr]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Screens -  links after the `/table` tag, `imgnm` align with side
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[/table]
+{% for screen in screens %}[img=196]{{screen}}[/img]{% endfor %}
+{% if marker_gifs %}{% for gif in marker_gifs -%}[imgnm]{{gif}}[/imgnm] {% endfor %}{% endif %}
+
+
+{% endif %}[anchor=contact][/anchor]
+[table=nball,nopad,vat]
+[tr]
+[td=4px,#ff2962,vab][/td][td=8px][/td]
+[td]PREVIEW THIS MOVIE[br][size=6][/size][size=3]Contact sheet[/size][/td]
+[/tr]
+[/table]
+[table=nball,nopad]
+[tr]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ Contact sheet - link after the bgblack tag
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[/table][center][bg=#f4f4f4]
+
+[imgnm]{{contact_sheet}}[/imgnm]
+
+[/bg][/center]
+
+
+
+[/color][/bg][/font][bg=#292b33]
+[center][size=2][url=#top][color=white][b]top⮭[/b][/color][/url][/size][/center]
+[/bg]
