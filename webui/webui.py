@@ -1,5 +1,13 @@
 from flask import Blueprint, abort, redirect, render_template, url_for
-from webui.forms import TagMapForm, BackendSettings, RedisSettings, RTorrentSettings, DelugeSettings, QBittorrentSettings, StashSettings
+from webui.forms import (
+    TagMapForm,
+    BackendSettings,
+    RedisSettings,
+    RTorrentSettings,
+    DelugeSettings,
+    QBittorrentSettings,
+    StashSettings,
+)
 
 from utils.confighandler import ConfigHandler
 from utils.taghandler import TagHandler
@@ -30,10 +38,10 @@ def tag_settings(page):
             s_tag = get_or_create(StashTag, tagname=tag["stash_tag"])
             db.session.delete(s_tag)
             db.session.commit()
-        if form.data['submit']:
+        if form.data["submit"]:
             for tag in form.data["tags"]:
                 if not tag["stash_tag"]:
-                    continue # Ignore empty tag inputs
+                    continue  # Ignore empty tag inputs
                 s_tag = get_or_create(StashTag, tagname=tag["stash_tag"])
                 e_tags = []
                 for et in tag["emp_tag"].split():
@@ -59,7 +67,7 @@ def settings(page):
                 media_directory=conf.get(page, "media_directory", ""),
                 move_method=conf.get(page, "move_method", "copy"),
                 anon=conf.get(page, "anon", False),
-                choices=[opt for opt in conf["templates"]] # type: ignore
+                choices=[opt for opt in conf["templates"]],  # type: ignore
             )
         case "stash":
             template_context["settings_option"] = "your stash server"
@@ -210,4 +218,3 @@ def settings(page):
         conf.update_file()
     template_context["form"] = form
     return render_template("settings.html", **template_context)
-

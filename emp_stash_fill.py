@@ -135,6 +135,7 @@ taghandler.setup(app)
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 
+
 @stream_with_context
 def generate():
     j = request.get_json()
@@ -144,7 +145,9 @@ def generate():
     gen_screens = j["screens"]
     include_gallery = j["gallery"]
 
-    logger.info(f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{'and including gallery' if include_gallery else ''}.")
+    logger.info(
+        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{'and including gallery' if include_gallery else ''}."
+    )
 
     template = (
         j["template"]
@@ -183,7 +186,7 @@ def generate():
             scene[key] = ""
         elif scene[key] == None:
             scene[key] = ""
-    
+
     new_dir = None
     image_dir = None
     image_temp = False
@@ -192,7 +195,7 @@ def generate():
     image_count = 0
     if include_gallery:
         try:
-            new_dir, image_dir, image_temp = readGallery(scene) # type: ignore
+            new_dir, image_dir, image_temp = readGallery(scene)  # type: ignore
             gallery_contact = tempfile.mkstemp("-gallery_contact.jpg")[1]
             files = [os.path.join(image_dir, file) for file in os.listdir(image_dir)]
             image_count = len(files)
@@ -227,7 +230,7 @@ def generate():
         return error(f"Couldn't find file {stash_file['path']}")
 
     if new_dir:
-        link(stash_file['path'], new_dir)
+        link(stash_file["path"], new_dir)
 
     if len(scene["title"]) == 0:
         scene["title"] = stash_file["basename"]
@@ -540,14 +543,14 @@ def generate():
             logger.warning("Unable to upload studio image")
 
     if image_temp:
-        shutil.rmtree(image_dir) # type: ignore
+        shutil.rmtree(image_dir)  # type: ignore
         logger.debug(f"Deleted {image_dir}")
-    
+
     gallery_contact_url = None
     if gallery_proc:
         gallery_proc.join()
-        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0] # type: ignore
-        os.remove(gallery_contact) # type: ignore
+        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]  # type: ignore
+        os.remove(gallery_contact)  # type: ignore
 
     ############
     # TEMPLATE #
@@ -602,7 +605,7 @@ def generate():
     # if include_gallery:
     #     gal_proc.join()
     #     gal = gal_recv.recv()
-        #TODO
+    # TODO
 
     logger.info("Waiting for torrent generation to complete")
     torrent_proc.join()
@@ -638,7 +641,7 @@ def generate():
 
     for client in config.torrent_clients:
         try:
-            path = new_dir if new_dir else stash_file['path']
+            path = new_dir if new_dir else stash_file["path"]
             client.add(torrent_paths[0], path)
         except Exception as e:
             logger.error(f"Error attempting to add torrent to {client.name}")
@@ -648,12 +651,14 @@ def generate():
     time.sleep(1)
 
 
-def genTorrent(pipe: Connection, stash_file: dict, announce_url: str, directory:str|None=None) -> list[str] | None:
+def genTorrent(
+    pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
+) -> list[str] | None:
     piece_size = int(math.log(stash_file["size"] / 2**10, 2))
     tempdir = tempfile.TemporaryDirectory()
     basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
 
-    target = directory if directory else stash_file['path']
+    target = directory if directory else stash_file["path"]
 
     temppath = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
@@ -732,16 +737,11 @@ def fill():
     return Response(generate(), mimetype="application/json")  # type: ignore
 
 
-# @app.route("/suggestions", methods=["POST"])
-# @csrf.exempt
-# def suggestions():
-#     return Response(processSuggestions(), mimetype="application/json")
-
-
 @app.route("/templates")
 @csrf.exempt
 def templates():
     return json.dumps(config.template_names)
+
 
 @app.route("/favicon.ico")
 def favicon():

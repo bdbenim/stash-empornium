@@ -1,5 +1,3 @@
-from collections.abc import Mapping
-
 from flask_bootstrap import SwitchField
 from flask_wtf import FlaskForm
 from wtforms import (
@@ -17,7 +15,6 @@ from wtforms import (
 from wtforms.widgets import Input, PasswordInput
 from wtforms.validators import URL, DataRequired, Optional
 from webui.validators import PortRange, ConditionallyRequired, Directory, Tag
-from utils.db import StashTag, EmpTag
 
 
 class PasswordField(StringField):
@@ -144,7 +141,7 @@ class TagMapForm(FlaskForm):
 
     def update_self(self):
         tag = None
-        
+
         # read the data in the form
         read_form_data = self.data
 
@@ -156,7 +153,7 @@ class TagMapForm(FlaskForm):
             for i, row in enumerate(read_form_data["tags"]):
                 if row["delete"]:
                     del updated_list[i]
-                    tag = row['stash_tag']
+                    tag = row["stash_tag"]
         read_form_data["tags"] = updated_list
 
         # reload the form from the modified data

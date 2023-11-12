@@ -184,7 +184,7 @@ Copyright 2019 Kenneth Reitz
 """
 
 from collections.abc import Mapping, MutableMapping
-from typing import TypeVar, Iterable, Sized
+from typing import TypeVar, Iterable
 
 from tomlkit import key
 
@@ -304,7 +304,7 @@ class Pagination:
 
         self.has_next = page < total_pages
         if self.has_next:
-            self.next_num = page+1
+            self.next_num = page + 1
         else:
             self.next_num = None
 
@@ -313,7 +313,7 @@ class Pagination:
         else:
             self.first = (page - 1) * per_page + 1
 
-        self.items = {x['st']:x['et'] for x in self.total_items[self.first:self.first+per_page]}
+        self.items = {x["st"]: x["et"] for x in self.total_items[self.first : self.first + per_page]}
 
         self.per_page = per_page
         self.page = page
@@ -325,35 +325,36 @@ class Pagination:
             self.prev_num = page - 1
 
     def prev(self, error_out=False) -> "Pagination":
-        return Pagination(self.total_items, self.per_page, self.page-1)
-    
+        return Pagination(self.total_items, self.per_page, self.page - 1)
+
     def next(self, error_out=False) -> "Pagination":
-        return Pagination(self.total_items, self.per_page, self.page+1)
+        return Pagination(self.total_items, self.per_page, self.page + 1)
 
-    def iter_pages(self, *, left_edge=2, left_current=2, right_current=4, right_edge=2) -> Iterable[int|None] :
+    def iter_pages(self, *, left_edge=2, left_current=2, right_current=4, right_edge=2) -> Iterable[int | None]:
         total = self.total if self.total else 1
-        total_pages = ceildiv(total,self.per_page)
+        total_pages = ceildiv(total, self.per_page)
 
-        pages:list[int|None] = [i for i in range(1, 1+left_edge) if i <= total_pages]
+        pages: list[int | None] = [i for i in range(1, 1 + left_edge) if i <= total_pages]
 
-        for i in range(self.page-left_current, self.per_page+right_current+1):
+        for i in range(self.page - left_current, self.per_page + right_current + 1):
             if i in pages or i < 0:
                 continue
             if i > total_pages:
                 break
-            if pages[-1] and i > pages[-1]+1:
+            if pages[-1] and i > pages[-1] + 1:
                 pages.append(None)
             pages.append(i)
-        
-        for i in range(total_pages-right_edge, total_pages+1):
+
+        for i in range(total_pages - right_edge, total_pages + 1):
             if i in pages:
                 continue
-            if pages[-1] and i > pages[-1]+1:
+            if pages[-1] and i > pages[-1] + 1:
                 pages.append(None)
             pages.append(i)
-        
+
         return pages
 
-def ceildiv(a:int, b:int) -> int:
+
+def ceildiv(a: int, b: int) -> int:
     "Same as `a // b` except result is rounded up not down"
     return -(a // -b)

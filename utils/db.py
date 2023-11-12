@@ -2,7 +2,6 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from sqlalchemy import MetaData, String, Integer, ForeignKey, Column, Boolean
 
-
 class Base(DeclarativeBase):
     metadata = MetaData(
         naming_convention={
@@ -47,7 +46,7 @@ class Category(db.Model):
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
 
 
-def get_or_create(model, **kwargs):
+def get_or_create(model:type, **kwargs):
     session = db.session
     instance = session.query(model).filter_by(**kwargs).first()
     if instance:

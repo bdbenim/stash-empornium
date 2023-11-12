@@ -15,7 +15,6 @@ from utils.db import db, StashTag, EmpTag, get_or_create, Category
 from collections.abc import MutableMapping
 
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 
 HAIR_COLOR_MAP = CaseInsensitiveDict(
     {
