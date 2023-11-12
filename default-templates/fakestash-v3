@@ -1,4 +1,4 @@
-{# 20231107 -#}
+{# 20231112 -#}
 [bg=#202b33][color=#F5F8FA][font=Helvetica][table=nopad,nball,vat][tr][td=#202b33][/td]
 
 
@@ -37,18 +37,16 @@
 
 
 [td=vat,800px][bg=98%]
-[bg={{cover}}]
-[br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br][br]
-
-[bg=#00000033][color=#F0EEEB][size=2]
-[table=100%,nball,vam][tr][td=16px][/td]
-
-
+[imgnm]{{cover}}[/imgnm][bg=#30404d][color=#F0EEEB][size=2]
+[table=100%,nball,vam][tr]
+[td=16px][/td]
 [td]{{duration}}[/td]
 [td][align=right]{{container}}   {{video_codec}}/{{audio_codec}}   {{resolution}}   {{bitrate}}   {{framerate}}[/align][/td]
+[td=16px][/td]
+[/tr][/table]
+[/size][/color][/bg]
 
-[td=16px][/td][/tr][/table]
-[/size][/color][/bg][/bg][size=2]
+[size=2]
 {% if screens %}[b]Screens[/b]
 
 {% for screen in screens %}[img=200]{{screen}}[/img]{% endfor %}
@@ -58,14 +56,6 @@
 [spoiler=Click to view]
 [img]{{contact_sheet}}[/img]
 [/spoiler]
-
-{% if gallery_contact %}
-[b]Image Contact Sheet[/b]
-
-[spoiler=Click to view]
-[img]{{gallery_contact}}[/img]
-[/spoiler]
-{% endif %}
 
 [/size]
 [img]https://fapping.empornium.sx/images/2022/02/24/space.png[/img]
