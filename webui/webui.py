@@ -1,4 +1,4 @@
-from flask import Blueprint, abort, redirect, render_template, url_for
+from flask import Blueprint, abort, redirect, render_template, url_for, request
 from webui.forms import (
     TagMapForm,
     BackendSettings,
@@ -7,11 +7,15 @@ from webui.forms import (
     DelugeSettings,
     QBittorrentSettings,
     StashSettings,
+    TagAdvancedForm,
+    CategoryList,
+    SearchForm
 )
 
 from utils.confighandler import ConfigHandler
 from utils.taghandler import TagHandler
-from utils.db import get_or_create, StashTag, EmpTag, db
+from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category
+from werkzeug.exceptions import HTTPException
 
 conf = ConfigHandler()
 
@@ -26,6 +30,29 @@ def index():
 @settings_page.route("/tags")
 def tags():
     return redirect(url_for(".tag_settings", page="maps"))
+
+
+@settings_page.route("/tag/<id>", methods=["GET", "POST"])
+def tag(id):
+    tag: StashTag = StashTag.query.filter_by(id=id).first_or_404()
+    form = TagAdvancedForm(tag=tag)
+    if form.validate_on_submit():
+        print(form.data)
+        if form.data["save"]:
+            tag.ignored = form.data["ignored"]
+            tag.emp_tags.clear()
+            for et in form.data["emp_tags"].split():
+                e_tag = get_or_create_no_commit(EmpTag, tagname=et)
+                tag.emp_tags.append(e_tag)
+            tag.categories.clear()
+            for cat in form.data["categories"]:
+                category = get_or_create_no_commit(Category, name=cat)
+                tag.categories.append(category)
+            db.session.commit()
+        elif form.data["delete"]:
+            db.session.delete(tag)
+            db.session.commit()
+    return render_template("tag-advanced.html", form=form)
 
 
 @settings_page.route("/tags/<page>", methods=["GET", "POST"])
@@ -48,8 +75,52 @@ def tag_settings(page):
                     e_tags.append(get_or_create(EmpTag, tagname=et))
                 s_tag.emp_tags = e_tags
                 db.session.commit()
+        else:
+            for tag in form.data["tags"]:
+                if tag["advanced"]:
+                    stag = StashTag.query.filter_by(tagname=tag["stash_tag"]).first_or_404()
+                    return redirect(url_for(".tag", id=stag.id))
     return render_template("tag-settings.html", form=form, pagination=pagination)
 
+
+
+@settings_page.route("/search", methods=['GET', 'POST'])
+def search():
+    tags = StashTag.query
+    page = request.args.get("page", default=1, type=int)
+    searched = request.args.get("search")
+    form = SearchForm()
+    if form.validate_on_submit():
+        for tag in form.tags:
+            s_tag = StashTag.query.filter_by(tagname=tag.stash_tag.data).first_or_404()
+            if tag.settings.data:
+                return redirect(url_for(".tag", id=s_tag.id))
+    elif searched:
+        # searched = form.search.data
+        tags = tags.filter(StashTag.tagname.like(f"%{searched}%"))
+        pagination = tags.order_by(StashTag.tagname).paginate(page=page)
+        form = SearchForm(s_tags=pagination.items)
+        return render_template("search.html", searched=searched, form=form, pagination=pagination)
+    return render_template("search.html")
+
+@settings_page.route("/categories")
+def category():
+    return redirect(url_for(".category_settings", page=1))
+
+@settings_page.route("/categories/<page>", methods=["GET", "POST"])
+def category_settings(page):
+    pagination = Category.query.paginate(page=int(page))
+    form = CategoryList(category_objs=pagination.items)
+    if form.validate_on_submit():
+        cat = form.update_self()
+        if cat:
+            cat = Category.query.filter_by(name=cat).first()
+            db.session.delete(cat)
+            db.session.commit()
+        elif form.submit.data:
+            for cat in form.categories.data:
+                cat = get_or_create(Category, name=cat["name"])
+    return render_template("categories.html", form=form, pagination=pagination)
 
 @settings_page.route("/settings/<page>", methods=["GET", "POST"])
 def settings(page):
@@ -218,3 +289,10 @@ def settings(page):
         conf.update_file()
     template_context["form"] = form
     return render_template("settings.html", **template_context)
+
+@settings_page.app_errorhandler(HTTPException)
+def handle_exception(e):
+    message = e.name
+    if e.code == 404:
+        message = "The page you were looking for was not found"
+    return render_template("errorpage.html", code=e.code, message=message)
