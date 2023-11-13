@@ -14,8 +14,9 @@ from webui.forms import (
 
 from utils.confighandler import ConfigHandler
 from utils.taghandler import TagHandler
-from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category
+from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category, tag_map
 from werkzeug.exceptions import HTTPException
+from sqlalchemy import select
 
 conf = ConfigHandler()
 
@@ -37,7 +38,6 @@ def tag(id):
     tag: StashTag = StashTag.query.filter_by(id=id).first_or_404()
     form = TagAdvancedForm(tag=tag)
     if form.validate_on_submit():
-        print(form.data)
         if form.data["save"]:
             tag.ignored = form.data["ignored"]
             tag.emp_tags.clear()
@@ -96,8 +96,9 @@ def search():
             if tag.settings.data:
                 return redirect(url_for(".tag", id=s_tag.id))
     elif searched:
-        # searched = form.search.data
         tags = tags.filter(StashTag.tagname.like(f"%{searched}%"))
+        e_tags = StashTag.query.join(StashTag.emp_tags).filter(EmpTag.tagname.like(f"%{searched}%"))
+        tags = tags.union(e_tags)
         pagination = tags.order_by(StashTag.tagname).paginate(page=page)
         form = SearchForm(s_tags=pagination.items)
         return render_template("search.html", searched=searched, form=form, pagination=pagination)
