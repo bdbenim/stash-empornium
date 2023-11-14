@@ -9,14 +9,13 @@ from webui.forms import (
     StashSettings,
     TagAdvancedForm,
     CategoryList,
-    SearchForm
+    SearchForm,
 )
 
 from utils.confighandler import ConfigHandler
 from utils.taghandler import TagHandler
-from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category, tag_map
+from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category
 from werkzeug.exceptions import HTTPException
-from sqlalchemy import select
 
 conf = ConfigHandler()
 
@@ -83,8 +82,7 @@ def tag_settings(page):
     return render_template("tag-settings.html", form=form, pagination=pagination)
 
 
-
-@settings_page.route("/search", methods=['GET', 'POST'])
+@settings_page.route("/search", methods=["GET", "POST"])
 def search():
     tags = StashTag.query
     page = request.args.get("page", default=1, type=int)
@@ -104,9 +102,11 @@ def search():
         return render_template("search.html", searched=searched, form=form, pagination=pagination)
     return render_template("search.html")
 
+
 @settings_page.route("/categories")
 def category():
     return redirect(url_for(".category_settings", page=1))
+
 
 @settings_page.route("/categories/<page>", methods=["GET", "POST"])
 def category_settings(page):
@@ -122,6 +122,7 @@ def category_settings(page):
             for cat in form.categories.data:
                 cat = get_or_create(Category, name=cat["name"])
     return render_template("categories.html", form=form, pagination=pagination)
+
 
 @settings_page.route("/settings/<page>", methods=["GET", "POST"])
 def settings(page):
@@ -290,6 +291,7 @@ def settings(page):
         conf.update_file()
     template_context["form"] = form
     return render_template("settings.html", **template_context)
+
 
 @settings_page.app_errorhandler(HTTPException)
 def handle_exception(e):
