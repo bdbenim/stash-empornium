@@ -19,13 +19,13 @@ class PortRange:
 
 
 class ConditionallyRequired:
-    def __init__(self, fieldname="enable_form", message="This field is required") -> None:
+    def __init__(self, *, message="This field is required", fieldname="enable_form") -> None:
         self.fieldname = fieldname
         self.message = message
 
     def __call__(self, form, field) -> None:
         if form.data[self.fieldname]:
-            if len(field.data) == 0:
+            if not field.data:
                 raise ValidationError(self.message)
         else:
             field.errors[:] = []

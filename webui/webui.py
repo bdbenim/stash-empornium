@@ -10,6 +10,7 @@ from webui.forms import (
     TagAdvancedForm,
     CategoryList,
     SearchForm,
+    FileMapForm,
 )
 
 from utils.confighandler import ConfigHandler
@@ -166,6 +167,7 @@ def settings(page):
                 path=conf.get(page, "path", "RPC2"),
                 label=conf.get(page, "label", ""),
                 ssl=conf.get(page, "ssl", False),
+                maps=conf.get(page, "pathmaps", {})
             )
         case "deluge":
             template_context["settings_option"] = "your Deluge client"
@@ -187,6 +189,14 @@ def settings(page):
                 label=conf.get(page, "label", ""),
                 ssl=conf.get(page, "ssl", False),
             )
+        case "files":
+            template_context["settings_option"] = "stash path mappings"
+            form = FileMapForm(maps=conf.items("file.maps"))
+            for field in form.file_maps.entries:
+                field["remote_path"].render_kw = {
+                    "data-toggle": "tooltip",
+                    "title": "This is the path as stash sees it",
+                }
         case "tags":
             return redirect(url_for(".tag_settings", page="maps"))
         case _:
@@ -228,7 +238,16 @@ def settings(page):
                     if page in conf:
                         conf.set(page, "disable", True)
             case "rtorrent":
-                if form.data["enable_form"]:
+                assert isinstance(form, RTorrentSettings)
+                path = form.update_self()
+                if path:
+                    maps:dict = conf.get(page, "pathmaps") # type: ignore
+                    del maps[path]
+                    if len(maps) > 0:
+                        conf.set(page, "pathmaps", maps)
+                    else:
+                        conf.delete(page, "pathmaps")
+                elif form.data["enable_form"]:
                     conf.set(page, "disable", False)
                     conf.set(page, "host", form.data["host"])
                     conf.set(page, "port", int(form.data["port"]))
@@ -246,6 +265,11 @@ def settings(page):
                         conf.set(page, "label", form.data["label"])
                     else:
                         conf.delete(page, "label")
+                    maps = {}
+                    for field in form.file_maps:
+                        maps[field["local_path"].data] = field["remote_path"].data
+                    if len(maps) > 0:
+                        conf.set(page, "pathmaps", maps)
                 else:
                     if page in conf:
                         conf.set(page, "disable", True)
@@ -286,6 +310,17 @@ def settings(page):
                     if page in conf:
                         conf.set(page, "disable", True)
                 conf.configureTorrents()
+            case "files":
+                del template_context["message"]
+                assert isinstance(form, FileMapForm)
+                map = form.update_self()
+                if map:
+                    conf.delete("file.maps", map)
+                elif form.submit.data:
+                    template_context["message"] = "Settings saved"
+                    conf.conf["file.maps"].clear()  # type: ignore
+                    for map in form.file_maps:
+                        conf.set("file.maps", map.data["local_path"], map.data["remote_path"])
             case _:
                 abort(404)
         conf.update_file()
