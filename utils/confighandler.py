@@ -297,7 +297,7 @@ class ConfigHandler(Singleton):
                     self.logger.info(
                         f"Template {filename} has a been added. To use it, add it to config.ini under [templates]"
                     )
-                    if filename not in conf["templates"]:  # type: ignore
+                    if filename not in self.conf["templates"]:  # type: ignore
                         with open("default.toml") as f:
                             tmpConf = tomlkit.load(f)
                         conf["templates"][filename] = tmpConf["templates"][filename]  # type: ignore

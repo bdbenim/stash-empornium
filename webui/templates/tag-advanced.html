@@ -1,0 +1,10 @@
+{% extends "base-settings.html" %}{% from "bootstrap5/form.html" import render_form %}
+{% block heading %}
+    tag settings
+{% endblock heading %}
+{% block desc %}
+    Here you can configure your tag mappings.
+{% endblock desc %}
+{% block formfields %}
+    {{ render_form(form) }}
+{% endblock formfields %}

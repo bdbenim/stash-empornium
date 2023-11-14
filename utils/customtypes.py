@@ -186,8 +186,6 @@ Copyright 2019 Kenneth Reitz
 from collections.abc import Mapping, MutableMapping
 from typing import TypeVar, Iterable
 
-from tomlkit import key
-
 T = TypeVar("T")
 
 

@@ -2,7 +2,6 @@ from flask_bootstrap import SwitchField
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
-    BooleanField,
     Form,
     FieldList,
     FormField,
@@ -11,10 +10,12 @@ from wtforms import (
     StringField,
     SubmitField,
     URLField,
+    SelectMultipleField,
 )
 from wtforms.widgets import Input, PasswordInput
 from wtforms.validators import URL, DataRequired, Optional
 from webui.validators import PortRange, ConditionallyRequired, Directory, Tag
+from utils.db import StashTag, Category
 
 
 class PasswordField(StringField):
@@ -42,15 +43,6 @@ class ButtonInput(Input):
     def __call__(self, field, **kwargs):
         kwargs.setdefault("value", field.label.text)
         return super().__call__(field, **kwargs)
-
-
-class ButtonField(BooleanField):
-    """
-    Represents an ``<input type="button">``.  This allows checking if a given
-    submit button has been pressed.
-    """
-
-    widget = ButtonInput()
 
 
 class BackendSettings(FlaskForm):
@@ -122,6 +114,7 @@ class StashSettings(FlaskForm):
 class TagMap(Form):
     stash_tag = StringField()
     emp_tag = StringField("EMP Tag", validators=[Tag()])
+    advanced = SubmitField()
     delete = SubmitField()
 
 
@@ -145,7 +138,7 @@ class TagMapForm(FlaskForm):
         # read the data in the form
         read_form_data = self.data
 
-        # modify the data as you see fit:
+        # modify the data:
         updated_list = read_form_data["tags"]
         if read_form_data["newline"]:
             updated_list.append({})
@@ -159,5 +152,81 @@ class TagMapForm(FlaskForm):
         # reload the form from the modified data
         self.__init__(formdata=None, **read_form_data)
         self.validate()  # the errors on validation are cancelled in the line above
-        if tag:
-            return tag
+        return tag
+
+
+def getCategories():
+    return [cat.name for cat in Category.query.all()]
+
+
+class TagAdvancedForm(FlaskForm):
+    ignored = SwitchField()
+    stash_tag = StringField()
+    emp_tags = StringField("EMP Tags")
+    categories = SelectMultipleField(choices=getCategories)  # type: ignore
+    delete = SubmitField()
+    save = SubmitField()
+
+    def __init__(self, *args, **kwargs):
+        if "tag" in kwargs:
+            tag: StashTag = kwargs["tag"]
+            kwargs["stash_tag"] = tag.tagname
+            kwargs["emp_tags"] = " ".join([et.tagname for et in tag.emp_tags])
+            kwargs["categories"] = [cat.name for cat in tag.categories]
+            kwargs["ignored"] = tag.ignored
+        super().__init__(*args, **kwargs)
+
+
+class CategoryForm(Form):
+    name = StringField()
+    delete = SubmitField()
+
+
+class CategoryList(FlaskForm):
+    categories = FieldList(FormField(CategoryForm))
+    new_category = SubmitField()
+    submit = SubmitField()
+
+    def __init__(self, *args, **kwargs):
+        if "category_objs" in kwargs:
+            kwargs["categories"] = [{"name": cat.name} for cat in kwargs["category_objs"]]
+        super().__init__(*args, **kwargs)
+
+    def update_self(self):
+        category = None
+
+        # read the data in the form
+        read_form_data = self.data
+
+        # modify the data:
+        updated_list = read_form_data["categories"]
+        if read_form_data["new_category"]:
+            updated_list.append({})
+        else:
+            for i, row in enumerate(read_form_data["categories"]):
+                if row["delete"]:
+                    del updated_list[i]
+                    category = row["name"]
+        read_form_data["categories"] = updated_list
+
+        # reload the form from the modified data
+        self.__init__(formdata=None, **read_form_data)
+        self.validate()  # the errors on validation are cancelled in the line above
+        return category
+
+class SearchResult(Form):
+    stash_tag = StringField(render_kw={'readonly':True})
+    emp_tag = StringField("EMP Tag", render_kw={'readonly':True})
+    settings = SubmitField()
+
+class SearchForm(FlaskForm):
+    tags = FieldList(FormField(SearchResult, render_kw={"readonly":True}))
+
+    def __init__(self, *args, **kwargs):
+        tags = []
+        if "s_tags" in kwargs:
+            for stag in kwargs["s_tags"]:
+                etag = " ".join([et.tagname for et in stag.emp_tags])
+                tags.append({"stash_tag": stag.tagname, "emp_tag": etag})
+            kwargs["tags"] = tags
+        super().__init__(*args, **kwargs)

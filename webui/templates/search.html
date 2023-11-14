@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{# {% from "bootstrap5/utils.html" import render_static %} #}
+{% from "bootstrap5/pagination.html" import render_pagination %}
+{% from "bootstrap5/form.html" import render_form_row %}
+{% block title %}
+    Search Results
+{% endblock title %}
+{# {% block head %}
+  {{ render_static('css', 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css', False) }}
+{% endblock head %} #}
+{% block content %}
+    <div class="container">
+        {% if pagination %}<div class="mt-2">{{ render_pagination(pagination, align='right') }}</div>{% endif %}
+        <div class="row">
+            <div class="col-md-10 col-lg-8 mx-lg-auto mx-md-auto">
+                <h1 class="pt-5 pb-2">search results</h1>
+            </div>
+        </div>
+        {% if form and form.tags %}
+        <div class="row">
+        Showing results for: {{ searched }}
+        </div>
+        <form method="post">
+        {{ form.hidden_tag() }}
+        {% for tag in form.tags %}
+        {{ render_form_row(tag, form_type='inline', col_map={tag.settings.id: 'col col-2'}) }}
+        {% endfor %}
+        </form>
+        {% else %}
+        <div class="row">
+        No results found for: {{ searched }}
+        </div>
+        {% endif %}
+        {% if pagination %}<div class="mt-2">{{ render_pagination(pagination, align='right') }}</div>{% endif %}
+    </div>
+{% endblock content %}
+{# {% block scripts %}
+  {{ render_static('js', 'scripts/forms.js') }}
+{% endblock scripts %} #}
