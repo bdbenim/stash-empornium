@@ -1,0 +1,30 @@
+{% extends "base-settings.html" %}{% from "bootstrap5/form.html" import render_field, render_form_row %}
+{% block heading %}
+    tag settings
+{% endblock heading %}
+{% block desc %}
+    Here you can configure your tag mappings.
+{% endblock desc %}
+{% block formfields %}
+    {{ form.csrf_token() }}
+    <div class="row text-center mb-2 fs-5">
+        <div class="col">Stash Tag</div>
+        <div class="col">EMP Tag</div>
+        <div class="col-2"></div>
+        <div class="col-2"></div>
+    </div>
+    {% for field in form.tags %}
+        {% if field.errors %}
+        <div class="row">
+        {% for subfield in field %}
+        <div class="col">
+            {% for error in subfield.errors %}<div class="invalid-feedback d-block mb-2 mt-0">{{ error }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+        </div>
+        {% endif %}
+        {{ render_form_row(field, form_type='inline', col_map={field.delete.id: 'col col-2', field.advanced.id: 'col col-2'}) }}
+    {% endfor %}
+    {{ render_field(form.newline) }}
+    {{ render_field(form.submit) }}
+{% endblock formfields %}
