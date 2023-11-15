@@ -1,4 +1,3 @@
-from genericpath import isfile
 import tomlkit
 import argparse
 import os
@@ -158,13 +157,6 @@ class ConfigHandler(Singleton):
         )
 
         redisgroup = parser.add_argument_group("redis", "options for connecting to a redis server")
-        # redisgroup.add_argument("--rhost", "--redis--host", "--rh", help="host redis server is listening on")
-        # redisgroup.add_argument(
-        #     "--rport", "--redis-port", "--rp", help="port redis server is listening on (default: 6379)", type=int
-        # )
-        # redisgroup.add_argument("--username", "--redis-user", help="redis username")
-        # redisgroup.add_argument("--password", "--redis-pass", help="redis password")
-        # redisgroup.add_argument("--use-ssl", "-s", action="store_true", help="use SSL to connect to redis")
         redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
         cache = redisgroup.add_mutually_exclusive_group()
         cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true")  # TODO implement
@@ -362,12 +354,6 @@ class ConfigHandler(Singleton):
             assert api_key is not None
             stash_headers["apiKey"] = str(api_key)
 
-        # self.rhost = self.args.rhost if self.args.rhost else str(self.get("redis", "host"))
-        # self.rhost = self.rhost if len(self.rhost) > 0 else None
-        # self.rport = self.args.rport if self.args.rport else self.get("redis", "port", 6379)  # type: ignore
-        # self.ssl = self.args.use_ssl or self.get("redis", "ssl", False)  # type: ignore
-        # self.username = self.args.username if self.args.username else self.get("redis", "username", "")  # type: ignore
-        # self.password = self.args.password if self.args.password else self.get("redis", "password", "")  # type: ignore
         self.configureTorrents()
 
     def configureTorrents(self) -> None:
