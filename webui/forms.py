@@ -5,6 +5,7 @@ from wtforms import (
     Form,
     FieldList,
     FormField,
+    Label,
     SubmitField,
     SelectField,
     StringField,
@@ -81,8 +82,8 @@ class RedisSettings(FlaskForm):
     save = SubmitField()
 
 
-class RTorrentSettings(FlaskForm):
-    enable_form = SwitchField("Use rTorrent")
+class TorrentSettings(FlaskForm):
+    enable_form = SwitchField("Enable")
     host = StringField(validators=[ConditionallyRequired()])
     port = StringField(validators=[PortRange(), ConditionallyRequired()])
     path = StringField(validators=[ConditionallyRequired(message="Please specify the API path (typically XMLRPC or RPC2)")])
@@ -129,24 +130,17 @@ class RTorrentSettings(FlaskForm):
         self.validate()  # the errors on validation are cancelled in the line above
         return map
 
-class QBittorrentSettings(FlaskForm):
-    enable_form = SwitchField("Use qBittorrent")
-    host = StringField(validators=[ConditionallyRequired()])
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    username = StringField(validators=[Optional()])
-    password = PasswordField(validators=[Optional()])
-    label = StringField()
-    ssl = SwitchField("SSL")
-    save = SubmitField()
+class RTorrentSettings(TorrentSettings):
+    pass
+
+class QBittorrentSettings(TorrentSettings):
+    path = None
 
 
-class DelugeSettings(FlaskForm):
-    enable_form = SwitchField("Use Deluge")
-    host = StringField(validators=[ConditionallyRequired()])
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    password = PasswordField(validators=[Optional()])
-    ssl = SwitchField("SSL")
-    save = SubmitField()
+class DelugeSettings(TorrentSettings):
+    username = None
+    label = None
+    path = None
 
 
 class StashSettings(FlaskForm):

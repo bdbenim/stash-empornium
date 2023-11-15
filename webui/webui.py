@@ -11,6 +11,7 @@ from webui.forms import (
     CategoryList,
     SearchForm,
     FileMapForm,
+    TorrentSettings
 )
 
 from utils.confighandler import ConfigHandler
@@ -177,6 +178,7 @@ def settings(page):
                 port=conf.get(page, "port", ""),
                 password=conf.get(page, "password", ""),
                 ssl=conf.get(page, "ssl", False),
+                maps=conf.get(page, "pathmaps", {})
             )
         case "qbittorrent":
             template_context["settings_option"] = "your qBittorrent client"
@@ -188,6 +190,7 @@ def settings(page):
                 password=conf.get(page, "password", ""),
                 label=conf.get(page, "label", ""),
                 ssl=conf.get(page, "ssl", False),
+                maps=conf.get(page, "pathmaps", {})
             )
         case "files":
             template_context["settings_option"] = "stash path mappings"
@@ -237,8 +240,11 @@ def settings(page):
                 else:
                     if page in conf:
                         conf.set(page, "disable", True)
-            case "rtorrent":
-                assert isinstance(form, RTorrentSettings)
+            case "rtorrent" | "deluge" | "qbittorrent":
+                try:
+                    assert isinstance(form, TorrentSettings)
+                except:
+                    abort(421)
                 path = form.update_self()
                 if path:
                     maps:dict = conf.get(page, "pathmaps") # type: ignore
@@ -247,13 +253,14 @@ def settings(page):
                         conf.set(page, "pathmaps", maps)
                     else:
                         conf.delete(page, "pathmaps")
-                elif form.data["enable_form"]:
-                    conf.set(page, "disable", False)
+                else:
+                    conf.set(page, "disable", not form.data["enable_form"])
                     conf.set(page, "host", form.data["host"])
                     conf.set(page, "port", int(form.data["port"]))
                     conf.set(page, "ssl", form.data["ssl"])
-                    conf.set(page, "path", form.data["path"])
-                    if form.data["username"]:
+                    if "path" in form.data:
+                        conf.set(page, "path", form.data["path"])
+                    if "username" in form.data and form.data["username"]:
                         conf.set(page, "username", form.data["username"])
                     else:
                         conf.delete(page, "username")
@@ -261,54 +268,16 @@ def settings(page):
                         conf.set(page, "password", form.data["password"])
                     else:
                         conf.delete(page, "password")
-                    if form.data["label"]:
+                    if "label" in form.data and form.data["label"]:
                         conf.set(page, "label", form.data["label"])
                     else:
                         conf.delete(page, "label")
                     maps = {}
                     for field in form.file_maps:
-                        maps[field["local_path"].data] = field["remote_path"].data
+                        if field["local_path"].data and field["remote_path"].data:
+                            maps[field["local_path"].data] = field["remote_path"].data
                     if len(maps) > 0:
                         conf.set(page, "pathmaps", maps)
-                else:
-                    if page in conf:
-                        conf.set(page, "disable", True)
-                conf.configureTorrents()
-            case "deluge":
-                if form.data["enable_form"]:
-                    conf.set(page, "disable", False)
-                    conf.set(page, "host", form.data["host"])
-                    conf.set(page, "port", int(form.data["port"]))
-                    conf.set(page, "ssl", form.data["ssl"])
-                    if form.data["password"]:
-                        conf.set(page, "password", form.data["password"])
-                    else:
-                        conf.delete(page, "password")
-                else:
-                    if page in conf:
-                        conf.set(page, "disable", True)
-                conf.configureTorrents()
-            case "qbittorrent":
-                if form.data["enable_form"]:
-                    conf.set(page, "disable", False)
-                    conf.set(page, "host", form.data["host"])
-                    conf.set(page, "port", int(form.data["port"]))
-                    conf.set(page, "ssl", form.data["ssl"])
-                    if form.data["username"]:
-                        conf.set(page, "username", form.data["username"])
-                    else:
-                        conf.delete(page, "username")
-                    if form.data["password"]:
-                        conf.set(page, "password", form.data["password"])
-                    else:
-                        conf.delete(page, "password")
-                    if form.data["label"]:
-                        conf.set(page, "label", form.data["label"])
-                    else:
-                        conf.delete(page, "label")
-                else:
-                    if page in conf:
-                        conf.set(page, "disable", True)
                 conf.configureTorrents()
             case "files":
                 del template_context["message"]
