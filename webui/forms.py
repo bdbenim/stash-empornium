@@ -5,6 +5,7 @@ from wtforms import (
     Form,
     FieldList,
     FormField,
+    Label,
     SubmitField,
     SelectField,
     StringField,
@@ -45,6 +46,14 @@ class ButtonInput(Input):
         return super().__call__(field, **kwargs)
 
 
+class FileMap(Form):
+    local_path = StringField(
+        render_kw={"data-toggle": "tooltip", "title": "This is the path as stash-empornium sees it"}
+    )
+    remote_path = StringField()
+    delete = SubmitField()
+
+
 class BackendSettings(FlaskForm):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -73,36 +82,65 @@ class RedisSettings(FlaskForm):
     save = SubmitField()
 
 
-class RTorrentSettings(FlaskForm):
-    enable_form = SwitchField("Use rTorrent")
+class TorrentSettings(FlaskForm):
+    enable_form = SwitchField("Enable")
     host = StringField(validators=[ConditionallyRequired()])
     port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    path = StringField(validators=[ConditionallyRequired("Please specify the API path (typically XMLRPC or RPC2)")])
+    path = StringField(validators=[ConditionallyRequired(message="Please specify the API path (typically XMLRPC or RPC2)")])
     username = StringField(validators=[Optional()])
     password = PasswordField(validators=[Optional()])
     label = StringField()
     ssl = SwitchField("SSL")
+    file_maps = FieldList(FormField(FileMap, "File Map"))
+    new_map = SubmitField()
     save = SubmitField()
 
+    def __init__(self, *args, **kwargs):
+        maps = []
+        if "maps" in kwargs:
+            for local, remote in kwargs["maps"].items():
+                maps.append({"local_path": local, "remote_path": remote})
+            kwargs["file_maps"] = maps
+        super().__init__(*args, **kwargs)
+        for map in self.file_maps.entries:
+            map["remote_path"].render_kw = {
+                "data-toggle": "tooltip",
+                "title": "This is the path as rTorrent sees it",
+            }
 
-class QBittorrentSettings(FlaskForm):
-    enable_form = SwitchField("Use qBittorrent")
-    host = StringField(validators=[ConditionallyRequired()])
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    username = StringField(validators=[Optional()])
-    password = PasswordField(validators=[Optional()])
-    label = StringField()
-    ssl = SwitchField("SSL")
-    save = SubmitField()
+    def update_self(self):
+        map = None
+
+        # read the data in the form
+        read_form_data = self.data
+
+        # modify the data:
+        updated_list = read_form_data["file_maps"]
+        if read_form_data["new_map"]:
+            updated_list.append({})
+        else:
+            for i, row in enumerate(read_form_data["file_maps"]):
+                if row["delete"]:
+                    del updated_list[i]
+                    map = row["local_path"]
+        read_form_data["file_maps"] = updated_list
+
+        # reload the form from the modified data
+        self.__init__(formdata=None, **read_form_data)
+        self.validate()  # the errors on validation are cancelled in the line above
+        return map
+
+class RTorrentSettings(TorrentSettings):
+    pass
+
+class QBittorrentSettings(TorrentSettings):
+    path = None
 
 
-class DelugeSettings(FlaskForm):
-    enable_form = SwitchField("Use Deluge")
-    host = StringField(validators=[ConditionallyRequired()])
-    port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    password = PasswordField(validators=[Optional()])
-    ssl = SwitchField("SSL")
-    save = SubmitField()
+class DelugeSettings(TorrentSettings):
+    username = None
+    label = None
+    path = None
 
 
 class StashSettings(FlaskForm):
@@ -214,13 +252,15 @@ class CategoryList(FlaskForm):
         self.validate()  # the errors on validation are cancelled in the line above
         return category
 
+
 class SearchResult(Form):
-    stash_tag = StringField(render_kw={'readonly':True})
-    emp_tag = StringField("EMP Tag", render_kw={'readonly':True})
+    stash_tag = StringField(render_kw={"readonly": True})
+    emp_tag = StringField("EMP Tag", render_kw={"readonly": True})
     settings = SubmitField()
 
+
 class SearchForm(FlaskForm):
-    tags = FieldList(FormField(SearchResult, render_kw={"readonly":True}))
+    tags = FieldList(FormField(SearchResult, render_kw={"readonly": True}))
 
     def __init__(self, *args, **kwargs):
         tags = []
@@ -230,3 +270,39 @@ class SearchForm(FlaskForm):
                 tags.append({"stash_tag": stag.tagname, "emp_tag": etag})
             kwargs["tags"] = tags
         super().__init__(*args, **kwargs)
+
+
+class FileMapForm(FlaskForm):
+    file_maps = FieldList(FormField(FileMap, "File Maps"))
+    new_map = SubmitField()
+    submit = SubmitField()
+
+    def __init__(self, *args, **kwargs):
+        maps = []
+        if "maps" in kwargs:
+            for remote, local in kwargs["maps"].items():
+                maps.append({"local_path": local, "remote_path": remote})
+            kwargs["file_maps"] = maps
+        super().__init__(*args, **kwargs)
+
+    def update_self(self):
+        map = None
+
+        # read the data in the form
+        read_form_data = self.data
+
+        # modify the data:
+        updated_list = read_form_data["file_maps"]
+        if read_form_data["new_map"]:
+            updated_list.append({})
+        else:
+            for i, row in enumerate(read_form_data["file_maps"]):
+                if row["delete"]:
+                    del updated_list[i]
+                    map = row["local_path"]
+        read_form_data["file_maps"] = updated_list
+
+        # reload the form from the modified data
+        self.__init__(formdata=None, **read_form_data)
+        self.validate()  # the errors on validation are cancelled in the line above
+        return map
