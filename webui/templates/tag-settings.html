@@ -6,6 +6,7 @@
     Here you can configure your tag mappings.
 {% endblock desc %}
 {% block formfields %}
+<form method="post" role="form">
     {{ form.csrf_token() }}
     <div class="row text-center mb-2 fs-5">
         <div class="col">Stash Tag</div>
@@ -27,4 +28,5 @@
     {% endfor %}
     {{ render_field(form.newline) }}
     {{ render_field(form.submit) }}
+</form>
 {% endblock formfields %}

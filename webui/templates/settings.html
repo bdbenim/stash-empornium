@@ -1,5 +1,6 @@
 {% extends "base-settings.html" %}{% from "bootstrap5/form.html" import render_field %}
 {% block formfields %}
+<form method="post" role="form">
     {{ form.csrf_token() }}
     {%- for item in form %}
         {%- if item == form.csrf_token %}
@@ -22,6 +23,7 @@
             </div>
         {%- endif %}
     {%- endfor %}
+</form>
 {% endblock formfields %}
 {% block scripts %}
     {{ super() }}

@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from sqlalchemy import MetaData, String, Integer, ForeignKey, Column, Boolean
 
+__schema__ = 1
+
 
 class Base(DeclarativeBase):
     metadata = MetaData(
@@ -77,7 +79,12 @@ def to_dict() -> dict[str, Any]:
     categories = Category.query.all()
     s_tags = StashTag.query.all()
     e_tags = EmpTag.query.all()
-    data = {"stash_tags": [], "emp_tags": [], "categories": []}
+    data = {
+        "schema": __schema__,
+        "stash_tags": [], 
+        "emp_tags": [], 
+        "categories": []
+    }
     for tag in s_tags:
         assert isinstance(tag, StashTag)
         stag = {
@@ -104,6 +111,9 @@ def to_dict() -> dict[str, Any]:
 
 
 def from_dict(data: dict[str, Any]) -> None:
+    if data["schema"] != __schema__:
+        raise ValueError("Schema version mismatch")
+
     # 1. Delete existing records
     Category.query.delete()
     StashTag.query.delete()
