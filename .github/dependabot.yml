@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      flask:
+        patterns:
+        - "*flask*"
+        - "*Flask*"
+      python-packages:
+        patterns:
+        - "*"
+      
