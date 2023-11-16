@@ -343,7 +343,8 @@ def generate():
 
     preview_recv, preview_send = mp.Pipe(False)
     preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene))
-    preview_proc.start()
+    if config.use_preview:
+        preview_proc.start()
 
     ###############
     # STUDIO LOGO #
@@ -577,9 +578,6 @@ def generate():
         info_proc.join()
         mediainfo = info_recv.recv()  # type: ignore
 
-    preview_proc.join()
-    preview_url = preview_recv.recv()
-
     time.sleep(0.1)
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
@@ -604,8 +602,13 @@ def generate():
         "image_count": image_count,
         "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
-        "preview": preview_url,
     }
+
+    preview_url = None
+    if config.use_preview:
+        preview_proc.join()
+        preview_url = preview_recv.recv()
+        template_context["preview"] = preview_url
 
     for key in tmpTagLists:
         template_context[key] = ", ".join(tmpTagLists[key])
@@ -613,11 +616,6 @@ def generate():
     description = render_template(template, **template_context)
 
     tag_suggestions = tags.tag_suggestions
-
-    # if include_gallery:
-    #     gal_proc.join()
-    #     gal = gal_recv.recv()
-    # TODO
 
     logger.info("Waiting for torrent generation to complete")
     torrent_proc.join()
@@ -629,8 +627,7 @@ def generate():
             "message": "Done",
             "fill": {
                 "title": title,
-                # "cover": cover_remote_url,
-                "cover": preview_url,
+                "cover": preview_url if preview_url and config.animated_cover else cover_remote_url,
                 "tags": " ".join(tags.tags),
                 "description": description,
                 "torrent_path": torrent_paths[0],
