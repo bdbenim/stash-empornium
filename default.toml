@@ -21,6 +21,10 @@ anon = false
 # media_directory = "/torrents"
 ## How to move files to media_directory. Must be 'copy', 'hardlink', or 'symlink'
 move_method = 'copy'
+## Upload a GIF preview of the scene
+use_preview = false
+## Use the preview GIF as the upload cover. Ignored if 'use_preview' is false
+animated_cover = true
 
 # [rtorrent]
 ## Hostname or IP address

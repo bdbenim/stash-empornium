@@ -337,6 +337,15 @@ def generate():
     cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
     os.remove(cover_file[1])
 
+    ###########
+    # PREVIEW #
+    ###########
+
+    preview_recv, preview_send = mp.Pipe(False)
+    preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene))
+    if config.use_preview:
+        preview_proc.start()
+
     ###############
     # STUDIO LOGO #
     ###############
@@ -595,17 +604,18 @@ def generate():
         "media_info": mediainfo,
     }
 
+    preview_url = None
+    if config.use_preview:
+        preview_proc.join()
+        preview_url = preview_recv.recv()
+        template_context["preview"] = preview_url
+
     for key in tmpTagLists:
         template_context[key] = ", ".join(tmpTagLists[key])
 
     description = render_template(template, **template_context)
 
     tag_suggestions = tags.tag_suggestions
-
-    # if include_gallery:
-    #     gal_proc.join()
-    #     gal = gal_recv.recv()
-    # TODO
 
     logger.info("Waiting for torrent generation to complete")
     torrent_proc.join()
@@ -617,7 +627,7 @@ def generate():
             "message": "Done",
             "fill": {
                 "title": title,
-                "cover": cover_remote_url,
+                "cover": preview_url if preview_url and config.animated_cover else cover_remote_url,
                 "tags": " ".join(tags.tags),
                 "description": description,
                 "torrent_path": torrent_paths[0],
