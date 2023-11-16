@@ -1,5 +1,5 @@
 Flask == 3.0.*
-requests == 2.29.*
+requests == 2.31.*
 vcsi == 7.0.*
 waitress == 2.1.*
 cairosvg == 2.7.*
