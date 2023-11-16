@@ -337,6 +337,14 @@ def generate():
     cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
     os.remove(cover_file[1])
 
+    ###########
+    # PREVIEW #
+    ###########
+
+    preview_recv, preview_send = mp.Pipe(False)
+    preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene))
+    preview_proc.start()
+
     ###############
     # STUDIO LOGO #
     ###############
@@ -569,6 +577,9 @@ def generate():
         info_proc.join()
         mediainfo = info_recv.recv()  # type: ignore
 
+    preview_proc.join()
+    preview_url = preview_recv.recv()
+
     time.sleep(0.1)
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
@@ -593,6 +604,7 @@ def generate():
         "image_count": image_count,
         "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
+        "preview": preview_url,
     }
 
     for key in tmpTagLists:
@@ -617,7 +629,8 @@ def generate():
             "message": "Done",
             "fill": {
                 "title": title,
-                "cover": cover_remote_url,
+                # "cover": cover_remote_url,
+                "cover": preview_url,
                 "tags": " ".join(tags.tags),
                 "description": description,
                 "torrent_path": torrent_paths[0],

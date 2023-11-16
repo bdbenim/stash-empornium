@@ -59,7 +59,6 @@ findScene(id: "{}") {{
     paths {{
         screenshot
         preview
-        webp
     }}
     files {{
         id

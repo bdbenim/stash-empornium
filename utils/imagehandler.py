@@ -1,6 +1,7 @@
 import hashlib
 import logging
 from multiprocessing import Pool
+from multiprocessing.connection import Connection
 import os
 import re
 import requests
@@ -10,7 +11,7 @@ import time
 from typing import Any, Optional, Sequence
 import uuid
 
-from utils.confighandler import ConfigHandler
+from utils.confighandler import ConfigHandler, stash_headers
 
 from PIL import Image, ImageSequence
 
@@ -44,11 +45,11 @@ class ImageHandler:
         self.img_host_token, self.cookies = connectionInit()
 
     def configureCache(self) -> None:
-        redisHost:str = conf.get("redis", "host", "") # type: ignore
-        redisPort:int = conf.get("redis", "port", 6379) # type: ignore
+        redisHost: str = conf.get("redis", "host", "")  # type: ignore
+        redisPort: int = conf.get("redis", "port", 6379)  # type: ignore
         user = conf.get("redis", "username", "")
         password = conf.get("redis", "password", "")
-        use_ssl:bool = conf.get("redis", "ssl", False) # type: ignore
+        use_ssl: bool = conf.get("redis", "ssl", False)  # type: ignore
         no_cache = conf.args.no_cache
         overwrite = conf.args.overwrite
 
@@ -109,6 +110,36 @@ class ImageHandler:
         logger.debug(f"No images found in cache for file {id}")
         return [None]
 
+    def process_preview(self, pipe: Connection, scene: dict[str, Any]) -> Optional[str]:
+        logger.info("Getting scene preview")
+        preview_url = self.get_images(scene["files"][0]["id"], "preview")[0]
+        if preview_url:
+            pipe.send(preview_url)
+            return
+
+        preview = requests.get(scene["paths"]["preview"], headers=stash_headers) if scene["paths"]["preview"] else None
+        if preview:
+            with tempfile.TemporaryDirectory() as tempdir:
+                temppath = os.path.join(tempdir, "preview.mp4")
+                # output = os.path.join(tempdir, "preview.gif")
+                output = os.path.abspath(os.path.join(conf.config_dir, "preview.gif"))
+                with open(temppath, "wb") as temp:
+                    temp.write(preview.content)
+                CMD = ["ffmpeg", "-i", temppath, "-vf", "fps=10", output, "-y"]
+                proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                logger.debug(f"ffmpeg output:\n{proc.stdout}")
+                width = 600
+                while os.path.getsize(output) > 5000000:
+                    CMD[4] = f"fps=10,scale={width}:-1:flags=lanczos"
+                    proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    logger.debug(f"ffmpeg output:\n{proc.stdout}")
+                    width -= 10
+                preview_url, digest = self.getURL(output, "image/gif", "gif", default=None)
+                if digest:
+                    for file in scene["files"]:
+                        self.set_images(file["id"], "preview", [digest])
+        pipe.send(preview_url)
+
     def generate_contact_sheet(self, stash_file: dict[str, Any]) -> Optional[str]:
         contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
         cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
@@ -152,12 +183,12 @@ class ImageHandler:
         cmds.clear()
         for path in paths:
             digests.append(getDigest(path))
-            cmds.append((path, "image/jpeg", "jpg", self.img_host_token, self.cookies, ""))
+            cmds.append((path, "image/jpeg", "jpg", self.img_host_token, self.cookies))
         logger.debug(f"Digests: {digests}")
         with Pool() as p:
             screens = p.starmap(img_host_upload, cmds)
         for url, digest in zip(screens, digests):
-            if url != "":
+            if url:
                 self.add(digest, url)
             else:
                 digests.remove(digest)
@@ -172,7 +203,7 @@ class ImageHandler:
         img_mime_type: str,
         image_ext: str,
         width: int = 0,
-        default: str = STUDIO_DEFAULT_LOGO,
+        default: str | None = STUDIO_DEFAULT_LOGO,
     ) -> tuple[str | None, str | None]:
         # Return cached url if available
         digest = None
@@ -186,9 +217,11 @@ class ImageHandler:
         if url is not None:
             logger.debug(f"Found url {url} in cache")
             return url, digest
-        url = img_host_upload(img_path, img_mime_type, image_ext, self.img_host_token, self.cookies, default)
-        self.add(digest, url)
-        return url, digest
+        url = img_host_upload(img_path, img_mime_type, image_ext, self.img_host_token, self.cookies)
+        if url:
+            self.add(digest, url)
+            return url, digest
+        return default, digest
 
     def set_images(self, id: str, key: str, digests: list[str]) -> None:
         if self.no_cache:
@@ -254,15 +287,14 @@ def img_host_upload(
     image_ext: str,
     img_host_token: str,
     cookies,
-    default: str = STUDIO_DEFAULT_LOGO,
-) -> str:
+) -> str | None:
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
     logger.debug(f"Uploading image from {img_path}")
 
     # Return default image if unknown
     if image_ext == "unk":
-        return default
+        return None
 
     # Convert animated webp to gif
     if img_mime_type == "image/webp":
@@ -327,7 +359,7 @@ def img_host_upload(
         response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
         if j and "error" in j:
             logger.error(f"Error uploading image: {response.json()['error']['message']}")
-            return default
+            return None
     url: str = response.json()["image"]["image"]["url"]
     return url
 
@@ -359,6 +391,7 @@ def getDigest(path: str) -> str:
     with open(path, "rb") as f:
         return hashlib.file_digest(f, hashlib.md5).hexdigest()
 
+
 def createContactSheet(files: list[str], target_width: int, row_height: int, output: str) -> str | None:
     """
     Creates a gallery contact sheet from a list of file names.
@@ -374,8 +407,8 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
             with Image.open(file) as img:
                 w = img.width
                 if img.height > row_height:
-                    w = int((row_height/img.height)*img.width)
-                if (row_width+w)>target_width:
+                    w = int((row_height / img.height) * img.width)
+                if (row_width + w) > target_width:
                     delta = target_width / row_width
                     h = int(row_height * delta)
                     row = Image.new(img.mode, (target_width, h))
@@ -397,8 +430,8 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
                     row_width += w
         except:
             pass
-            
-    sheet = Image.new('RGB', (target_width, total_height))
+
+    sheet = Image.new("RGB", (target_width, total_height))
     top = 0
     for row in rows:
         bbox = (0, top)
