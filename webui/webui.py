@@ -1,4 +1,6 @@
-from flask import Blueprint, abort, redirect, render_template, url_for, request
+import json
+import tempfile
+from flask import Blueprint, abort, redirect, render_template, url_for, request, send_file
 from webui.forms import (
     TagMapForm,
     BackendSettings,
@@ -11,12 +13,13 @@ from webui.forms import (
     CategoryList,
     SearchForm,
     FileMapForm,
-    TorrentSettings
+    TorrentSettings,
+    DBImportExport
 )
 
 from utils.confighandler import ConfigHandler
 from utils.taghandler import TagHandler
-from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category
+from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category, from_dict, to_dict
 from werkzeug.exceptions import HTTPException
 
 conf = ConfigHandler()
@@ -129,6 +132,7 @@ def category_settings(page):
 @settings_page.route("/settings/<page>", methods=["GET", "POST"])
 def settings(page):
     template_context = {}
+    template = "settings.html"
     enable = page in conf and not conf.get(page, "disable", False)
     match page:
         case "backend":
@@ -202,6 +206,10 @@ def settings(page):
                 }
         case "tags":
             return redirect(url_for(".tag_settings", page="maps"))
+        case "database":
+            template_context["settings_option"] = "the tag database"
+            form = DBImportExport()
+            template = "dbexport.html"
         case _:
             abort(404)
     if form.validate_on_submit():
@@ -241,10 +249,7 @@ def settings(page):
                     if page in conf:
                         conf.set(page, "disable", True)
             case "rtorrent" | "deluge" | "qbittorrent":
-                try:
-                    assert isinstance(form, TorrentSettings)
-                except:
-                    abort(421)
+                assert isinstance(form, TorrentSettings)
                 path = form.update_self()
                 if path:
                     maps:dict = conf.get(page, "pathmaps") # type: ignore
@@ -290,11 +295,24 @@ def settings(page):
                     conf.conf["file.maps"].clear()  # type: ignore
                     for map in form.file_maps:
                         conf.set("file.maps", map.data["local_path"], map.data["remote_path"])
+            case "database":
+                del template_context["message"]
+                assert isinstance(form, DBImportExport)
+                if form.export_database.data:
+                    data = json.dumps(to_dict())
+                    temp = tempfile.mktemp()
+                    with open(temp, "w") as f:
+                        f.write(data)
+                    return send_file(temp, as_attachment=True, download_name="export.json")
+                elif form.imp.data:
+                    data = json.loads(form.upload_database.data.read())
+                    from_dict(data)
+                    template_context["message"] = "Settings imported"
             case _:
                 abort(404)
         conf.update_file()
     template_context["form"] = form
-    return render_template("settings.html", **template_context)
+    return render_template(template, **template_context)
 
 
 @settings_page.app_errorhandler(HTTPException)

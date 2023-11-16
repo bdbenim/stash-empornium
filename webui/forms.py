@@ -1,17 +1,18 @@
 from flask_bootstrap import SwitchField
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import (
     StringField,
     Form,
     FieldList,
     FormField,
-    Label,
     SubmitField,
     SelectField,
     StringField,
     SubmitField,
     URLField,
     SelectMultipleField,
+    # FileField
 )
 from wtforms.widgets import Input, PasswordInput
 from wtforms.validators import URL, DataRequired, Optional
@@ -306,3 +307,8 @@ class FileMapForm(FlaskForm):
         self.__init__(formdata=None, **read_form_data)
         self.validate()  # the errors on validation are cancelled in the line above
         return map
+
+class DBImportExport(FlaskForm):
+    export_database = SubmitField()
+    upload_database = FileField(validators=[FileAllowed(["txt", "json", "md"])])
+    imp = SubmitField("Import")

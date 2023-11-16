@@ -125,6 +125,7 @@ def mapPaths(f: dict) -> dict:
 app = Flask(__name__, template_folder=config.template_dir)
 app.secret_key = "secret"
 app.config["BOOTSTRAP_BOOTSWATCH_THEME"] = "cyborg"
+app.config["UPLOAD_FOLDER"] = tempfile.mkdtemp()
 db_path = os.path.abspath(os.path.join(config.config_dir, "db.sqlite3"))
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 db.db.init_app(app)
