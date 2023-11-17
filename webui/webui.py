@@ -147,6 +147,12 @@ def settings(page):
                 move_method=conf.get(page, "move_method", "copy"),
                 anon=conf.get(page, "anon", False),
                 choices=[opt for opt in conf["templates"]],  # type: ignore
+                upload_gif=conf.get(page, "use_preview", False),
+                use_gif=conf.get(page, "animated_cover", False),
+                tag_codec = conf.get("metadata", "tag_codec", False),
+                tag_date = conf.get("metadata", "tag_date", False),
+                tag_framerate = conf.get("metadata", "tag_framerate", False),
+                tag_resolution = conf.get("metadata", "tag_resolution", False),
             )
         case "stash":
             template_context["settings_option"] = "your stash server"
@@ -216,11 +222,18 @@ def settings(page):
         template_context["message"] = "Settings saved"
         match page:
             case "backend":
+                assert isinstance(form, BackendSettings)
                 conf.set(page, "default_template", form.data["default_template"])
                 conf.set(page, "torrent_directories", [x.strip() for x in form.data["torrent_directories"].split(",")])
                 conf.set(page, "port", int(form.data["port"]))
                 conf.set(page, "title_template", form.data["title_template"])
                 conf.set(page, "date_format", form.data["date_format"])
+                conf.set(page, "use_preview", form.upload_gif.data)
+                conf.set(page, "animated_cover", form.use_gif.data)
+                conf.set("metadata", "tag_codec", form.tag_codec.data)
+                conf.set("metadata", "tag_date", form.tag_date.data)
+                conf.set("metadata", "tag_framerate", form.tag_framerate.data)
+                conf.set("metadata", "tag_resolution", form.tag_resolution.data)
                 if form.data["media_directory"]:
                     conf.set(page, "media_directory", form.data["media_directory"])
                 conf.set(page, "move_method", form.data["move_method"])

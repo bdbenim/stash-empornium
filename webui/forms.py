@@ -12,7 +12,6 @@ from wtforms import (
     SubmitField,
     URLField,
     SelectMultipleField,
-    # FileField
 )
 from wtforms.widgets import Input, PasswordInput
 from wtforms.validators import URL, DataRequired, Optional
@@ -68,8 +67,14 @@ class BackendSettings(FlaskForm):
     example = StringField("Date Example:", render_kw={"readonly": True})
     title_template = StringField()
     anon = SwitchField("Upload Anonymously")
-    media_directory = StringField(validators=[Directory()])
+    media_directory = StringField(validators=[Directory()], render_kw={"data-toggle": "tooltip", "title": "Where to save data for multi-file torrents"})
     move_method = SelectField(choices=["copy", "hardlink", "symlink"])  # type: ignore
+    upload_gif = SwitchField("Upload Preview GIF")
+    use_gif = SwitchField("Use GIF as Cover")
+    tag_codec = SwitchField()
+    tag_date = SwitchField()
+    tag_framerate = SwitchField()
+    tag_resolution = SwitchField()
     save = SubmitField()
 
 
