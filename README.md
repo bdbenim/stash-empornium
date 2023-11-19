@@ -18,7 +18,7 @@ The docker version is recommended as it comes bundled with all required and reco
 
 ```bash
 docker pull bdbenim/stash-empornium:latest
-docker run -d \
+docker run \
 --name stash-empornium \
 -p 9932:9932 \
 --mount type=bind,src=/path/to/config,target=/config \
