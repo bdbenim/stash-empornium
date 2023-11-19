@@ -1,6 +1,6 @@
 # this dockerfile is used to build the image for the emp_stash_fill service, install all the dependencies and run the service to listen to the tampermonkey script on the host browser
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /emp_stash_fill
 
