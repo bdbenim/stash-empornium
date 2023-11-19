@@ -52,7 +52,7 @@ class Category(db.Model):
     tags: Mapped[list[StashTag]] = db.relationship(secondary=list_tags, back_populates="categories")  # type: ignore
 
 
-def get_or_create(model: type, **kwargs):
+def get_or_create[T](model: type[T], **kwargs) -> T:
     session = db.session
     instance = session.query(model).filter_by(**kwargs).first()
     if instance:
@@ -64,7 +64,7 @@ def get_or_create(model: type, **kwargs):
         return instance
 
 
-def get_or_create_no_commit(model: type, **kwargs):
+def get_or_create_no_commit[T](model: type[T], **kwargs) -> T:
     session = db.session
     instance = session.query(model).filter_by(**kwargs).first()
     if instance:
@@ -76,17 +76,11 @@ def get_or_create_no_commit(model: type, **kwargs):
 
 
 def to_dict() -> dict[str, Any]:
-    categories = Category.query.all()
-    s_tags = StashTag.query.all()
-    e_tags = EmpTag.query.all()
-    data = {
-        "schema": __schema__,
-        "stash_tags": [], 
-        "emp_tags": [], 
-        "categories": []
-    }
+    categories: list[Category] = Category.query.all()
+    s_tags: list[StashTag] = StashTag.query.all()
+    e_tags: list[EmpTag] = EmpTag.query.all()
+    data = {"schema": __schema__, "stash_tags": [], "emp_tags": [], "categories": []}
     for tag in s_tags:
-        assert isinstance(tag, StashTag)
         stag = {
             "id": tag.id,
             "name": tag.tagname,
@@ -98,12 +92,10 @@ def to_dict() -> dict[str, Any]:
         data["stash_tags"].append(stag)
 
     for cat in categories:
-        assert isinstance(cat, Category)
         category = {"id": cat.id, "name": cat.name}
         data["categories"].append(category)
 
     for tag in e_tags:
-        assert isinstance(tag, EmpTag)
         etag = {"id": tag.id, "name": tag.tagname}
         data["emp_tags"].append(etag)
 

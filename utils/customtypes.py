@@ -186,10 +186,8 @@ Copyright 2019 Kenneth Reitz
 from collections.abc import Mapping, MutableMapping
 from typing import TypeVar, Iterable
 
-T = TypeVar("T")
 
-
-class CaseInsensitiveDict(MutableMapping[str, T]):
+class CaseInsensitiveDict[T](MutableMapping[str, T]):
     """
     A case-insensitive ``dict``-like object.
 
