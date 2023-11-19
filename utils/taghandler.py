@@ -155,43 +155,44 @@ class TagHandler:
                 self.tags.add("circumcised.cock")
             elif performer["circumcised"] == "UNCUT":
                 self.tags.add("uncircumcised.cock")
-        if self.conf["performers"]["tag_ethnicity"] and "ethnicity" in performer and performer["ethnicity"] in ETHNICITY_MAP:  # type: ignore
-            self.add(ETHNICITY_MAP[performer["ethnicity"]])
-        if self.conf["performers"]["tag_eye_color"] and "eye_color" in performer and len(performer["eye_color"]) > 0:  # type: ignore
-            self.add(performer["eye_color"] + ".eyes")
-        fake_tits = ""
-        if "fake_tits" in performer:
-            fake_tits = performer["fake_tits"].lower()
-            if fake_tits == "natural":
-                self.add("natural.tits")
-            elif fake_tits == "augmented" or fake_tits == "fake":
-                self.add("fake.tits")
-        if self.conf["performers"]["tag_hair_color"] and "hair_color" in performer and performer["hair_color"] in HAIR_COLOR_MAP:  # type: ignore
-            self.add(HAIR_COLOR_MAP[performer["hair_color"]])
-        if "measurements" in performer and len(performer["measurements"]) > 0:
-            tits = self.processTits(performer["measurements"], fake_tits)
-            if tits >= 0:
-                for key, (value, op) in self.cup_sizes.items():
-                    match op:
-                        case -1:
-                            if tits <= value:
-                                self.add(key)
-                        case 0:
-                            if tits == value:
-                                self.add(key)
-                        case 1:
-                            if tits >= value:
-                                self.add(key)
-        tattoos = "tattoos" in performer and len(performer["tattoos"]) > 0
-        piercings = "piercings" in performer and len(performer["piercings"]) > 0
-        if tattoos:
-            self.add("tattoo")
-            if gender.lower() == "female":
-                self.add("tattooed.female")
-        if piercings:
-            self.add("piercings")
-        if tattoos and piercings:
-            self.add("tattoo.and.piercing")
+        if gender not in ("MALE", "TRANSGENDER_MALE"):
+            if self.conf["performers"]["tag_ethnicity"] and "ethnicity" in performer and performer["ethnicity"] in ETHNICITY_MAP:  # type: ignore
+                self.add(ETHNICITY_MAP[performer["ethnicity"]])
+            if self.conf["performers"]["tag_eye_color"] and "eye_color" in performer and len(performer["eye_color"]) > 0:  # type: ignore
+                self.add(performer["eye_color"] + ".eyes")
+            if self.conf["performers"]["tag_hair_color"] and "hair_color" in performer and performer["hair_color"] in HAIR_COLOR_MAP:  # type: ignore
+                self.add(HAIR_COLOR_MAP[performer["hair_color"]])
+            tattoos = "tattoos" in performer and len(performer["tattoos"]) > 0
+            piercings = "piercings" in performer and len(performer["piercings"]) > 0
+            if tattoos:
+                self.add("tattoo")
+                if gender.lower() == "female":
+                    self.add("tattooed.female")
+            if piercings:
+                self.add("piercings")
+            if tattoos and piercings:
+                self.add("tattoo.and.piercing")
+            fake_tits = ""
+            if "fake_tits" in performer:
+                fake_tits = performer["fake_tits"].lower()
+                if fake_tits == "natural":
+                    self.add("natural.tits")
+                elif fake_tits == "augmented" or fake_tits == "fake":
+                    self.add("fake.tits")
+            if "measurements" in performer and len(performer["measurements"]) > 0:
+                tits = self.processTits(performer["measurements"], fake_tits)
+                if tits >= 0:
+                    for key, (value, op) in self.cup_sizes.items():
+                        match op:
+                            case -1:
+                                if tits <= value:
+                                    self.add(key)
+                            case 0:
+                                if tits == value:
+                                    self.add(key)
+                            case 1:
+                                if tits >= value:
+                                    self.add(key)            
         return performer_tag
 
     def processTits(self, measurements: str, fake_tits: str = "") -> int:
@@ -201,6 +202,7 @@ class TagHandler:
         if cup_size == "":
             logger.error(f"No cup size found in {measurements}")
             return -1
+        self.add(f"{cup_size}.cup")
         if len(cup_size) > 1:
             letter = cup_size[0]
             if cup_size != len(cup_size) * letter or (letter != "A" and letter != "D"):
