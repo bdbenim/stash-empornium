@@ -121,23 +121,32 @@ class ImageHandler:
         if preview:
             with tempfile.TemporaryDirectory() as tempdir:
                 temppath = os.path.join(tempdir, "preview.mp4")
-                # output = os.path.join(tempdir, "preview.gif")
-                output = os.path.abspath(os.path.join(conf.config_dir, "preview.gif"))
+                output = os.path.join(tempdir, "preview.gif")
                 with open(temppath, "wb") as temp:
                     temp.write(preview.content)
                 CMD = ["ffmpeg", "-i", temppath, "-vf", "fps=10", output, "-y"]
                 proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 logger.debug(f"ffmpeg output:\n{proc.stdout}")
+                if proc.returncode:
+                    logger.error("Error generating preview GIF")
+                    pipe.send(None)
+                    return
                 width = 600
                 while os.path.getsize(output) > 5000000:
                     CMD[4] = f"fps=10,scale={width}:-1:flags=lanczos"
                     proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                     logger.debug(f"ffmpeg output:\n{proc.stdout}")
+                    if proc.returncode:
+                        logger.error("Error generating preview GIF")
+                        pipe.send(None)
+                        return
                     width -= 10
                 preview_url, digest = self.getURL(output, "image/gif", "gif", default=None)
                 if digest:
                     for file in scene["files"]:
                         self.set_images(file["id"], "preview", [digest])
+        else:
+            logger.error(f"No preview found for scene {scene['id']}")
         pipe.send(preview_url)
 
     def generate_contact_sheet(self, stash_file: dict[str, Any]) -> Optional[str]:
