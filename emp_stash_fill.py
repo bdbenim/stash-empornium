@@ -330,7 +330,7 @@ def generate():
 
     preview_recv, preview_send = mp.Pipe(False)
     preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene))
-    if config.use_preview:
+    if config.get("backend", "use_preview", False):
         preview_proc.start()
 
     ###############
@@ -592,7 +592,7 @@ def generate():
     }
 
     preview_url = None
-    if config.use_preview:
+    if config.get("backend", "use_preview", False):
         preview_proc.join()
         preview_url = preview_recv.recv()
         template_context["preview"] = preview_url
@@ -614,7 +614,7 @@ def generate():
             "message": "Done",
             "fill": {
                 "title": title,
-                "cover": preview_url if preview_url and config.animated_cover else cover_remote_url,
+                "cover": preview_url if preview_url and config.get("backend", "animated_cover", False) else cover_remote_url,
                 "tags": " ".join(tags.tags),
                 "description": description,
                 "torrent_path": torrent_paths[0],
