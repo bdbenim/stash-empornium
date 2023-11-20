@@ -105,23 +105,6 @@ def info(message: str, altMessage: str | None = None) -> str:
     return json.dumps({"status": "success", "data": {"message": altMessage if altMessage else message}})
 
 
-def mapPaths(f: dict) -> dict:
-    # Apply remote path mappings
-    logger.debug(f"Got path {f['path']} from stash")
-    for remote in config.items("file.maps"):
-        local = config.get("file.maps", remote)
-        assert isinstance(local, str)
-        if not f["path"].startswith(remote):
-            continue
-        if remote[-1] != "/":
-            remote += "/"
-        if local[-1] != "/":
-            local += "/"
-        f["path"] = local + f["path"].removeprefix(remote)
-        break
-    return f
-
-
 app = Flask(__name__, template_folder=config.template_dir)
 app.secret_key = "secret"
 app.config["BOOTSTRAP_BOOTSWATCH_THEME"] = "cyborg"
@@ -214,17 +197,21 @@ def generate():
         logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
             stash_file = f
-            # stash_file = mapPaths(stash_file)
-            stash_file["path"] = mapPath(stash_file["path"], config.items("file.maps"))
+            maps = config.items("file.maps")
+            if not maps:
+                maps = config.get("file", "maps", {})
+            stash_file["path"] = mapPath(stash_file["path"], maps)  # type: ignore
             break
 
     if stash_file is None:
         tmp_file = scene["files"][0]
         if tmp_file is None:
             return error("No file exists")
-        # stash_file = mapPaths(tmp_file)
         stash_file = tmp_file
-        stash_file["path"] = mapPath(stash_file["path"], config.items("file.maps"))
+        maps = config.items("file.maps")
+        if not maps:
+            maps = config.get("file", "maps", {})
+        stash_file["path"] = mapPath(stash_file["path"], maps)  # type: ignore
         logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
         return error(f"Couldn't find file {stash_file['path']}")
