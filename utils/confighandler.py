@@ -88,19 +88,12 @@ class ConfigHandler(Singleton):
     default_template: str
     anon: bool
     port: int
-    rhost: str | None
-    rport: int
-    ssl: bool
     username: str
     password: str
     torrent_dirs: list[str]
     date_format: str
     stash_url: str
     template_dir: str
-    tag_codec: bool
-    tag_date: bool
-    tag_framerate: bool
-    tag_resolution: bool
     title_template: str
     template_names: dict[str, str]
     config_file: str
@@ -136,11 +129,6 @@ class ConfigHandler(Singleton):
             nargs=1,
         )
         parser.add_argument("-p", "--port", nargs=1, help="port to listen on (default: 9932)", type=int)
-        flags = parser.add_argument_group("Tags", "optional tag settings")
-        flags.add_argument("-c", action="store_true", help="include codec as tag")
-        flags.add_argument("-d", action="store_true", help="include date as tag")
-        flags.add_argument("-f", action="store_true", help="include framerate as tag")
-        flags.add_argument("-r", action="store_true", help="include resolution as tag")
         parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
         parser.add_argument("--anon", action="store_true", help="upload anonymously")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
@@ -339,10 +327,6 @@ class ConfigHandler(Singleton):
             )
         )
         self.date_format = self.get("backend", "date_format", "%B %-d, %Y")  # type: ignore
-        self.tag_codec = self.args.c or self.get("metadata", "tag_codec", False)  # type: ignore
-        self.tag_date = self.args.d or self.get("metadata", "tag_date", False)  # type: ignore
-        self.tag_framerate = self.args.f or self.get("metadata", "tag_framerate", False)  # type: ignore
-        self.tag_resolution = self.args.r or self.get("metadata", "tag_resolution", False)  # type: ignore
 
         self.template_names = {}
         template_files = os.listdir(self.template_dir)

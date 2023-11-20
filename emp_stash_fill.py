@@ -254,7 +254,7 @@ def generate():
     elif ht >= 6143:
         resolution = "8K+"
 
-    if resolution is not None and config.tag_resolution:
+    if resolution is not None and config.get("metadata", "tag_resolution"):
         tags.add(resolution)
 
     ###########
@@ -487,16 +487,16 @@ def generate():
         for parent in tag["parents"]:
             tags.processTag(parent["name"])
 
-    if config.tag_codec and stash_file["video_codec"] is not None:
+    if config.get("metadata", "tag_codec") and stash_file["video_codec"] is not None:
         tags.add(stash_file["video_codec"])
 
-    if config.tag_codec and scene["date"] is not None and len(scene["date"]) > 0:
+    if config.get("metadata", "tag_date") and scene["date"] is not None and len(scene["date"]) > 0:
         year, month, day = scene["date"].split("-")
         tags.add(year)
         tags.add(f"{year}.{month}")
         tags.add(f"{year}.{month}.{day}")
 
-    if config.tag_framerate:
+    if config.get("metadata", "tag_framerate"):
         tags.add(str(round(stash_file["frame_rate"])) + ".fps")
 
     if scene["studio"] and scene["studio"]["url"] is not None:
