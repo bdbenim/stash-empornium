@@ -135,7 +135,7 @@ def generate():
     template = (
         j["template"]
         if "template" in j and j["template"] in os.listdir(app.template_folder)
-        else config.default_template
+        else config.get("backend", "default_template")
     )
     assert template is not None
 
@@ -152,7 +152,7 @@ def generate():
     logger.info("Querying stash")
     stash_request_body = {"query": "{" + stash_query.format(scene_id) + "}"}
     stash_response = requests.post(
-        urllib.parse.urljoin(config.stash_url, "/graphql"),
+        urllib.parse.urljoin(config.get("stash", "url", "http://localhost:9999"), "/graphql"), # type: ignore
         json=stash_request_body,
         headers=stash_headers,
     )
@@ -465,7 +465,7 @@ def generate():
     #########
 
     title = render_template_string(
-        config.title_template,
+        config.get("backend", "title_template", ""), # type: ignore
         **{
             "studio": scene["studio"]["name"] if scene["studio"] else "",
             "performers": [p["name"] for p in scene["performers"]],
@@ -557,7 +557,7 @@ def generate():
     # Prevent error in case date is missing
     date = scene["date"]
     if date != None and len(date) > 1:
-        date = datetime.datetime.fromisoformat(date).strftime(config.date_format)
+        date = datetime.datetime.fromisoformat(date).strftime(config.get("backend", "date_format", "%B %-d, %Y")) # type: ignore
 
     yield info("Rendering template")
 
@@ -600,7 +600,7 @@ def generate():
     for key in tmpTagLists:
         template_context[key] = ", ".join(tmpTagLists[key])
 
-    description = render_template(template, **template_context)
+    description = render_template(template, **template_context) # type: ignore
 
     tag_suggestions = tags.tag_suggestions
 
@@ -619,7 +619,7 @@ def generate():
                 "description": description,
                 "torrent_path": torrent_paths[0],
                 "file_path": stash_file["path"],
-                "anon": config.anon,
+                "anon": config.get("backend", "anon", False),
             },
         },
     }
@@ -750,8 +750,8 @@ if __name__ == "__main__":
     try:
         from waitress import serve
 
-        serve(app, host="0.0.0.0", port=config.port)
+        serve(app, host="0.0.0.0", port=config.get("backend", "port", 9932))
         # app.run(host="0.0.0.0", port=config.port, debug=True)
     except:
         logger.info("Waitress not installed, using builtin server")
-        app.run(host="0.0.0.0", port=config.port, debug=True)
+        app.run(host="0.0.0.0", port=config.get("backend", "port", 9932), debug=False) # type: ignore

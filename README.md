@@ -212,8 +212,7 @@ The `media_directory` option specifies the parent directory where media files wi
 The script can be run with optional command line arguments, most of which override a corresponding configuration file option. These can be used to quickly change a setting without needing to modify the config file, such as for temporarily listening on a different port or saving torrent files in a different directory. Not all configuration options can currently be set via the command line. The available options are described in the script's help text below:
 
 ```text
-usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [-t TORRENTDIR] [-p PORT] [-c] [-d] [-f] [-r] [--version] [--anon] [-q | -v | -l LEVEL] [--flush]
-                         [--no-cache | --overwrite]
+usage: emp_stash_fill.py [-h] [--configdir CONFIGDIR] [--version] [-q | -v | -l LEVEL] [--flush] [--no-cache | --overwrite]
 
 backend server for EMP Stash upload helper userscript
 
@@ -221,19 +220,7 @@ options:
   -h, --help            show this help message and exit
   --configdir CONFIGDIR
                         specify the directory containing configuration files
-  -t TORRENTDIR, --torrentdir TORRENTDIR
-                        specify the directory where .torrent files should be saved
-  -p PORT, --port PORT  port to listen on (default: 9932)
   --version             show program's version number and exit
-  --anon                upload anonymously
-
-Tags:
-  optional tag settings
-
-  -c                    include codec as tag
-  -d                    include date as tag
-  -f                    include framerate as tag
-  -r                    include resolution as tag
 
 Output:
   options for setting the log level
