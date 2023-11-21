@@ -742,8 +742,59 @@ def templates():
 
 @app.route("/favicon.ico")
 def favicon():
-    return redirect(url_for("static", filename="favicon.ico"))
+    return redirect(url_for("static", filename="images/favicon.ico"))
 
+@app.route("/favicon-16x16.png")
+def favicon16():
+    return redirect(url_for("static", filename="images/favicon-16x16.png"))
+
+@app.route("/favicon-32x32.png")
+def favicon32():
+    return redirect(url_for("static", filename="images/favicon-32x32.png"))
+
+@app.route("/apple-touch-icon.png")
+def apple_touch_icon():
+    return redirect(url_for("static", filename="images/apple-touch-icon.png"))
+
+@app.route("/android-chrome-192x192.png")
+def android_chrome_192():
+    return redirect(url_for("static", filename="images/android-chrome-192x192.png"))
+
+@app.route("/android-chrome-512x512.png")
+def android_chrome_512():
+    return redirect(url_for("static", filename="images/android-chrome-512x512.png"))
+
+@app.route("/mstile-70x70.png")
+def mstile70():
+    return redirect(url_for("static", filename="images/mstile-70x70.png"))
+
+@app.route("/mstile-144x144.png")
+def mstile144():
+    return redirect(url_for("static", filename="images/mstile-144x144.png"))
+
+@app.route("/mstile-150x150.png")
+def mstile150():
+    return redirect(url_for("static", filename="images/mstile-150x150.png"))
+
+@app.route("/mstile-310x150.png")
+def mstile310_150():
+    return redirect(url_for("static", filename="images/mstile-310x150.png"))
+
+@app.route("/mstile-310x310.png")
+def mstile310():
+    return redirect(url_for("static", filename="images/mstile-310x310.png"))
+
+@app.route("/safari-pinned-tab.svg")
+def safari():
+    return redirect(url_for("static", filename="images/safari-pinned-tab.svg"))
+
+@app.route("/browserconfig.xml")
+def browserconfig():
+    return redirect(url_for("static", filename="browserconfig.xml"))
+
+@app.route("/site.webmanifest")
+def webmanifest():
+    return redirect(url_for("static", filename="site.webmanifest"))
 
 if __name__ == "__main__":
     app.register_blueprint(settings_page)
