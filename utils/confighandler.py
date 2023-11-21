@@ -94,8 +94,6 @@ class ConfigHandler(Singleton):
     config_file: str
     tag_config_file: str
     torrent_clients: list[TorrentClient] = []
-    animated_cover: bool
-    use_preview: bool
 
     def __init__(self):
         if not (self.initialized):
@@ -271,8 +269,6 @@ class ConfigHandler(Singleton):
                         conf["templates"][filename] = tmpConf["templates"][filename]  # type: ignore
 
         # TODO: better handling of unexpected values
-        self.use_preview = self.conf["backend"]["use_preview"] # type: ignore
-        self.animated_cover = self.conf["backend"]["animated_cover"] # type: ignore
         self.torrent_dirs = list(self.conf["backend"]["torrent_directories"])  # type: ignore
         assert self.torrent_dirs is not None and len(self.torrent_dirs) > 0
         for dir in self.torrent_dirs:
