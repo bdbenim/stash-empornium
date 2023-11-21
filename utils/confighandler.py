@@ -85,23 +85,11 @@ class ConfigHandler(Singleton):
     args: argparse.Namespace
     conf: tomlkit.TOMLDocument
     tagconf: tomlkit.TOMLDocument
-    default_template: str
-    anon: bool
     port: int
-    rhost: str | None
-    rport: int
-    ssl: bool
     username: str
     password: str
     torrent_dirs: list[str]
-    date_format: str
-    stash_url: str
     template_dir: str
-    tag_codec: bool
-    tag_date: bool
-    tag_framerate: bool
-    tag_resolution: bool
-    title_template: str
     template_names: dict[str, str]
     config_file: str
     tag_config_file: str
@@ -127,20 +115,7 @@ class ConfigHandler(Singleton):
             help="specify the directory containing configuration files",
             nargs=1,
         )
-        parser.add_argument(
-            "-t",
-            "--torrentdir",
-            help="specify the directory where .torrent files should be saved",
-            nargs=1,
-        )
-        parser.add_argument("-p", "--port", nargs=1, help="port to listen on (default: 9932)", type=int)
-        flags = parser.add_argument_group("Tags", "optional tag settings")
-        flags.add_argument("-c", action="store_true", help="include codec as tag")
-        flags.add_argument("-d", action="store_true", help="include date as tag")
-        flags.add_argument("-f", action="store_true", help="include framerate as tag")
-        flags.add_argument("-r", action="store_true", help="include resolution as tag")
         parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
-        parser.add_argument("--anon", action="store_true", help="upload anonymously")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
         mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
         mutex.add_argument(
@@ -294,26 +269,7 @@ class ConfigHandler(Singleton):
                         conf["templates"][filename] = tmpConf["templates"][filename]  # type: ignore
 
         # TODO: better handling of unexpected values
-        anon = self.conf["backend"]["anon"]  # type: ignore
-        if anon is not None:
-            assert isinstance(anon, bool)
-        self.anon: bool = self.args.anon or anon
-        self.logger.debug(f"Anonymous uploading: {self.anon}")
-        self.stash_url = self.conf["stash"]["url"]  # type: ignore
-        if self.stash_url is None:
-            self.stash_url = "http://localhost:9999"
-        self.port = self.args.port[0] if self.args.port else self.conf["backend"]["port"]  # type: ignore
-        if not isinstance(self.port, int):
-            self.port = 9932
-        self.default_template = self.conf["backend"]["default_template"]  # type: ignore
-        if self.default_template is None:
-            self.default_template = "fakestash-v2"
-        # TODO check that template exists
-        self.torrent_dirs = (
-            [self.args.torrentdir[0]]
-            if self.args.torrentdir
-            else list(self.conf["backend"]["torrent_directories"])  # type: ignore
-        )
+        self.torrent_dirs = list(self.conf["backend"]["torrent_directories"])  # type: ignore
         assert self.torrent_dirs is not None and len(self.torrent_dirs) > 0
         for dir in self.torrent_dirs:
             if not os.path.isdir(dir):
@@ -327,18 +283,6 @@ class ConfigHandler(Singleton):
         if len(self.torrent_dirs) == 0:
             self.logger.critical("No valid output directories found")
             exit(1)
-        self.title_template = str(
-            self.get(
-                "backend",
-                "title_template",
-                "{% if studio %}[{{studio}}]{% endif %} {{performers|join(', ')}} - {{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]",
-            )
-        )
-        self.date_format = self.get("backend", "date_format", "%B %-d, %Y")  # type: ignore
-        self.tag_codec = self.args.c or self.get("metadata", "tag_codec", False)  # type: ignore
-        self.tag_date = self.args.d or self.get("metadata", "tag_date", False)  # type: ignore
-        self.tag_framerate = self.args.f or self.get("metadata", "tag_framerate", False)  # type: ignore
-        self.tag_resolution = self.args.r or self.get("metadata", "tag_resolution", False)  # type: ignore
 
         self.template_names = {}
         template_files = os.listdir(self.template_dir)
