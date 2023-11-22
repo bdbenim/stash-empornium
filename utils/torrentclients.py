@@ -164,6 +164,9 @@ class Qbittorrent(TorrentClient):
     def _post(self, path: str, data: dict, files:dict|None = None, timeout: int = 5) -> requests.Response:
         r = requests.post(self.url+path, data=data, cookies=self.cookies, timeout=timeout, files=files)
         return r
+    
+    def connected(self) -> bool:
+        return self.logged_in
 
 
 class Deluge(TorrentClient):
