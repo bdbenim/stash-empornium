@@ -6,23 +6,25 @@
     Here you can configure your tag categories.
 {% endblock desc %}
 {% block formfields %}
-    {{ form.csrf_token() }}
-    <div class="row text-center mb-2 fs-5">
-        <div class="col">Categories</div>
-        <div class="col"></div>
-    </div>
-    {% for field in form.categories %}
-        {% if field.errors %}
-        <div class="row">
-        {% for subfield in field %}
-        <div class="col">
-            {% for error in subfield.errors %}<div class="invalid-feedback d-block mb-2 mt-0">{{ error }}</div>{% endfor %}
+    <form method="post" role="form">
+        {{ form.csrf_token() }}
+        <div class="row text-center mb-2 fs-5">
+            <div class="col">Categories</div>
+            <div class="col"></div>
         </div>
+        {% for field in form.categories %}
+            {% if field.errors %}
+                <div class="row">
+                    {% for subfield in field %}
+                        <div class="col">
+                            {% for error in subfield.errors %}<div class="invalid-feedback d-block mb-2 mt-0">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {{ render_form_row(field, form_type='inline') }}
         {% endfor %}
-        </div>
-        {% endif %}
-        {{ render_form_row(field, form_type='inline') }}
-    {% endfor %}
-    {{ render_field(form.new_category) }}
-    {{ render_field(form.submit) }}
+        {{ render_field(form.new_category) }}
+        {{ render_field(form.submit) }}
+    </form>
 {% endblock formfields %}
