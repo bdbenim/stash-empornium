@@ -126,7 +126,7 @@ class TagHandler:
         else:
             self.tag_suggestions[tag] = empify(tag)
         for cat in s_tag.categories:
-            self.tag_sets[cat.name].add(tag)
+            self.tag_sets[cat.name].add(s_tag.display if s_tag.display else tag)
 
     def queryMaps(self, page=1, per_page=50):
         return StashTag.query.paginate(page=page, per_page=per_page)
