@@ -44,6 +44,7 @@ def tag(id):
     if form.validate_on_submit():
         if form.data["save"]:
             tag.ignored = form.data["ignored"]
+            tag.display = form.data["display"]
             tag.emp_tags.clear()
             for et in form.data["emp_tags"].split():
                 e_tag = get_or_create_no_commit(EmpTag, tagname=et)

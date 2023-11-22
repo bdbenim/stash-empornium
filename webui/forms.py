@@ -67,7 +67,10 @@ class BackendSettings(FlaskForm):
     example = StringField("Date Example:", render_kw={"readonly": True})
     title_template = StringField()
     anon = SwitchField("Upload Anonymously")
-    media_directory = StringField(validators=[Directory()], render_kw={"data-toggle": "tooltip", "title": "Where to save data for multi-file torrents"})
+    media_directory = StringField(
+        validators=[Directory()],
+        render_kw={"data-toggle": "tooltip", "title": "Where to save data for multi-file torrents"},
+    )
     move_method = SelectField(choices=["copy", "hardlink", "symlink"])  # type: ignore
     upload_gif = SwitchField("Upload Preview GIF")
     use_gif = SwitchField("Use GIF as Cover")
@@ -92,7 +95,9 @@ class TorrentSettings(FlaskForm):
     enable_form = SwitchField("Enable")
     host = StringField(validators=[ConditionallyRequired()])
     port = StringField(validators=[PortRange(), ConditionallyRequired()])
-    path = StringField(validators=[ConditionallyRequired(message="Please specify the API path (typically XMLRPC or RPC2)")])
+    path = StringField(
+        validators=[ConditionallyRequired(message="Please specify the API path (typically XMLRPC or RPC2)")]
+    )
     username = StringField(validators=[Optional()])
     password = PasswordField(validators=[Optional()])
     label = StringField()
@@ -136,8 +141,10 @@ class TorrentSettings(FlaskForm):
         self.validate()  # the errors on validation are cancelled in the line above
         return map
 
+
 class RTorrentSettings(TorrentSettings):
     pass
+
 
 class QBittorrentSettings(TorrentSettings):
     path = None
@@ -204,9 +211,32 @@ def getCategories():
 
 
 class TagAdvancedForm(FlaskForm):
-    ignored = SwitchField()
-    stash_tag = StringField()
-    emp_tags = StringField("EMP Tags")
+    ignored = SwitchField(
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "Don't include this tag in uploads",
+        }
+    )
+    stash_tag = StringField(
+        validators=[DataRequired()],
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "The name of the tag in your stash server",
+        },
+    )
+    display = StringField(
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "(Optional) How you want this tag to be displayed in your presentation",
+        }
+    )
+    emp_tags = StringField(
+        "EMP Tags",
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "(Optional) The tag(s) that this corresponds to on Empornium",
+        },
+    )
     categories = SelectMultipleField(choices=getCategories)  # type: ignore
     delete = SubmitField()
     save = SubmitField()
@@ -216,6 +246,7 @@ class TagAdvancedForm(FlaskForm):
             tag: StashTag = kwargs["tag"]
             kwargs["stash_tag"] = tag.tagname
             kwargs["emp_tags"] = " ".join([et.tagname for et in tag.emp_tags])
+            kwargs["display"] = tag.display
             kwargs["categories"] = [cat.name for cat in tag.categories]
             kwargs["ignored"] = tag.ignored
         super().__init__(*args, **kwargs)
@@ -244,7 +275,7 @@ class CategoryList(FlaskForm):
 
         # modify the data:
         updated_list = read_form_data["categories"]
-        if read_form_data["new_category"]:
+        if self.new_category.data:
             updated_list.append({})
         else:
             for i, row in enumerate(read_form_data["categories"]):
@@ -312,6 +343,7 @@ class FileMapForm(FlaskForm):
         self.__init__(formdata=None, **read_form_data)
         self.validate()  # the errors on validation are cancelled in the line above
         return map
+
 
 class DBImportExport(FlaskForm):
     export_database = SubmitField()
