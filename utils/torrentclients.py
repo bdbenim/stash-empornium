@@ -31,6 +31,9 @@ class TorrentClient:
     
     def resume(self, infohash: str):
         raise NotImplementedError()
+    
+    def connected(self) -> bool:
+        return True
 
 
 class RTorrent(TorrentClient):
@@ -85,6 +88,13 @@ class RTorrent(TorrentClient):
     
     def resume(self, infohash: str):
         self.server.d.start(infohash.upper())
+    
+    def connected(self) -> bool:
+        try:
+            self.server.system.listMethods()
+            return True
+        except:
+            return False
 
 
 class Qbittorrent(TorrentClient):

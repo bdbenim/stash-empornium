@@ -302,12 +302,16 @@ class ConfigHandler(Singleton):
     def configureTorrents(self) -> None:
         self.torrent_clients.clear()
         clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent}
-        for client in clients:
+        for client, clientType in clients.items():
+            assert issubclass(clientType, TorrentClient)
             try:
                 if client in self.conf and not self.get(client, "disable", False):
                     settings = dict(self.conf[client])  # type: ignore
-                    clientType = clients[client]
-                    self.torrent_clients.append(clientType(settings))
+                    tc = clientType(settings)
+                    if tc.connected():
+                        self.torrent_clients.append(tc)
+                    else:
+                        self.logger.error(f"Could not connect to {client}")
             except:
                 pass
         self.logger.debug(f"Configured {len(self.torrent_clients)} torrent client(s)")
