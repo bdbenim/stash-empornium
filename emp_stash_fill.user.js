@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.5.0
+// @version      0.5.1
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -18,6 +18,9 @@
 // ==/UserScript==
 
 // Changelog:
+// v0.5.1
+//  - Fix bug where screens checkbox would be disabled instead of gallery
+//    checkbox if no gallery is associated with the scene.
 // v0.5.0
 //  - Add the option to include a scene's gallery
 // v0.4.0
@@ -645,7 +648,7 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
         context: {
           fileSelect: fileSelect,
           titleDisplay: titleDisplay,
-          screensToggle: screensToggle,
+          galleryToggle: galleryToggle,
         },
         onload: function (response) {
           try {
@@ -681,10 +684,10 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
             }
             this.context.fileSelect.innerHTML = optionsAsString;
             if (scene.galleries.length == 0) {
-              this.context.screensToggle.setAttribute("checked", false);
-              this.context.screensToggle.disabled = true;
+              this.context.galleryToggle.checked = false;
+              this.context.galleryToggle.disabled = true;
             } else {
-              this.context.screensToggle.disabled = false;
+              this.context.galleryToggle.disabled = false;
             }
           } catch (err) {
             this.context.titleDisplay.value = "";
