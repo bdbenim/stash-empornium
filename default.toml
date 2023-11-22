@@ -114,4 +114,4 @@ tushy = "Tushy video page lookalike (by dickon)"
 ## url of your stash instance
 url = "http://localhost:9999"
 ## only needed if you set up authentication for stash
-#api_key = 123abc.xyz
+#api_key = "123abc.xyz"
