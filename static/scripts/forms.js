@@ -1,7 +1,7 @@
 try {
   let enabled = document.getElementById("enable_form");
   function toggle() {
-    const form = document.getElementsByTagName("form")[0];
+    const form = document.querySelector("#enable_form").parentElement.closest("form");
     for (el of form.querySelectorAll("input")) {
       if (el.id != "csrf_token" && el.id != "save" && el.id != enabled.id) {
         el.disabled = !enabled.checked;
