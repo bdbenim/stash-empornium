@@ -22,29 +22,28 @@ from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
 from utils.packs import link, readGallery
 from utils.paths import mapPath
-from webui.webui import settings_page
 
 MEDIA_INFO = shutil.which("mediainfo")
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 config = ConfigHandler()
 
 
-def error(message: str, altMessage: str | None = None) -> str:
+def error(message: str, alt_message: str | None = None) -> str:
     logger = logging.getLogger(__name__)
     logger.error(message)
-    return json.dumps({"status": "error", "message": altMessage if altMessage else message})
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
 
 
-def warning(message: str, altMessage: str | None = None) -> str:
+def warning(message: str, alt_message: str | None = None) -> str:
     logger = logging.getLogger(__name__)
     logger.warning(message)
-    return json.dumps({"status": "error", "message": altMessage if altMessage else message})
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
 
 
-def info(message: str, altMessage: str | None = None) -> str:
+def info(message: str, alt_message: str | None = None) -> str:
     logger = logging.getLogger(__name__)
     logger.info(message)
-    return json.dumps({"status": "success", "data": {"message": altMessage if altMessage else message}})
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
 
 
 def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
@@ -58,7 +57,8 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     include_gallery = j["gallery"]
 
     logger.info(
-        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens {'and including gallery' if include_gallery else ''}."
+        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens {
+            'and including gallery' if include_gallery else ''}."
     )
 
     template = (
@@ -96,7 +96,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     for key in str_keys:
         if key not in scene:
             scene[key] = ""
-        elif scene[key] == None:
+        elif scene[key] is None:
             scene[key] = ""
 
     new_dir = None
@@ -154,31 +154,31 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     ht = stash_file["height"]
     resolution = None
     # these are stash's heuristics, see pkg/models/resolution.go
-    if ht >= 144 and ht < 240:
+    if 144 <= ht < 240:
         resolution = "144p"
-    elif ht >= 240 and ht < 360:
+    elif 240 <= ht < 360:
         resolution = "240p"
-    elif ht >= 360 and ht < 480:
+    elif 360 <= ht < 480:
         resolution = "360p"
-    elif ht >= 480 and ht < 540:
+    elif 480 <= ht < 540:
         resolution = "480p"
-    elif ht >= 540 and ht < 720:
+    elif 540 <= ht < 720:
         resolution = "540p"
-    elif ht >= 720 and ht < 1080:
+    elif 720 <= ht < 1080:
         resolution = "720p"
-    elif ht >= 1080 and ht < 1440:
+    elif 1080 <= ht < 1440:
         resolution = "1080p"
-    elif ht >= 1440 and ht < 1920:
+    elif 1440 <= ht < 1920:
         resolution = "1440p"
-    elif ht >= 1920 and ht < 2560:
+    elif 1920 <= ht < 2560:
         resolution = "2160p"
-    elif ht >= 2560 and ht < 3000:
+    elif 2560 <= ht < 3000:
         resolution = "5K"
-    elif ht >= 3000 and ht < 3584:
+    elif 3000 <= ht < 3584:
         resolution = "6K"
-    elif ht >= 3584 and ht < 3840:
+    elif 3584 <= ht < 3840:
         resolution = "7K"
-    elif ht >= 3840 and ht < 6143:
+    elif 3840 <= ht < 6143:
         resolution = "8K"
     elif ht >= 6143:
         resolution = "8K+"
@@ -192,7 +192,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
 
     yield info("Making torrent")
     receive_pipe, send_pipe = mp.Pipe(False)
-    torrent_proc = mp.Process(target=genTorrent, args=(send_pipe, stash_file, announce_url, new_dir))
+    torrent_proc = mp.Process(target=gen_torrent, args=(send_pipe, stash_file, announce_url, new_dir))
     torrent_proc.start()
 
     #########
@@ -202,7 +202,6 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
-    cover_ext = ""
     cover_gen = False
     match cover_mime_type:
         case "image/jpeg":
@@ -218,7 +217,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             logger.warning(f"Unrecognized cover format")  # TODO return warnings to client
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     if cover_gen:
-        CMD = [
+        cmd = [
             "ffmpeg",
             "-ss",
             "30",
@@ -231,7 +230,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             cover_file[1],
             "-y",
         ]
-        proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         # cover_gen_proc = subprocess.Popen(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
     else:
@@ -239,10 +238,9 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             fp.write(cover_response.content)
 
     yield info("Uploading images")
-    images = None
     try:
         images = imagehandler.ImageHandler()
-    except Exception as e:
+    except:
         return error("Failed to initialize image handler")
     if config.args.flush:
         images.clear()
@@ -267,13 +265,13 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     ###############
 
     studio_img_ext = ""
-    sudio_img_mime_type = ""
+    studio_img_mime_type = ""
     studio_img_file = None
     if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
         logger.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
         studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
-        sudio_img_mime_type = studio_img_response.headers["Content-Type"]
-        match sudio_img_mime_type:
+        studio_img_mime_type = studio_img_response.headers["Content-Type"]
+        match studio_img_mime_type:
             case "image/jpeg":
                 studio_img_ext = "jpg"
             case "image/png":
@@ -285,7 +283,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             case _:
                 studio_img_ext = "unk"
                 yield warning(
-                    f"Unknown studio logo file type: {sudio_img_mime_type}", "Unrecognized studio image file type"
+                    f"Unknown studio logo file type: {studio_img_mime_type}", "Unrecognized studio image file type"
                 )
                 time.sleep(0.1)
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
@@ -296,7 +294,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             svg2png(url=studio_img_file[1], write_to=png_file[1])
             os.remove(studio_img_file[1])
             studio_img_file = png_file
-            sudio_img_mime_type = "image/png"
+            studio_img_mime_type = "image/png"
             studio_img_ext = "png"
 
     ##############
@@ -311,7 +309,6 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
         performer_image_mime_type = performer_image_response.headers["Content-Type"]
         logger.debug(f"Got image with mime type {performer_image_mime_type}")
-        performer_image_ext = ""
         match performer_image_mime_type:
             case "image/jpeg":
                 performer_image_ext = "jpg"
@@ -355,7 +352,6 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         if screens_urls is None or None in screens_urls:
             return error("Failed to generate screens")
 
-    audio_bitrate = ""
     cmd = [
         "ffprobe",
         "-v",
@@ -369,10 +365,10 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         stash_file["path"],
     ]
     try:
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        audio_bitrate = f"{int(proc.stdout)//1000} kbps"
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
+        audio_bitrate = f"{int(proc.stdout) // 1000} kbps"
 
-    except:
+    except subprocess.CalledProcessError:
         logger.warning("Unable to determine audio bitrate")
         audio_bitrate = "UNK"
 
@@ -385,7 +381,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     info_recv = None
     if MEDIA_INFO:
         info_recv, info_send = mp.Pipe(False)
-        info_proc = mp.Process(target=genMediaInfo, args=(info_send, stash_file["path"]))
+        info_proc = mp.Process(target=gen_media_info, args=(info_send, stash_file["path"]))
         info_proc.start()
         logger.debug(mediainfo)
 
@@ -432,9 +428,9 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
         tags.add(studio_tag)
     if (
-        scene["studio"] is not None
-        and scene["studio"]["parent_studio"] is not None
-        and scene["studio"]["parent_studio"]["url"] is not None
+            scene["studio"] is not None
+            and scene["studio"]["parent_studio"] is not None
+            and scene["studio"]["parent_studio"]["url"] is not None
     ):
         tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
 
@@ -460,7 +456,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         logger.info("Uploading studio logo")
         logo_url = images.getURL(
             studio_img_file[1],
-            sudio_img_mime_type,
+            studio_img_mime_type,
             studio_img_ext,
         )[0]
         if logo_url is None:
@@ -481,12 +477,13 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     # TEMPLATE #
     ############
 
-    tmpTagLists = tags.sortTagLists()
+    tmp_tag_lists = tags.sortTagLists()
 
     # Prevent error in case date is missing
     date = scene["date"]
-    if date != None and len(date) > 1:
-        date = datetime.datetime.fromisoformat(date).strftime(config.get("backend", "date_format", "%B %-d, %Y"))  # type: ignore
+    if date is not None and len(date) > 1:
+        date = datetime.datetime.fromisoformat(date).strftime(
+            config.get("backend", "date_format", "%B %-d, %Y"))  # type: ignore
 
     yield info("Rendering template")
 
@@ -509,7 +506,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         "audio_codec": stash_file["audio_codec"],
         "audio_bitrate": audio_bitrate,
         "resolution": "{}×{}".format(stash_file["width"], stash_file["height"]),
-        "bitrate": "{:.2f} Mb/s".format(stash_file["bit_rate"] / 2**20),
+        "bitrate": "{:.2f} Mb/s".format(stash_file["bit_rate"] / 2 ** 20),
         "framerate": "{} fps".format(stash_file["frame_rate"]),
         "screens": screens_urls if len(screens_urls) else None,
         "contact_sheet": contact_sheet_remote_url,
@@ -526,8 +523,8 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         preview_url = preview_recv.recv()
         template_context["preview"] = preview_url
 
-    for key in tmpTagLists:
-        template_context[key] = ", ".join(tmpTagLists[key])
+    for key in tmp_tag_lists:
+        template_context[key] = ", ".join(tmp_tag_lists[key])
 
     description = render_template(template, **template_context)  # type: ignore
 
@@ -579,19 +576,19 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     time.sleep(1)
 
 
-def genTorrent(
-    pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
+def gen_torrent(
+        pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
 ) -> list[str] | None:
     logger = logging.getLogger(__name__)
-    piece_size = int(math.log(stash_file["size"] / 2**10, 2))
+    piece_size = int(math.log(stash_file["size"] / 2 ** 10, 2))
     tempdir = tempfile.TemporaryDirectory()
     basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
 
     target = directory if directory else stash_file["path"]
 
-    temppath = os.path.join(tempdir.name, basename + ".torrent")
-    torrent_paths = [os.path.join(dir, stash_file["basename"] + ".torrent") for dir in config.torrent_dirs]
-    logger.debug(f"Saving torrent to {temppath}")
+    temp_path = os.path.join(tempdir.name, basename + ".torrent")
+    torrent_paths = [os.path.join(d, stash_file["basename"] + ".torrent") for d in config.torrent_dirs]
+    logger.debug(f"Saving torrent to {temp_path}")
     cmd = [
         "mktorrent",
         "-l",
@@ -603,7 +600,7 @@ def genTorrent(
         "-p",
         "-v",
         "-o",
-        temppath,
+        temp_path,
         target,
     ]
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -613,13 +610,13 @@ def genTorrent(
         logger.error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
         return None
     for path in torrent_paths:
-        shutil.copy(temppath, path)
+        shutil.copy(temp_path, path)
     tempdir.cleanup()
     logger.debug(f"Moved torrent to {torrent_paths}")
     pipe.send(torrent_paths)
     # return torrent_paths
 
 
-def genMediaInfo(pipe: Connection, path: str) -> None:
+def gen_media_info(pipe: Connection, path: str) -> None:
     cmd = [MEDIA_INFO, path]
     pipe.send(subprocess.check_output(cmd, text=True))

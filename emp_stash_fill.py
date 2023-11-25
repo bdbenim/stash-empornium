@@ -1,33 +1,4 @@
 #!/usr/bin/env python3.12
-"""A mini service that generates upload material for EMP
-
-Generate and upload screenshots and contact sheet, generate torrent
-details from a template, generate torrent file, etc. to easily fill
-the EMP upload form.
-
-Required external utilities:
-ffmpeg
-mktorrent
-
-Required Python modules:
-bootstrap-Flask
-cairosvg
-configupdater
-Flask
-Flask-WTF
-Pillow
-requests
-tomlkit
-vcsi
-
-Optional external utilities:
-mediainfo
-redis
-
-Optional Python modules:
-redis
-waitress
-"""
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
@@ -54,14 +25,14 @@ from webui.webui import settings_page
 # CONSTANTS #
 #############
 
-ODBL_NOTICE = "Contains information from https://github.com/mledoze/countries which is made available here under the Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE"
+ODBL_NOTICE = ("Contains information from https://github.com/mledoze/countries which is made available here under the "
+               "Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE")
 
 config = ConfigHandler()
 logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
-
 
 app = Flask(__name__, template_folder=config.template_dir)
 app.secret_key = "secret"
@@ -101,22 +72,21 @@ def submit():
 
 @app.route("/suggestions", methods=["POST"])
 @csrf.exempt
-def processSuggestions():
+def process_suggestions():
     j = request.get_json()
     logger.debug(f"Got json {j}")
-    acceptedTags = {}
+    accepted_tags = {}
     if "accept" in j:
         logger.info(f"Accepting {len(j['accept'])} tag suggestions")
         for tag in j["accept"]:
             if "name" in tag:
-                acceptedTags[tag["name"]] = tag["emp"]
-    ignoredTags = []
+                accepted_tags[tag["name"]] = tag["emp"]
+    ignored_tags = []
     if "ignore" in j:
         logger.info(f"Ignoring {len(j['ignore'])} tags")
         for tag in j["ignore"]:
-            ignoredTags.append(tag)
-    success = taghandler.acceptSuggestions(acceptedTags)
-    success = success and taghandler.rejectSuggestions(ignoredTags)
+            ignored_tags.append(tag)
+    taghandler.acceptSuggestions(accepted_tags)
     return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
 
 
@@ -207,6 +177,6 @@ if __name__ == "__main__":
         from waitress import serve
         serve(app, host="0.0.0.0", port=config.get("backend", "port", 9932))
         # app.run(host="0.0.0.0", port=config.port, debug=True)
-    except:
+    except ModuleNotFoundError:
         logger.info("Waitress not installed, using builtin server")
         app.run(host="0.0.0.0", port=config.get("backend", "port", 9932), debug=False)  # type: ignore
