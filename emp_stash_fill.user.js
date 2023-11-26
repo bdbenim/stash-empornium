@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      0.5.1
+// @version      1.0.0
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -18,6 +18,9 @@
 // ==/UserScript==
 
 // Changelog:
+// v1.0.0
+//  - BREAKING: Fill requests go to a new endpoint now to start a job and
+//    get a job ID before going to the original endpoint to retrieve data.
 // v0.5.1
 //  - Fix bug where screens checkbox would be disabled instead of gallery
 //    checkbox if no gallery is associated with the scene.
@@ -48,671 +51,597 @@ var STASH = GM_getValue("stash_url", STASH_DEFAULT);
 var STASH_API_KEY = GM_getValue("stash_api_key", STASH_API_KEY_DEFAULT);
 
 function store(key, prompt_text, default_value) {
-  let oldvalue = GM_getValue(key, default_value);
-  GM_setValue(key, prompt(prompt_text, oldvalue) || oldvalue);
+    let oldvalue = GM_getValue(key, default_value);
+    GM_setValue(key, prompt(prompt_text, oldvalue) || oldvalue);
 }
 
 GM_registerMenuCommand("Set backend URL", () => {
-  store(
-    "backend_url",
-    "backend url? (e.g. http://localhost:9932)",
-    BACKEND_DEFAULT
-  );
+    store("backend_url", "backend url? (e.g. http://localhost:9932)", BACKEND_DEFAULT);
 });
 GM_registerMenuCommand("Set stash URL", () => {
-  store("stash_url", "stash URL? (e.g. http://localhost:9999)", STASH_DEFAULT);
+    store("stash_url", "stash URL? (e.g. http://localhost:9999)", STASH_DEFAULT);
 });
 GM_registerMenuCommand("Set stash API key", () => {
-  store("stash_api_key", "stash API key?", STASH_API_KEY_DEFAULT);
+    store("stash_api_key", "stash API key?", STASH_API_KEY_DEFAULT);
 });
 
-GM_addStyle(
-  "#stash_statusarea { font-weight: bold; font-size: 16pt; padding-top: 12pt; text-align: center; }"
-);
+GM_addStyle("#stash_statusarea { font-weight: bold; font-size: 16pt; padding-top: 12pt; text-align: center; }");
 GM_addStyle("#stash_statusarea:empty { padding: 0; }");
-GM_addStyle(
-  "#stash_instructions { font-size: 12pt; padding: 12pt 0; margin-left: auto; margin-right: auto; max-width: 600px; }"
-);
+GM_addStyle("#stash_instructions { font-size: 12pt; padding: 12pt 0; margin-left: auto; margin-right: auto; max-width: 600px; }");
 GM_addStyle("#stash_instructions:empty { padding: 0; }");
 GM_addStyle("#stash_instructions li + li { padding-top: 12pt; }");
 GM_addStyle("#stash_instructions > ol { padding-top: 12pt; }");
-GM_addStyle(
-  "#stash_instructions input { width: 100%; font-family: monospace; font-size: 10pt; }"
-);
+GM_addStyle("#stash_instructions input { width: 100%; font-family: monospace; font-size: 10pt; }");
 
 var graphql = {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  url: new URL("/graphql", STASH).href,
+    method: "POST", headers: {
+        "Content-Type": "application/json",
+    }, url: new URL("/graphql", STASH).href,
 };
 
 if (STASH_API_KEY !== null) {
-  graphql.headers.apiKey = STASH_API_KEY;
+    graphql.headers.apiKey = STASH_API_KEY;
 }
 
 const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
-  const byteCharacters = atob(b64Data);
-  const byteArrays = [];
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
 
-  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-    const slice = byteCharacters.slice(offset, offset + sliceSize);
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
 
-    const byteNumbers = new Array(slice.length);
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
     }
 
-    const byteArray = new Uint8Array(byteNumbers);
-    byteArrays.push(byteArray);
-  }
-
-  const blob = new Blob(byteArrays, { type: contentType });
-  return blob;
+    const blob = new Blob(byteArrays, {type: contentType});
+    return blob;
 };
 
 (function () {
-  "use strict";
+    "use strict";
 
-  let parent = document.getElementsByClassName("thin")[0];
+    let parent = document.getElementsByClassName("thin")[0];
 
-  let head = document.createElement("div");
-  head.classList.add("head");
-  head.innerHTML = "Fill from Stash";
+    let head = document.createElement("div");
+    head.classList.add("head");
+    head.innerHTML = "Fill from Stash";
 
-  let body = document.createElement("div");
-  body.classList.add("box", "pad");
+    let body = document.createElement("div");
+    body.classList.add("box", "pad");
 
-  let fileSelect = document.createElement("select");
-  fileSelect.style.marginLeft = "12pt";
-  fileSelect.style.width = "auto";
+    let fileSelect = document.createElement("select");
+    fileSelect.style.marginLeft = "12pt";
+    fileSelect.style.width = "auto";
 
-  let titleDisplay = document.createElement("input");
-  titleDisplay.setAttribute("type", "text");
-  titleDisplay.setAttribute("disabled", true);
-  titleDisplay.style.marginLeft = "12pt";
-  titleDisplay.setAttribute("size", 60);
+    let titleDisplay = document.createElement("input");
+    titleDisplay.setAttribute("type", "text");
+    titleDisplay.setAttribute("disabled", true);
+    titleDisplay.style.marginLeft = "12pt";
+    titleDisplay.setAttribute("size", 60);
 
-  let templateSelect = document.createElement("select");
-  templateSelect.style.marginLeft = "12pt";
-  GM_xmlhttpRequest({
-    method: "GET",
-    url: new URL("/templates", BACKEND).href,
-    context: { templateSelect: templateSelect },
-    responseType: "json",
-    onload: function (response) {
-      let optionsAsString = "";
-      for (let key in response.response) {
-        optionsAsString +=
-          "<option value='" + key + "'>" + response.response[key] + "</option>";
-      }
-      this.context.templateSelect.innerHTML = optionsAsString;
-    },
-  });
-
-  let fillButton = document.createElement("input");
-  fillButton.setAttribute("type", "submit");
-  fillButton.setAttribute("value", "fill from");
-  fillButton.style.marginLeft = "12pt";
-
-  let stashButton = document.createElement("input");
-  stashButton.setAttribute("type", "submit");
-  stashButton.setAttribute("value", "Open Stash");
-  stashButton.style.marginLeft = "12pt";
-
-  let moreOptions = document.createElement("div");
-  moreOptions.style.marginTop = "12pt";
-  let screensToggleLabel = document.createElement("label");
-  screensToggleLabel.setAttribute("for", "screenstoggle");
-  screensToggleLabel.innerText =
-    "Generate screens? (contact sheet is always generated)";
-  screensToggleLabel.style.marginRight = "6pt";
-  let screensToggle = document.createElement("input");
-  screensToggle.setAttribute("type", "checkbox");
-  screensToggle.setAttribute("name", "screenstoggle");
-  screensToggle.setAttribute("id", "screenstoggle");
-  screensToggle.setAttribute("checked", true);
-  moreOptions.appendChild(screensToggleLabel);
-  moreOptions.appendChild(screensToggle);
-  moreOptions.appendChild(templateSelect);
-
-  let galleryToggleLabel = document.createElement("label");
-  galleryToggleLabel.setAttribute("for", "gallery_toggle");
-  galleryToggleLabel.innerText = "Include gallery?";
-  galleryToggleLabel.style.marginRight = "6pt";
-  let galleryToggle = document.createElement("input");
-  galleryToggle.setAttribute("type", "checkbox");
-  galleryToggle.setAttribute("name", "gallerytoggle");
-  galleryToggle.setAttribute("id", "gallery_toggle");
-  galleryToggle.checked = false;
-  moreOptions.appendChild(document.createElement("br"));
-  moreOptions.appendChild(galleryToggleLabel);
-  moreOptions.appendChild(galleryToggle);
-
-  let statusArea = document.createElement("div");
-  statusArea.setAttribute("id", "stash_statusarea");
-
-  let instructions = document.createElement("div");
-  instructions.setAttribute("id", "stash_instructions");
-
-  let idInput = document.createElement("input");
-  idInput.setAttribute("size", 8);
-  idInput.setAttribute("type", "text");
-  idInput.setAttribute("id", "stash_id");
-  idInput.setAttribute("placeholder", "Stash ID");
-
-  const announceURL = document.evaluate(
-    "//input[contains(@value,'/announce')]",
-    document,
-    null,
-    XPathResult.ANY_UNORDERED_NODE_TYPE,
-    null
-  ).singleNodeValue.value;
-
-  const submitForm = document.getElementById("upload_table");
-  const submitRow = submitForm.querySelector(
-    ".border > tbody > tr:last-child > td"
-  );
-  let submitBtn = document.createElement("input");
-  submitBtn.id = "autoupload";
-  submitBtn.type = "button";
-  submitBtn.value = "Upload with File";
-  submitBtn.disabled = true;
-  submitRow.appendChild(submitBtn);
-
-  fillButton.addEventListener("click", () => {
-    let suggestionsHead = document.getElementById("suggestions-head");
-    let suggestionsBody = document.getElementById("suggestions-body");
-    if (suggestionsHead) suggestionsHead.remove();
-    if (suggestionsBody) suggestionsBody.remove();
-
-    statusArea.innerHTML = "";
-    instructions.innerHTML = "";
+    let templateSelect = document.createElement("select");
+    templateSelect.style.marginLeft = "12pt";
     GM_xmlhttpRequest({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      url: new URL("/fill", BACKEND).href,
-      responseType: "stream",
-      data: JSON.stringify({
-        scene_id: idInput.value,
-        file_id: fileSelect.value,
-        announce_url: announceURL,
-        template: templateSelect.value,
-        screens: screensToggle.checked,
-        gallery: galleryToggle.checked,
-      }),
-      context: {
-        statusArea: statusArea,
-        description: document.getElementById("desc"),
-        tags: document.getElementById("taginput"),
-        cover: document.getElementById("image"),
-        title: document.getElementById("title"),
-        instructions: instructions,
-      },
-      onreadystatechange: async function (response) {
-        if (response.readyState == 2 && response.status == 200) {
-          const reader = response.response.getReader();
-          while (true) {
-            const { done, value } = await reader.read(); // value is Uint8Array
-            if (value) {
-              let text = new TextDecoder().decode(value);
-              let j;
-              try {
-                j = JSON.parse(text);
-              } catch (e) {
-                if (text.includes('"message": "Done"')) {
-                  console.debug(
-                    "The response stream was incomplete, reading until end of stream."
-                  );
-                  const stashData = [];
-                  stashData.push(text);
-                  while (true) {
-                    let { done, value } = await reader.read();
-                    stashData.push(new TextDecoder().decode(value));
-                    if (done) break;
-                  }
-                  text = stashData.join("");
-                  j = JSON.parse(text);
-                } else {
-                  console.warn("Unexpected failure to read stream data.");
-                }
-              }
-              if (j) {
-                if (j.status === "success") {
-                  if ("message" in j.data) {
-                    this.context.statusArea.innerText = j.data.message;
-                  }
-                  if ("fill" in j.data) {
-                    this.context.description.value = j.data.fill.description;
-                    this.context.tags.value = j.data.fill.tags;
-                    this.context.cover.value = j.data.fill.cover;
-                    this.context.title.value = j.data.fill.title;
-                    let instructions = "";
-                    instructions += "Instructions:<ol>";
-                    instructions +=
-                      "<li>Set a category for the upload and double-check everything for correctness</li>";
-                    instructions +=
-                      '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' +
-                      j.data.fill.torrent_path +
-                      '" disabled></div></li>';
-                    instructions +=
-                      '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' +
-                      j.data.fill.file_path +
-                      '" disabled></div></li>';
-                    instructions += "</ol>";
-                    this.context.instructions.innerHTML = instructions;
-
-                    if ("anon" in j.data.fill) {
-                      let radios = [];
-                      for (const el of document.getElementsByTagName("input")) {
-                        if (el.type === "radio") {
-                          radios.push(el);
-                        }
-                      }
-                      if (radios.length == 2) {
-                        if (j.data.fill.anon) {
-                          radios[1].checked = true;
-                        } else {
-                          radios[0].checked = true;
-                        }
-                      }
-                    }
-
-                    if ("file" in j.data) {
-                      // Temporary for debugging. Replace the button each time
-                      // so that we don't add multiple copies of the listener
-                      // function to the same button.
-                      let newBtn = submitBtn.cloneNode();
-                      newBtn.disabled = false;
-                      submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-                      newBtn.addEventListener("click", () => {
-                        newBtn.disabled = true;
-                        let formel = document.getElementById("upload_table");
-                        let formdata = new FormData(formel);
-                        formdata.set(
-                          "file_input",
-                          b64toBlob(
-                            j.data.file.content,
-                            "application/x-bittorrent"
-                          ),
-                          j.data.file.name
-                        );
-                        console.debug(formdata);
-                        const r = new XMLHttpRequest();
-                        r.onreadystatechange = function () {
-                          if (r.readyState == XMLHttpRequest.DONE) {
-                            document.open();
-                            document.write(r.responseText);
-                            document.close();
-                          }
-                        };
-                        r.open(
-                          "POST",
-                          new URL("/upload.php", window.location).href
-                        );
-                        r.responseType = "text";
-                        r.send(formdata);
-
-                        GM_xmlhttpRequest({
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          url: new URL("/submit", BACKEND).href,
-                          responseType: "json",
-                          data: JSON.stringify({
-                            torrent_path: j.data.fill.torrent_path,
-                          }),
-                        });
-                      });
-                    }
-
-                    if ("suggestions" in j.data) {
-                      let parent = document.getElementsByClassName("thin")[0];
-
-                      let head = document.createElement("div");
-                      head.classList.add("head");
-                      head.id = "suggestions-head";
-                      head.innerHTML = "Tag Suggestions";
-
-                      let body = document.createElement("div");
-                      body.classList.add("box", "pad");
-                      body.id = "suggestions-body";
-
-                      let table = document.createElement("table");
-                      table.id = "tagsuggestions";
-                      table.style.width = "1%";
-                      table.style.marginLeft = "12pt";
-                      let header = document.createElement("tr");
-                      let stashTagHeader = document.createElement("th");
-                      stashTagHeader.setAttribute("scope", "col");
-                      stashTagHeader.style.marginLeft = "12pt";
-                      stashTagHeader.style.marginRight = "auto";
-                      stashTagHeader.innerText = "Stash Tag";
-
-                      let empTagHeader = document.createElement("th");
-                      empTagHeader.setAttribute("scope", "col");
-                      empTagHeader.style.marginLeft = "12pt";
-                      empTagHeader.style.marginRight = "auto";
-                      empTagHeader.innerText = "EMP Tag";
-
-                      let ignoreTagHeader = document.createElement("th");
-                      ignoreTagHeader.setAttribute("scope", "col");
-                      ignoreTagHeader.style.marginLeft = "12pt";
-                      ignoreTagHeader.style.marginRight = "auto";
-                      ignoreTagHeader.innerText = "Ignore? ";
-
-                      let ignoreAll = document.createElement("input");
-                      ignoreAll.type = "checkbox";
-                      ignoreAll.addEventListener("change", function () {
-                        for (let checkbox of document.getElementsByClassName(
-                          "tag-ignore"
-                        )) {
-                          checkbox.checked = this.checked;
-                        }
-                      });
-                      ignoreTagHeader.appendChild(ignoreAll);
-
-                      header.appendChild(stashTagHeader);
-                      header.appendChild(empTagHeader);
-                      header.appendChild(ignoreTagHeader);
-
-                      table.appendChild(header);
-
-                      for (var key in j.data.suggestions) {
-                        if (j.data.suggestions.hasOwnProperty(key)) {
-                          let row = document.createElement("tr");
-
-                          let stashTagBox = document.createElement("td");
-                          stashTagBox.style.marginRight = "auto";
-                          stashTagBox.style.whiteSpace = "nowrap";
-                          let empTagBox = document.createElement("td");
-                          empTagBox.style.marginLeft = "12pt";
-                          empTagBox.style.marginRight = "auto";
-                          empTagBox.style.whiteSpace = "nowrap";
-                          let ignoreTagBox = document.createElement("td");
-                          ignoreTagBox.style.marginLeft = "12pt";
-                          ignoreTagBox.style.marginRight = "auto";
-                          ignoreTagBox.style.whiteSpace = "nowrap";
-                          ignoreTagBox.style.textAlign = "center";
-                          let acceptTagBox = document.createElement("td");
-                          acceptTagBox.style.marginLeft = "12pt";
-                          acceptTagBox.style.marginRight = "auto";
-                          acceptTagBox.style.whiteSpace = "nowrap";
-
-                          let tagDisplay = document.createElement("input");
-                          tagDisplay.setAttribute("type", "text");
-                          tagDisplay.setAttribute("disabled", true);
-                          tagDisplay.setAttribute("size", 30);
-                          tagDisplay.value = key;
-
-                          stashTagBox.appendChild(tagDisplay);
-                          row.appendChild(stashTagBox);
-
-                          let tagInput = document.createElement("input");
-                          tagInput.setAttribute("size", 30);
-                          tagInput.setAttribute("type", "text");
-                          tagInput.autocomplete = "on";
-                          tagInput.value = j.data.suggestions[key];
-                          unsafeWindow.AutoComplete.addInput(
-                            tagInput,
-                            "/tags.php"
-                          );
-
-                          empTagBox.appendChild(tagInput);
-                          row.appendChild(empTagBox);
-
-                          let ignoreInput = document.createElement("input");
-                          ignoreInput.setAttribute("type", "checkbox");
-                          ignoreInput.classList.add("tag-ignore");
-
-                          ignoreTagBox.appendChild(ignoreInput);
-                          row.appendChild(ignoreTagBox);
-
-                          let acceptTagButton = document.createElement("input");
-                          acceptTagButton.type = "submit";
-                          acceptTagButton.value = "Accept/Ignore Suggestion";
-                          acceptTagButton.addEventListener(
-                            "click",
-                            function () {
-                              let acceptTags = [];
-                              let ignoreTags = [];
-                              if (ignoreInput.checked) {
-                                ignoreTags.push(tagDisplay.value);
-                              } else {
-                                acceptTags.push({
-                                  name: tagDisplay.value,
-                                  emp: tagInput.value,
-                                });
-                                document.getElementById("taginput").value +=
-                                  " " + tagInput.value;
-                              }
-                              GM_xmlhttpRequest({
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                url: new URL("/suggestions", BACKEND).href,
-                                responseType: "json",
-                                data: JSON.stringify({
-                                  accept: acceptTags,
-                                  ignore: ignoreTags,
-                                }),
-                                context: {
-                                  statusArea: statusArea,
-                                },
-                                onload: function (response) {
-                                  try {
-                                    let j = JSON.parse(response.responseText);
-                                    if (j.status === "success") {
-                                      if ("message" in j.data) {
-                                        this.context.statusArea.innerText =
-                                          j.data.message;
-                                      }
-                                    } else if (j.status === "error") {
-                                      this.context.statusArea.innerHTML =
-                                        "<span style='color: red;'>" +
-                                        j.message +
-                                        "</span>";
-                                    }
-                                  } catch (e) {
-                                    console.warn(
-                                      "Unexpected failure to parse text: " +
-                                        response.responseText
-                                    );
-                                  }
-                                },
-                              });
-                              row.remove();
-                            }
-                          );
-
-                          acceptTagBox.appendChild(acceptTagButton);
-                          row.appendChild(acceptTagBox);
-
-                          table.appendChild(row);
-                        }
-                      }
-
-                      let tagSubmitButton = document.createElement("input");
-                      tagSubmitButton.setAttribute("type", "submit");
-                      tagSubmitButton.value = "Accept/Ignore All Suggestions";
-                      tagSubmitButton.style.marginLeft = "12pt";
-
-                      body.appendChild(table);
-                      body.appendChild(tagSubmitButton);
-
-                      tagSubmitButton.addEventListener("click", () => {
-                        console.log("Accepting tag suggestions");
-                        let acceptTags = [];
-                        let ignoreTags = [];
-                        for (const row of Array.from(table.rows).slice(1)) {
-                          let stashTag = row.cells[0].childNodes[0].value;
-                          let empTag = row.cells[1].childNodes[0].value;
-                          let ignore = row.cells[2].childNodes[0].checked;
-                          if (ignore) {
-                            ignoreTags.push(stashTag);
-                          } else {
-                            acceptTags.push({ name: stashTag, emp: empTag });
-                            document.getElementById("taginput").value +=
-                              " " + empTag;
-                          }
-                        }
-                        head.remove();
-                        body.remove();
-                        GM_xmlhttpRequest({
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          url: new URL("/suggestions", BACKEND).href,
-                          responseType: "json",
-                          data: JSON.stringify({
-                            accept: acceptTags,
-                            ignore: ignoreTags,
-                          }),
-                          context: {
-                            statusArea: statusArea,
-                          },
-                          onload: function (response) {
-                            try {
-                              let j = JSON.parse(response.responseText);
-                              if (j.status === "success") {
-                                if ("message" in j.data) {
-                                  this.context.statusArea.innerText =
-                                    j.data.message;
-                                }
-                              } else if (j.status === "error") {
-                                this.context.statusArea.innerHTML =
-                                  "<span style='color: red;'>" +
-                                  j.message +
-                                  "</span>";
-                              }
-                            } catch (e) {
-                              console.warn(
-                                "Unexpected failure to parse text: " +
-                                  response.responseText
-                              );
-                            }
-                          },
-                        });
-                      });
-
-                      let tagCloseButton = document.createElement("input");
-                      tagCloseButton.setAttribute("type", "submit");
-                      tagCloseButton.value = "Close Suggestions";
-                      tagCloseButton.style.marginLeft = "12pt";
-                      tagCloseButton.addEventListener("click", function () {
-                        head.remove();
-                        body.remove();
-                      });
-
-                      body.appendChild(tagCloseButton);
-
-                      parent.insertBefore(body, parent.children[7]);
-                      parent.insertBefore(head, body);
-                    }
-                  }
-                } else if (j.status === "error") {
-                  this.context.statusArea.innerHTML =
-                    "<span style='color: red;'>" + j.message + "</span>";
-                  break;
-                }
-              } else {
-                console.warn(
-                  "The response was not read or not converted to JSON."
-                );
-                console.debug(text);
-              }
-            }
-            if (done) break;
-          }
-        }
-      },
-    });
-  });
-
-  stashButton.addEventListener("click", function () {
-    let idInput = document.getElementById("stash_id");
-    if (idInput.value.length > 0) {
-      window.open(STASH + "/scenes/" + idInput.value, "_blank");
-    } else {
-      window.open(STASH, "_blank");
-    }
-  });
-
-  idInput.addEventListener("input", function (event) {
-    GM_xmlhttpRequest(
-      Object.assign({}, graphql, {
-        data: JSON.stringify({
-          query:
-            '{ findScene(id: "' +
-            idInput.value +
-            '") { id title performers { id name image_path } files { id basename path format width height video_codec audio_codec duration bit_rate frame_rate } galleries { id } } }',
-        }),
-        context: {
-          fileSelect: fileSelect,
-          titleDisplay: titleDisplay,
-          galleryToggle: galleryToggle,
-        },
+        method: "GET",
+        url: new URL("/templates", BACKEND).href,
+        context: {templateSelect: templateSelect},
+        responseType: "json",
         onload: function (response) {
-          try {
-            let scene = JSON.parse(response.responseText).data.findScene;
             let optionsAsString = "";
-            if (scene.title.length > 0) {
-              this.context.titleDisplay.value = scene.title;
-            } else {
-              this.context.titleDisplay.value = scene.files[0].basename;
+            for (let key in response.response) {
+                optionsAsString += "<option value='" + key + "'>" + response.response[key] + "</option>";
             }
-            for (let i = 0; i < scene.files.length; i++) {
-              let file = scene.files[i];
-              let duration = new Date(file.duration * 1000)
-                .toISOString()
-                .slice(11, 19)
-                .replace(/^00:/, "");
-              optionsAsString +=
-                "<option value='" +
-                file.id +
-                "'>" +
-                file.width +
-                "×" +
-                file.height +
-                ", " +
-                file.format +
-                ", " +
-                file.video_codec +
-                "/" +
-                file.audio_codec +
-                ", " +
-                duration +
-                "</option>";
-            }
-            this.context.fileSelect.innerHTML = optionsAsString;
-            if (scene.galleries.length == 0) {
-              this.context.galleryToggle.checked = false;
-              this.context.galleryToggle.disabled = true;
-            } else {
-              this.context.galleryToggle.disabled = false;
-            }
-          } catch (err) {
-            this.context.titleDisplay.value = "";
-            this.context.fileSelect.innerHTML = "";
-          }
+            this.context.templateSelect.innerHTML = optionsAsString;
         },
-      })
-    );
-    if (event.target.value === "") {
-      titleDisplay.value = "";
-      fileSelect.innerHTML = "";
-    }
-    statusArea.innerHTML = "";
-    instructions.innerHTML = "";
-  });
+    });
 
-  body.appendChild(idInput);
-  body.appendChild(titleDisplay);
-  body.appendChild(fileSelect);
-  body.appendChild(fillButton);
-  body.appendChild(stashButton);
-  body.appendChild(moreOptions);
-  body.appendChild(statusArea);
-  body.appendChild(instructions);
+    let fillButton = document.createElement("input");
+    fillButton.setAttribute("type", "submit");
+    fillButton.setAttribute("value", "fill from");
+    fillButton.style.marginLeft = "12pt";
 
-  parent.insertBefore(body, parent.children[5]);
-  parent.insertBefore(head, body);
+    let stashButton = document.createElement("input");
+    stashButton.setAttribute("type", "submit");
+    stashButton.setAttribute("value", "Open Stash");
+    stashButton.style.marginLeft = "12pt";
+
+    let moreOptions = document.createElement("div");
+    moreOptions.style.marginTop = "12pt";
+    let screensToggleLabel = document.createElement("label");
+    screensToggleLabel.setAttribute("for", "screenstoggle");
+    screensToggleLabel.innerText = "Generate screens? (contact sheet is always generated)";
+    screensToggleLabel.style.marginRight = "6pt";
+    let screensToggle = document.createElement("input");
+    screensToggle.setAttribute("type", "checkbox");
+    screensToggle.setAttribute("name", "screenstoggle");
+    screensToggle.setAttribute("id", "screenstoggle");
+    screensToggle.setAttribute("checked", true);
+    moreOptions.appendChild(screensToggleLabel);
+    moreOptions.appendChild(screensToggle);
+    moreOptions.appendChild(templateSelect);
+
+    let galleryToggleLabel = document.createElement("label");
+    galleryToggleLabel.setAttribute("for", "gallery_toggle");
+    galleryToggleLabel.innerText = "Include gallery?";
+    galleryToggleLabel.style.marginRight = "6pt";
+    let galleryToggle = document.createElement("input");
+    galleryToggle.setAttribute("type", "checkbox");
+    galleryToggle.setAttribute("name", "gallerytoggle");
+    galleryToggle.setAttribute("id", "gallery_toggle");
+    galleryToggle.checked = false;
+    moreOptions.appendChild(document.createElement("br"));
+    moreOptions.appendChild(galleryToggleLabel);
+    moreOptions.appendChild(galleryToggle);
+
+    let statusArea = document.createElement("div");
+    statusArea.setAttribute("id", "stash_statusarea");
+
+    let instructions = document.createElement("div");
+    instructions.setAttribute("id", "stash_instructions");
+
+    let idInput = document.createElement("input");
+    idInput.setAttribute("size", 8);
+    idInput.setAttribute("type", "text");
+    idInput.setAttribute("id", "stash_id");
+    idInput.setAttribute("placeholder", "Stash ID");
+
+    const announceURL = document.evaluate("//input[contains(@value,'/announce')]", document, null, XPathResult.ANY_UNORDERED_NODE_TYPE, null).singleNodeValue.value;
+
+    const submitForm = document.getElementById("upload_table");
+    const submitRow = submitForm.querySelector(".border > tbody > tr:last-child > td");
+    let submitBtn = document.createElement("input");
+    submitBtn.id = "autoupload";
+    submitBtn.type = "button";
+    submitBtn.value = "Upload with File";
+    submitBtn.disabled = true;
+    submitRow.appendChild(submitBtn);
+
+    fillButton.addEventListener("click", () => {
+        let suggestionsHead = document.getElementById("suggestions-head");
+        let suggestionsBody = document.getElementById("suggestions-body");
+        if (suggestionsHead) suggestionsHead.remove();
+        if (suggestionsBody) suggestionsBody.remove();
+
+        statusArea.innerHTML = "";
+        instructions.innerHTML = "";
+        GM_xmlhttpRequest({
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            url: new URL("/generate", BACKEND).href,
+            responseType: "json",
+            data: JSON.stringify({
+                scene_id: idInput.value,
+                file_id: fileSelect.value,
+                announce_url: announceURL,
+                template: templateSelect.value,
+                screens: screensToggle.checked,
+                gallery: galleryToggle.checked,
+            }),
+            onload: function (response) {
+                if (response.status === 404) {
+                    statusArea.innerHTML = "<span style='color: red;'>Error submitting job. Is the backend updated?</span>";
+                    return;
+                }
+                if ("id" in response.response) {
+                    let job_id = response.response.id;
+                    GM_xmlhttpRequest({
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        url: new URL("/fill", BACKEND).href,
+                        responseType: "stream",
+                        data: JSON.stringify({
+                            id: job_id,
+                        }),
+                        context: {
+                            statusArea: statusArea,
+                            description: document.getElementById("desc"),
+                            tags: document.getElementById("taginput"),
+                            cover: document.getElementById("image"),
+                            title: document.getElementById("title"),
+                            instructions: instructions,
+                        },
+                        onreadystatechange: async function (response) {
+                            if (response.readyState === 2 && response.status === 200) {
+                                const reader = response.response.getReader();
+                                while (true) {
+                                    const {done, value} = await reader.read(); // value is Uint8Array
+                                    if (value) {
+                                        let text = new TextDecoder().decode(value);
+                                        let j;
+                                        try {
+                                            j = JSON.parse(text);
+                                        } catch (e) {
+                                            if (text.includes('"message": "Done"')) {
+                                                console.debug("The response stream was incomplete, reading until end of stream.");
+                                                const stashData = [];
+                                                stashData.push(text);
+                                                while (true) {
+                                                    let {done, value} = await reader.read();
+                                                    stashData.push(new TextDecoder().decode(value));
+                                                    if (done) break;
+                                                }
+                                                text = stashData.join("");
+                                                j = JSON.parse(text);
+                                            } else {
+                                                console.warn("Unexpected failure to read stream data.");
+                                            }
+                                        }
+                                        if (j) {
+                                            if (j.status === "success") {
+                                                if ("message" in j.data) {
+                                                    this.context.statusArea.innerText = j.data.message;
+                                                }
+                                                if ("fill" in j.data) {
+                                                    this.context.description.value = j.data.fill.description;
+                                                    this.context.tags.value = j.data.fill.tags;
+                                                    this.context.cover.value = j.data.fill.cover;
+                                                    this.context.title.value = j.data.fill.title;
+                                                    let instructions = "";
+                                                    instructions += "Instructions:<ol>";
+                                                    instructions += "<li>Set a category for the upload and double-check everything for correctness</li>";
+                                                    instructions += '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' + j.data.fill.torrent_path + '" disabled></div></li>';
+                                                    instructions += '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' + j.data.fill.file_path + '" disabled></div></li>';
+                                                    instructions += "</ol>";
+                                                    this.context.instructions.innerHTML = instructions;
+
+                                                    if ("anon" in j.data.fill) {
+                                                        let radios = [];
+                                                        for (const el of document.getElementsByTagName("input")) {
+                                                            if (el.type === "radio") {
+                                                                radios.push(el);
+                                                            }
+                                                        }
+                                                        if (radios.length == 2) {
+                                                            if (j.data.fill.anon) {
+                                                                radios[1].checked = true;
+                                                            } else {
+                                                                radios[0].checked = true;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if ("file" in j.data) {
+                                                        // Temporary for debugging. Replace the button each time
+                                                        // so that we don't add multiple copies of the listener
+                                                        // function to the same button.
+                                                        let newBtn = submitBtn.cloneNode();
+                                                        newBtn.disabled = false;
+                                                        submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+                                                        newBtn.addEventListener("click", () => {
+                                                            newBtn.disabled = true;
+                                                            let formel = document.getElementById("upload_table");
+                                                            let formdata = new FormData(formel);
+                                                            formdata.set("file_input", b64toBlob(j.data.file.content, "application/x-bittorrent"), j.data.file.name);
+                                                            console.debug(formdata);
+                                                            const r = new XMLHttpRequest();
+                                                            r.onreadystatechange = function () {
+                                                                if (r.readyState == XMLHttpRequest.DONE) {
+                                                                    document.open();
+                                                                    document.write(r.responseText);
+                                                                    document.close();
+                                                                }
+                                                            };
+                                                            r.open("POST", new URL("/upload.php", window.location).href);
+                                                            r.responseType = "text";
+                                                            r.send(formdata);
+
+                                                            GM_xmlhttpRequest({
+                                                                method: "POST",
+                                                                headers: {"Content-Type": "application/json"},
+                                                                url: new URL("/submit", BACKEND).href,
+                                                                responseType: "json",
+                                                                data: JSON.stringify({
+                                                                    torrent_path: j.data.fill.torrent_path,
+                                                                }),
+                                                            });
+                                                        });
+                                                    }
+
+                                                    if ("suggestions" in j.data) {
+                                                        let parent = document.getElementsByClassName("thin")[0];
+
+                                                        let head = document.createElement("div");
+                                                        head.classList.add("head");
+                                                        head.id = "suggestions-head";
+                                                        head.innerHTML = "Tag Suggestions";
+
+                                                        let body = document.createElement("div");
+                                                        body.classList.add("box", "pad");
+                                                        body.id = "suggestions-body";
+
+                                                        let table = document.createElement("table");
+                                                        table.id = "tagsuggestions";
+                                                        table.style.width = "1%";
+                                                        table.style.marginLeft = "12pt";
+                                                        let header = document.createElement("tr");
+                                                        let stashTagHeader = document.createElement("th");
+                                                        stashTagHeader.setAttribute("scope", "col");
+                                                        stashTagHeader.style.marginLeft = "12pt";
+                                                        stashTagHeader.style.marginRight = "auto";
+                                                        stashTagHeader.innerText = "Stash Tag";
+
+                                                        let empTagHeader = document.createElement("th");
+                                                        empTagHeader.setAttribute("scope", "col");
+                                                        empTagHeader.style.marginLeft = "12pt";
+                                                        empTagHeader.style.marginRight = "auto";
+                                                        empTagHeader.innerText = "EMP Tag";
+
+                                                        let ignoreTagHeader = document.createElement("th");
+                                                        ignoreTagHeader.setAttribute("scope", "col");
+                                                        ignoreTagHeader.style.marginLeft = "12pt";
+                                                        ignoreTagHeader.style.marginRight = "auto";
+                                                        ignoreTagHeader.innerText = "Ignore? ";
+
+                                                        let ignoreAll = document.createElement("input");
+                                                        ignoreAll.type = "checkbox";
+                                                        ignoreAll.addEventListener("change", function () {
+                                                            for (let checkbox of document.getElementsByClassName("tag-ignore")) {
+                                                                checkbox.checked = this.checked;
+                                                            }
+                                                        });
+                                                        ignoreTagHeader.appendChild(ignoreAll);
+
+                                                        header.appendChild(stashTagHeader);
+                                                        header.appendChild(empTagHeader);
+                                                        header.appendChild(ignoreTagHeader);
+
+                                                        table.appendChild(header);
+
+                                                        for (var key in j.data.suggestions) {
+                                                            if (j.data.suggestions.hasOwnProperty(key)) {
+                                                                let row = document.createElement("tr");
+
+                                                                let stashTagBox = document.createElement("td");
+                                                                stashTagBox.style.marginRight = "auto";
+                                                                stashTagBox.style.whiteSpace = "nowrap";
+                                                                let empTagBox = document.createElement("td");
+                                                                empTagBox.style.marginLeft = "12pt";
+                                                                empTagBox.style.marginRight = "auto";
+                                                                empTagBox.style.whiteSpace = "nowrap";
+                                                                let ignoreTagBox = document.createElement("td");
+                                                                ignoreTagBox.style.marginLeft = "12pt";
+                                                                ignoreTagBox.style.marginRight = "auto";
+                                                                ignoreTagBox.style.whiteSpace = "nowrap";
+                                                                ignoreTagBox.style.textAlign = "center";
+                                                                let acceptTagBox = document.createElement("td");
+                                                                acceptTagBox.style.marginLeft = "12pt";
+                                                                acceptTagBox.style.marginRight = "auto";
+                                                                acceptTagBox.style.whiteSpace = "nowrap";
+
+                                                                let tagDisplay = document.createElement("input");
+                                                                tagDisplay.setAttribute("type", "text");
+                                                                tagDisplay.setAttribute("disabled", true);
+                                                                tagDisplay.setAttribute("size", 30);
+                                                                tagDisplay.value = key;
+
+                                                                stashTagBox.appendChild(tagDisplay);
+                                                                row.appendChild(stashTagBox);
+
+                                                                let tagInput = document.createElement("input");
+                                                                tagInput.setAttribute("size", 30);
+                                                                tagInput.setAttribute("type", "text");
+                                                                tagInput.autocomplete = "on";
+                                                                tagInput.value = j.data.suggestions[key];
+                                                                unsafeWindow.AutoComplete.addInput(tagInput, "/tags.php");
+
+                                                                empTagBox.appendChild(tagInput);
+                                                                row.appendChild(empTagBox);
+
+                                                                let ignoreInput = document.createElement("input");
+                                                                ignoreInput.setAttribute("type", "checkbox");
+                                                                ignoreInput.classList.add("tag-ignore");
+
+                                                                ignoreTagBox.appendChild(ignoreInput);
+                                                                row.appendChild(ignoreTagBox);
+
+                                                                let acceptTagButton = document.createElement("input");
+                                                                acceptTagButton.type = "submit";
+                                                                acceptTagButton.value = "Accept/Ignore Suggestion";
+                                                                acceptTagButton.addEventListener("click", function () {
+                                                                    let acceptTags = [];
+                                                                    let ignoreTags = [];
+                                                                    if (ignoreInput.checked) {
+                                                                        ignoreTags.push(tagDisplay.value);
+                                                                    } else {
+                                                                        acceptTags.push({
+                                                                            name: tagDisplay.value, emp: tagInput.value,
+                                                                        });
+                                                                        document.getElementById("taginput").value += " " + tagInput.value;
+                                                                    }
+                                                                    GM_xmlhttpRequest({
+                                                                        method: "POST",
+                                                                        headers: {"Content-Type": "application/json"},
+                                                                        url: new URL("/suggestions", BACKEND).href,
+                                                                        responseType: "json",
+                                                                        data: JSON.stringify({
+                                                                            accept: acceptTags, ignore: ignoreTags,
+                                                                        }),
+                                                                        context: {
+                                                                            statusArea: statusArea,
+                                                                        },
+                                                                        onload: function (response) {
+                                                                            try {
+                                                                                let j = JSON.parse(response.responseText);
+                                                                                if (j.status === "success") {
+                                                                                    if ("message" in j.data) {
+                                                                                        this.context.statusArea.innerText = j.data.message;
+                                                                                    }
+                                                                                } else if (j.status === "error") {
+                                                                                    this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
+                                                                                }
+                                                                            } catch (e) {
+                                                                                console.warn("Unexpected failure to parse text: " + response.responseText);
+                                                                            }
+                                                                        },
+                                                                    });
+                                                                    row.remove();
+                                                                });
+
+                                                                acceptTagBox.appendChild(acceptTagButton);
+                                                                row.appendChild(acceptTagBox);
+
+                                                                table.appendChild(row);
+                                                            }
+                                                        }
+
+                                                        let tagSubmitButton = document.createElement("input");
+                                                        tagSubmitButton.setAttribute("type", "submit");
+                                                        tagSubmitButton.value = "Accept/Ignore All Suggestions";
+                                                        tagSubmitButton.style.marginLeft = "12pt";
+
+                                                        body.appendChild(table);
+                                                        body.appendChild(tagSubmitButton);
+
+                                                        tagSubmitButton.addEventListener("click", () => {
+                                                            console.log("Accepting tag suggestions");
+                                                            let acceptTags = [];
+                                                            let ignoreTags = [];
+                                                            for (const row of Array.from(table.rows).slice(1)) {
+                                                                let stashTag = row.cells[0].childNodes[0].value;
+                                                                let empTag = row.cells[1].childNodes[0].value;
+                                                                let ignore = row.cells[2].childNodes[0].checked;
+                                                                if (ignore) {
+                                                                    ignoreTags.push(stashTag);
+                                                                } else {
+                                                                    acceptTags.push({name: stashTag, emp: empTag});
+                                                                    document.getElementById("taginput").value += " " + empTag;
+                                                                }
+                                                            }
+                                                            head.remove();
+                                                            body.remove();
+                                                            GM_xmlhttpRequest({
+                                                                method: "POST",
+                                                                headers: {"Content-Type": "application/json"},
+                                                                url: new URL("/suggestions", BACKEND).href,
+                                                                responseType: "json",
+                                                                data: JSON.stringify({
+                                                                    accept: acceptTags, ignore: ignoreTags,
+                                                                }),
+                                                                context: {
+                                                                    statusArea: statusArea,
+                                                                },
+                                                                onload: function (response) {
+                                                                    try {
+                                                                        let j = JSON.parse(response.responseText);
+                                                                        if (j.status === "success") {
+                                                                            if ("message" in j.data) {
+                                                                                this.context.statusArea.innerText = j.data.message;
+                                                                            }
+                                                                        } else if (j.status === "error") {
+                                                                            this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
+                                                                        }
+                                                                    } catch (e) {
+                                                                        console.warn("Unexpected failure to parse text: " + response.responseText);
+                                                                    }
+                                                                },
+                                                            });
+                                                        });
+
+                                                        let tagCloseButton = document.createElement("input");
+                                                        tagCloseButton.setAttribute("type", "submit");
+                                                        tagCloseButton.value = "Close Suggestions";
+                                                        tagCloseButton.style.marginLeft = "12pt";
+                                                        tagCloseButton.addEventListener("click", function () {
+                                                            head.remove();
+                                                            body.remove();
+                                                        });
+
+                                                        body.appendChild(tagCloseButton);
+
+                                                        parent.insertBefore(body, parent.children[7]);
+                                                        parent.insertBefore(head, body);
+                                                    }
+                                                }
+                                            } else if (j.status === "error") {
+                                                this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
+                                                break;
+                                            }
+                                        } else {
+                                            console.warn("The response was not read or not converted to JSON.");
+                                            console.debug(text);
+                                        }
+                                    }
+                                    if (done) break;
+                                }
+                            }
+                        },
+                    });
+                } else {
+                    console.error("No job ID returned from stash-empornium");
+                }
+            }
+        });
+
+    });
+
+    stashButton.addEventListener("click", function () {
+        let idInput = document.getElementById("stash_id");
+        if (idInput.value.length > 0) {
+            window.open(STASH + "/scenes/" + idInput.value, "_blank");
+        } else {
+            window.open(STASH, "_blank");
+        }
+    });
+
+    idInput.addEventListener("input", function (event) {
+        GM_xmlhttpRequest(Object.assign({}, graphql, {
+            data: JSON.stringify({
+                query: '{ findScene(id: "' + idInput.value + '") { id title performers { id name image_path } files { id basename path format width height video_codec audio_codec duration bit_rate frame_rate } galleries { id } } }',
+            }), context: {
+                fileSelect: fileSelect, titleDisplay: titleDisplay, galleryToggle: galleryToggle,
+            }, onload: function (response) {
+                try {
+                    let scene = JSON.parse(response.responseText).data.findScene;
+                    let optionsAsString = "";
+                    if (scene.title.length > 0) {
+                        this.context.titleDisplay.value = scene.title;
+                    } else {
+                        this.context.titleDisplay.value = scene.files[0].basename;
+                    }
+                    for (let i = 0; i < scene.files.length; i++) {
+                        let file = scene.files[i];
+                        let duration = new Date(file.duration * 1000)
+                            .toISOString()
+                            .slice(11, 19)
+                            .replace(/^00:/, "");
+                        optionsAsString += "<option value='" + file.id + "'>" + file.width + "×" + file.height + ", " + file.format + ", " + file.video_codec + "/" + file.audio_codec + ", " + duration + "</option>";
+                    }
+                    this.context.fileSelect.innerHTML = optionsAsString;
+                    if (scene.galleries.length == 0) {
+                        this.context.galleryToggle.checked = false;
+                        this.context.galleryToggle.disabled = true;
+                    } else {
+                        this.context.galleryToggle.disabled = false;
+                    }
+                } catch (err) {
+                    this.context.titleDisplay.value = "";
+                    this.context.fileSelect.innerHTML = "";
+                }
+            },
+        }));
+        if (event.target.value === "") {
+            titleDisplay.value = "";
+            fileSelect.innerHTML = "";
+        }
+        statusArea.innerHTML = "";
+        instructions.innerHTML = "";
+    });
+
+    body.appendChild(idInput);
+    body.appendChild(titleDisplay);
+    body.appendChild(fileSelect);
+    body.appendChild(fillButton);
+    body.appendChild(stashButton);
+    body.appendChild(moreOptions);
+    body.appendChild(statusArea);
+    body.appendChild(instructions);
+
+    parent.insertBefore(body, parent.children[5]);
+    parent.insertBefore(head, body);
 })();

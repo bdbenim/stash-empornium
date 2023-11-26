@@ -290,7 +290,7 @@ class ConfigHandler(Singleton):
             if k in template_files:
                 self.template_names[k] = str(self.get("templates", k))
             else:
-                self.logger.warning(f"Template {k} from config.ini is not present in {self.template_dir}")
+                self.logger.warning(f"Template {k} from config.toml is not present in {self.template_dir}")
 
         if "api_key" in self.conf["stash"]:  # type: ignore
             api_key = self.get("stash", "api_key")

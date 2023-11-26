@@ -4,3 +4,4 @@ __pycache__/
 package*.json
 node_modules/
 !strftime-min.js
+venv/
