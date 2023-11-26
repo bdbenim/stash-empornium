@@ -2,13 +2,14 @@
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.16.3"
+__version__ = "0.17.0"
 
 # built-in
 import json
 import logging
 import os
 import time
+from concurrent.futures import Future
 
 # external
 from flask import (Flask, Response, redirect, request, stream_with_context,
@@ -51,7 +52,18 @@ csrf = CSRFProtect(app)
 @stream_with_context
 def generate():
     j = request.get_json()
-    for msg in generator.generate(j, app):
+    try:
+        future: Future = generator.jobs[j["id"]]
+    except KeyError:
+        yield generator.error("Error getting job. Is your userscript updated?")
+        return
+    except ValueError:
+        yield generator.error("Invalid job ID")
+        return
+    except IndexError:
+        yield generator.error("Job does not exist")
+        return
+    for msg in future.result():
         yield msg
         time.sleep(0.1)
 
@@ -94,6 +106,14 @@ def process_suggestions():
 @csrf.exempt
 def fill():
     return Response(generate(), mimetype="application/json")  # type: ignore
+
+
+@app.route("/generate", methods=["POST"])
+@csrf.exempt
+def submit_job():
+    j = request.get_json()
+    job_id = generator.add_job(j)
+    return json.dumps({"id": job_id})
 
 
 @app.route("/templates")
@@ -175,6 +195,7 @@ def webmanifest():
 if __name__ == "__main__":
     try:
         from waitress import serve
+
         serve(app, host="0.0.0.0", port=config.get("backend", "port", 9932))
         # app.run(host="0.0.0.0", port=config.port, debug=True)
     except ModuleNotFoundError:

@@ -12,11 +12,12 @@ import tempfile
 import time
 import urllib.parse
 from collections.abc import Generator
+from concurrent.futures import Future, ThreadPoolExecutor
 from multiprocessing.connection import Connection
 
 import requests
 from cairosvg import svg2png
-from flask import Flask, render_template, render_template_string
+from flask import render_template, render_template_string
 
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
@@ -27,29 +28,37 @@ MEDIA_INFO = shutil.which("mediainfo")
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
 config = ConfigHandler()
 
+jobs: list[Future] = []
+job_pool = ThreadPoolExecutor(max_workers=4)
+jobs_lock = mp.Lock()
+
+
+def add_job(j: dict) -> int:
+    future = job_pool.submit(generate, j)
+    with jobs_lock:
+        job_id = len(jobs)
+        jobs.append(future)
+    return job_id
+
 
 def error(message: str, alt_message: str | None = None) -> str:
-    logger = logging.getLogger(__name__)
-    logger.error(message)
+    logging.getLogger(__name__).error(message)
     return json.dumps({"status": "error", "message": alt_message if alt_message else message})
 
 
 def warning(message: str, alt_message: str | None = None) -> str:
-    logger = logging.getLogger(__name__)
-    logger.warning(message)
+    logging.getLogger(__name__).warning(message)
     return json.dumps({"status": "error", "message": alt_message if alt_message else message})
 
 
 def info(message: str, alt_message: str | None = None) -> str:
-    logger = logging.getLogger(__name__)
-    logger.info(message)
+    logging.getLogger(__name__).info(message)
     return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
 
 
-def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
+def generate(j: dict) -> Generator[str, None, str | None]:
     logger = logging.getLogger(__name__)
 
-    # with app.app_context():
     scene_id = j["scene_id"]
     file_id = j["file_id"]
     announce_url = j["announce_url"]
@@ -58,12 +67,12 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
 
     logger.info(
         f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens {
-            'and including gallery' if include_gallery else ''}."
+        ' and including gallery' if include_gallery else ''}."
     )
 
     template = (
         j["template"]
-        if "template" in j and j["template"] in os.listdir(app.template_folder)
+        if "template" in j and j["template"] in config.template_names
         else config.get("backend", "default_template")
     )
     assert template is not None
@@ -89,7 +98,8 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
     if scene is None:
-        return error(f"Scene {scene_id} does not exist")
+        yield error(f"Scene {scene_id} does not exist")
+        return
 
     # Ensure that all expected string keys are present
     str_keys = ["title", "details", "date"]
@@ -114,12 +124,14 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             gallery_proc = mp.Process(target=imagehandler.createContactSheet, args=(files, 800, 200, gallery_contact))
             gallery_proc.start()
         except ValueError as ve:
-            return error(str(ve))
+            yield error(str(ve))
+            return
         except TypeError:
             logger.warning("Unable to include gallery in torrent")
         except Exception as e:
             logger.debug(e)
-            return error("An unexpected error occurred while processing the gallery")
+            yield error("An unexpected error occurred while processing the gallery")
+            return
 
     stash_file = None
     for f in scene["files"]:
@@ -135,7 +147,8 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     if stash_file is None:
         tmp_file = scene["files"][0]
         if tmp_file is None:
-            return error("No file exists")
+            yield error("No file exists")
+            return
         stash_file = tmp_file
         maps = config.items("file.maps")
         if not maps:
@@ -143,7 +156,8 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
         stash_file["path"] = mapPath(stash_file["path"], maps)  # type: ignore
         logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
-        return error(f"Couldn't find file {stash_file['path']}")
+        yield error(f"Couldn't find file {stash_file['path']}")
+        return
 
     if new_dir:
         link(stash_file["path"], new_dir)
@@ -191,9 +205,12 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     ###########
 
     yield info("Making torrent")
+    receive_pipe: Connection
+    send_pipe: Connection
     receive_pipe, send_pipe = mp.Pipe(False)
     torrent_proc = mp.Process(target=gen_torrent, args=(send_pipe, stash_file, announce_url, new_dir))
     torrent_proc.start()
+    # del send_pipe  # Ensures connection can be automatically closed if garbage collected
 
     #########
     # COVER #
@@ -231,7 +248,6 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             "-y",
         ]
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        # cover_gen_proc = subprocess.Popen(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
     else:
         with open(cover_file[1], "wb") as fp:
@@ -240,25 +256,31 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     yield info("Uploading images")
     try:
         images = imagehandler.ImageHandler()
-    except:
-        return error("Failed to initialize image handler")
+    except KeyboardInterrupt:
+        raise
+    except Exception:
+        yield error("Failed to initialize image handler")
+        return
     if config.args.flush:
         images.clear()
 
     cover_remote_url = images.getURL(cover_file[1], cover_mime_type, cover_ext)[0]
     if cover_remote_url is None:
-        return error("Failed to upload cover")
+        yield error("Failed to upload cover")
+        return
     cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
     os.remove(cover_file[1])
 
     ###########
     # PREVIEW #
     ###########
-
+    preview_recv: Connection
+    preview_send: Connection
     preview_recv, preview_send = mp.Pipe(False)
     preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene))
     if config.get("backend", "use_preview", False):
         preview_proc.start()
+    # del preview_send  # Ensures connection can be automatically closed if garbage collected
 
     ###############
     # STUDIO LOGO #
@@ -282,10 +304,9 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
                 studio_img_ext = "webp"
             case _:
                 studio_img_ext = "unk"
-                yield warning(
+                yield (warning(
                     f"Unknown studio logo file type: {studio_img_mime_type}", "Unrecognized studio image file type"
-                )
-                time.sleep(0.1)
+                ))
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
@@ -317,10 +338,11 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             case "image/webp":
                 performer_image_ext = "webp"
             case _:
-                return error(
+                yield (error(
                     f"Unrecognized performer image mime type: {performer_image_mime_type}",
                     "Unrecognized performer image format",
-                )
+                ))
+                return
         performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
@@ -341,7 +363,8 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     # upload images and paste in description
     contact_sheet_remote_url = images.generate_contact_sheet(stash_file)
     if contact_sheet_remote_url is None:
-        return error("Failed to generate contact sheet")
+        yield error("Failed to generate contact sheet")
+        return
 
     ###########
     # SCREENS #
@@ -350,7 +373,8 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     if gen_screens:
         screens_urls = images.generate_screens(stash_file=stash_file)  # TODO customize number of screens from config
         if screens_urls is None or None in screens_urls:
-            return error("Failed to generate screens")
+            yield error("Failed to generate screens")
+            return
 
     cmd = [
         "ffprobe",
@@ -378,12 +402,13 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
 
     mediainfo = ""
     info_proc = None
-    info_recv = None
+    info_recv: Connection
+    info_send: Connection
     if MEDIA_INFO:
         info_recv, info_send = mp.Pipe(False)
         info_proc = mp.Process(target=gen_media_info, args=(info_send, stash_file["path"]))
         info_proc.start()
-        logger.debug(mediainfo)
+        # del info_send  # Ensures connection can be automatically closed if garbage collected
 
     #########
     # TITLE #
@@ -469,7 +494,7 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
 
     gallery_contact_url = None
     if gallery_proc:
-        gallery_proc.join()
+        gallery_proc.join(timeout=60)
         gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]  # type: ignore
         os.remove(gallery_contact)  # type: ignore
 
@@ -488,10 +513,14 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
     yield info("Rendering template")
 
     if info_proc is not None:
-        info_proc.join()
-        mediainfo = info_recv.recv()  # type: ignore
+        info_proc.join(timeout=60)
+        info_proc.close()
+        try:
+            info_send.close()
+            mediainfo = info_recv.recv()  # type: ignore
+        except EOFError:
+            error("Failed to generate media info")
 
-    time.sleep(0.1)
     template_context = {
         "studio": scene["studio"]["name"] if scene["studio"] else "",
         "studio_logo": logo_url,
@@ -519,8 +548,13 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
 
     preview_url = None
     if config.get("backend", "use_preview", False):
-        preview_proc.join()
-        preview_url = preview_recv.recv()
+        preview_proc.join(timeout=60)
+        preview_proc.close()
+        try:
+            preview_send.close()
+            preview_url = preview_recv.recv()
+        except EOFError:
+            error("Unable to upload preview GIF")
         template_context["preview"] = preview_url
 
     for key in tmp_tag_lists:
@@ -530,9 +564,14 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
 
     tag_suggestions = tags.tag_suggestions
 
-    logger.info("Waiting for torrent generation to complete")
-    torrent_proc.join()
-    torrent_paths = receive_pipe.recv()
+    yield info("Waiting for torrent generation to complete")
+    torrent_proc.join(timeout=60)
+    send_pipe.close()
+    try:
+        torrent_paths = receive_pipe.recv()
+    except EOFError:
+        yield error("Failed to save torrent")
+        return
 
     result = {
         "status": "success",
@@ -573,7 +612,6 @@ def generate(j: dict, app: Flask) -> Generator[str, None, str | None]:
             logger.debug(e)
 
     logger.info("Done")
-    time.sleep(1)
 
 
 def gen_torrent(
@@ -608,13 +646,12 @@ def gen_torrent(
     if process.returncode != 0:
         tempdir.cleanup()
         logger.error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
-        return None
+        return
     for path in torrent_paths:
         shutil.copy(temp_path, path)
     tempdir.cleanup()
     logger.debug(f"Moved torrent to {torrent_paths}")
     pipe.send(torrent_paths)
-    # return torrent_paths
 
 
 def gen_media_info(pipe: Connection, path: str) -> None:
