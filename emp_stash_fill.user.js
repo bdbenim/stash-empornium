@@ -224,6 +224,10 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
                 gallery: galleryToggle.checked,
             }),
             onload: function (response) {
+                if (response.status === 404) {
+                    statusArea.innerHTML = "<span style='color: red;'>Error submitting job. Is the backend updated?</span>";
+                    return;
+                }
                 if ("id" in response.response) {
                     let job_id = response.response.id;
                     GM_xmlhttpRequest({
