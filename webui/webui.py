@@ -334,4 +334,4 @@ def handle_exception(e):
     message = e.name
     if e.code == 404:
         message = "The page you were looking for was not found"
-    return render_template("errorpage.html", code=e.code, message=message)
+    return render_template("error-page.html", code=e.code, message=message), e.code
