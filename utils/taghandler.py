@@ -11,7 +11,7 @@ import json
 import re
 import logging
 from utils.customtypes import CaseInsensitiveDict
-from utils.db import db, StashTag, EmpTag, get_or_create, Category
+from utils.db import db, StashTag, EmpTag, get_or_create, get_or_create_no_commit, Category
 from collections.abc import MutableMapping
 
 from flask import Flask
@@ -286,16 +286,17 @@ def acceptSuggestions(tags: MutableMapping[str, str]) -> None:
     logger.debug(f"Tags: {tags}")
     for st,et in tags.items():
         s_tag = get_or_create(StashTag, tagname=st)
-        s_tag.emp_tags.clear()
+        etags = []
         for tag in et.split():
-            s_tag.emp_tags.append(get_or_create(EmpTag, tagname=tag))
-            db.session.commit()
+            etags.append(get_or_create_no_commit(EmpTag, tagname=tag))
+        s_tag.emp_tags = etags
+        db.session.commit()
 
 def rejectSuggestions(tags: list[str]) -> None:
     "Marks all supplied tags as ignored"
     logger = logging.getLogger(__name__)
     logger.debug(f"Ignoring tags: {tags}")
     for tag in tags:
-        s_tag = get_or_create(StashTag, tagname=tag)
+        s_tag = get_or_create_no_commit(StashTag, tagname=tag)
         s_tag.ignored = True
         db.session.commit()

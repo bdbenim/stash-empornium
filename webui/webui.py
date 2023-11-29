@@ -39,23 +39,23 @@ def tags():
 
 @settings_page.route("/tag/<id>", methods=["GET", "POST"])
 def tag(id):
-    tag: StashTag = StashTag.query.filter_by(id=id).first_or_404()
-    form = TagAdvancedForm(tag=tag)
+    stag: StashTag = StashTag.query.filter_by(id=id).first_or_404()
+    form = TagAdvancedForm(tag=stag)
     if form.validate_on_submit():
         if form.data["save"]:
-            tag.ignored = form.data["ignored"]
-            tag.display = form.data["display"]
-            tag.emp_tags.clear()
+            stag.ignored = form.data["ignored"]
+            stag.display = form.data["display"]
+            etags = []
             for et in form.data["emp_tags"].split():
-                e_tag = get_or_create_no_commit(EmpTag, tagname=et)
-                tag.emp_tags.append(e_tag)
-            tag.categories.clear()
+                etags.append(get_or_create_no_commit(EmpTag, tagname=et))
+            stag.emp_tags = etags
+            cats = []
             for cat in form.data["categories"]:
-                category = get_or_create_no_commit(Category, name=cat)
-                tag.categories.append(category)
+                cats.append(get_or_create_no_commit(Category, name=cat))
+            stag.categories = cats
             db.session.commit()
         elif form.data["delete"]:
-            db.session.delete(tag)
+            db.session.delete(stag)
             db.session.commit()
     return render_template("tag-advanced.html", form=form)
 
