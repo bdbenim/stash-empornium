@@ -144,7 +144,6 @@ async function mutex(lock, op, timeout = 10000) {
     const start = new Date()
     while (value /*&& (new Date() - new Date(value) < 30000)*/) {
         if (new Date() - start > timeout) {
-            alert("Mutex failed");
             return false;
         }
         await sleep(100);
