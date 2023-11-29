@@ -18,7 +18,7 @@
 // @downloadURL  https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
 // @require      https://code.jquery.com/jquery-3.7.1.min.js#sha256=fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a
 // @require      https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
-// @require      https://github.com/bdbenim/stash-empornium/raw/stash-script/stash_library.user.js#sha256=a3495315fb08ecb26ddc0ef02ace3c81aac1e389fa1096c8a1ef5e4717f5eac3
+// @require      https://github.com/bdbenim/stash-empornium/raw/main/resources/stash_library.user.js#sha256=a3495315fb08ecb26ddc0ef02ace3c81aac1e389fa1096c8a1ef5e4717f5eac3
 // ==/UserScript==
 
 // Changelog:
