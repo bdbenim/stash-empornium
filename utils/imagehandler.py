@@ -1,19 +1,19 @@
 import hashlib
 import logging
-from multiprocessing import Pool
-from multiprocessing.connection import Connection
 import os
 import re
-import requests
 import subprocess
 import tempfile
 import time
-from typing import Any, Optional, Sequence
 import uuid
+from multiprocessing import Pool
+from multiprocessing.connection import Connection
+from typing import Any, Optional, Sequence
+
+import requests
+from PIL import Image, ImageSequence
 
 from utils.confighandler import ConfigHandler, stash_headers
-
-from PIL import Image, ImageSequence
 
 logger = logging.getLogger(__name__)
 use_redis = False
@@ -124,16 +124,18 @@ class ImageHandler:
                 output = os.path.join(tempdir, "preview.gif")
                 with open(temppath, "wb") as temp:
                     temp.write(preview.content)
-                CMD = ["ffmpeg", "-i", temppath, "-vf", "fps=10", output, "-y"]
+                CMD = ["ffmpeg", "-i", temppath, "-vf",
+                       "fps=10,scale=320:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+                       output, "-y"]
                 proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 logger.debug(f"ffmpeg output:\n{proc.stdout}")
                 if proc.returncode:
                     logger.error("Error generating preview GIF")
                     pipe.send(None)
                     return
-                width = 600
+                width = 310
                 while os.path.getsize(output) > 5000000:
-                    CMD[4] = f"fps=10,scale={width}:-1:flags=lanczos"
+                    CMD[4] = f"fps=10,scale={width}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
                     proc = subprocess.run(CMD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                     logger.debug(f"ffmpeg output:\n{proc.stdout}")
                     if proc.returncode:
@@ -182,8 +184,8 @@ class ImageHandler:
         cmds: list[tuple] = []
 
         for seek in map(
-            lambda i: stash_file["duration"] * (0.05 + i / (num_frames - 1) * 0.9),
-            range(num_frames),
+                lambda i: stash_file["duration"] * (0.05 + i / (num_frames - 1) * 0.9),
+                range(num_frames),
         ):
             cmds.append((stash_file["path"], str(seek)))
         with Pool() as p:
@@ -207,12 +209,12 @@ class ImageHandler:
         return screens
 
     def getURL(
-        self,
-        img_path: str,
-        img_mime_type: str,
-        image_ext: str,
-        width: int = 0,
-        default: str | None = STUDIO_DEFAULT_LOGO,
+            self,
+            img_path: str,
+            img_mime_type: str,
+            image_ext: str,
+            width: int = 0,
+            default: str | None = STUDIO_DEFAULT_LOGO,
     ) -> tuple[str | None, str | None]:
         # Return cached url if available
         digest = None
@@ -291,11 +293,11 @@ def isWebpAnimated(path: str):
 
 
 def img_host_upload(
-    img_path: str,
-    img_mime_type: str,
-    image_ext: str,
-    img_host_token: str,
-    cookies,
+        img_path: str,
+        img_mime_type: str,
+        image_ext: str,
+        img_host_token: str,
+        cookies,
 ) -> str | None:
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
