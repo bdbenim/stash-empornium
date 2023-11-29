@@ -762,7 +762,7 @@ async function popJob() {
                 const data = await stash.callGQL({"query": "{findScene(id:" + scene_id + "){title files{id}}}"})
                 generate({
                     scene_id: scene_id, file_id: data.data.findScene.files[0].id, announce_url: announceURL, // template: "",
-                    screens: true, gallery: false, // TODO actually get these values form the user
+                    screens: true, gallery: false, // TODO actually get these values from the user
                 }, function (r) {
                     pushJob(r.response.id);
                     window.location = new URL("/upload.php", EMPORNIUM).href;
