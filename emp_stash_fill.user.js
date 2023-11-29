@@ -109,8 +109,7 @@ const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
         byteArrays.push(byteArray);
     }
 
-    const blob = new Blob(byteArrays, {type: contentType});
-    return blob;
+    return new Blob(byteArrays, {type: contentType});
 };
 
 let job_id;
@@ -143,8 +142,9 @@ function sleep(ms) {
 async function mutex(lock, op, timeout = 10000) {
     let value = GM_getValue(lock, null);
     const start = new Date()
-    while (value && (new Date() - new Date(value) < 10000)) {
+    while (value /*&& (new Date() - new Date(value) < 30000)*/) {
         if (new Date() - start > timeout) {
+            alert("Mutex failed");
             return false;
         }
         await sleep(100);
@@ -338,7 +338,7 @@ async function popJob() {
                                                         radios.push(el);
                                                     }
                                                 }
-                                                if (radios.length == 2) {
+                                                if (radios.length === 2) {
                                                     if (j.data.fill.anon) {
                                                         radios[1].checked = true;
                                                     } else {
@@ -362,7 +362,7 @@ async function popJob() {
                                                     console.debug(formdata);
                                                     const r = new XMLHttpRequest();
                                                     r.onreadystatechange = function () {
-                                                        if (r.readyState == XMLHttpRequest.DONE) {
+                                                        if (r.readyState === XMLHttpRequest.DONE) {
                                                             document.open();
                                                             document.write(r.responseText);
                                                             document.close();
