@@ -133,8 +133,8 @@ class ConfigHandler(Singleton):
         redisgroup = parser.add_argument_group("redis", "options for connecting to a redis server")
         redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
         cache = redisgroup.add_mutually_exclusive_group()
-        cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true")  # TODO implement
-        cache.add_argument("--overwrite", help="overwrite cached values", action="store_true")  # TODO implement
+        cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true")
+        cache.add_argument("--overwrite", help="overwrite cached values", action="store_true")
 
         self.args = parser.parse_args()
 
@@ -268,7 +268,6 @@ class ConfigHandler(Singleton):
                             tmpConf = tomlkit.load(f)
                         conf["templates"][filename] = tmpConf["templates"][filename]  # type: ignore
 
-        # TODO: better handling of unexpected values
         self.torrent_dirs = list(self.conf["backend"]["torrent_directories"])  # type: ignore
         assert self.torrent_dirs is not None and len(self.torrent_dirs) > 0
         for dir in self.torrent_dirs:
@@ -290,7 +289,7 @@ class ConfigHandler(Singleton):
             if k in template_files:
                 self.template_names[k] = str(self.get("templates", k))
             else:
-                self.logger.warning(f"Template {k} from config.ini is not present in {self.template_dir}")
+                self.logger.warning(f"Template {k} from config.toml is not present in {self.template_dir}")
 
         if "api_key" in self.conf["stash"]:  # type: ignore
             api_key = self.get("stash", "api_key")
