@@ -11,7 +11,7 @@ import json
 import re
 import logging
 from utils.customtypes import CaseInsensitiveDict
-from utils.db import db, StashTag, EmpTag, get_or_create, get_or_create_no_commit, Category
+from utils.db import db, StashTag, GazelleTag, get_or_create, get_or_create_no_commit, Category
 from collections.abc import MutableMapping
 
 from flask import Flask
@@ -245,11 +245,13 @@ def db_init(app: Flask, tag_map: MutableMapping, tag_lists):
         for st, et in tag_map.items():
             s_tag = get_or_create(StashTag, tagname=st)
             for tag in str(et).split():
-                e_tag = get_or_create(EmpTag, tagname=tag)
-                s_tag.emp_tags.append(e_tag)
-            for cat in cats:
+                e_tag = get_or_create(GazelleTag, tagname=tag)
+                if e_tag not in s_tag.emp_tags:
+                    s_tag.emp_tags.append(e_tag)
+            for cat, cat_obj in cats.items():
                 if st in tag_lists[cat] or st.lower() in tag_lists[cat]:
-                    s_tag.categories.append(cats[cat])
+                    if cat_obj not in s_tag.categories:
+                        s_tag.categories.append(cat_obj)
         for st in tag_lists["ignored_tags"]:
             s_tag = get_or_create(StashTag, tagname=st)
             s_tag.ignored = True
@@ -288,7 +290,7 @@ def acceptSuggestions(tags: MutableMapping[str, str]) -> None:
         s_tag = get_or_create(StashTag, tagname=st)
         etags = []
         for tag in et.split():
-            etags.append(get_or_create_no_commit(EmpTag, tagname=tag))
+            etags.append(get_or_create_no_commit(GazelleTag, tagname=tag))
         s_tag.emp_tags = etags
         db.session.commit()
 

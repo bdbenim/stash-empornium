@@ -2,7 +2,7 @@
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
 # built-in
 import json
@@ -15,6 +15,7 @@ from concurrent.futures import Future
 from flask import (Flask, Response, redirect, request, stream_with_context,
                    url_for)
 from flask_bootstrap import Bootstrap5
+from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
 
 # included
@@ -42,8 +43,19 @@ app.register_blueprint(settings_page)
 db_path = os.path.abspath(os.path.join(config.config_dir, "db.sqlite3"))
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 db.db.init_app(app)
+# Ensure FOREIGN KEY for sqlite3
+if 'sqlite:' in app.config['SQLALCHEMY_DATABASE_URI']:
+    def _fk_pragma_on_connect(dbapi_con, con_record):  # noqa
+        dbapi_con.execute('pragma foreign_keys=ON')
+
+
+    with app.app_context():
+        from sqlalchemy import event
+
+        event.listen(db.db.engine, 'connect', _fk_pragma_on_connect)
+migrate = Migrate(app, db.db)
 with app.app_context():
-    db.db.create_all()
+    db.upgrade()
 taghandler.setup(app)
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)

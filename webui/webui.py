@@ -19,7 +19,7 @@ from webui.forms import (
 
 from utils.confighandler import ConfigHandler
 from utils.taghandler import TagHandler
-from utils.db import get_or_create, StashTag, EmpTag, db, get_or_create_no_commit, Category, from_dict, to_dict
+from utils.db import get_or_create, StashTag, GazelleTag, db, get_or_create_no_commit, Category, from_dict, to_dict
 from werkzeug.exceptions import HTTPException
 
 conf = ConfigHandler()
@@ -47,7 +47,7 @@ def tag(id):
             stag.display = form.data["display"]
             etags = []
             for et in form.data["emp_tags"].split():
-                etags.append(get_or_create_no_commit(EmpTag, tagname=et))
+                etags.append(get_or_create_no_commit(GazelleTag, tagname=et))
             stag.emp_tags = etags
             cats = []
             for cat in form.data["categories"]:
@@ -77,7 +77,7 @@ def tag_settings(page):
                 s_tag = get_or_create(StashTag, tagname=tag["stash_tag"])
                 e_tags = []
                 for et in tag["emp_tag"].split():
-                    e_tags.append(get_or_create(EmpTag, tagname=et))
+                    e_tags.append(get_or_create(GazelleTag, tagname=et))
                 s_tag.emp_tags = e_tags
                 db.session.commit()
         else:
@@ -101,7 +101,7 @@ def search():
                 return redirect(url_for(".tag", id=s_tag.id))
     elif searched:
         tags = tags.filter(StashTag.tagname.like(f"%{searched}%"))
-        e_tags = StashTag.query.join(StashTag.emp_tags).filter(EmpTag.tagname.like(f"%{searched}%"))
+        e_tags = StashTag.query.join(StashTag.emp_tags).filter(GazelleTag.tagname.like(f"%{searched}%"))
         tags = tags.union(e_tags)
         pagination = tags.order_by(StashTag.tagname).paginate(page=page)
         form = SearchForm(s_tags=pagination.items)
