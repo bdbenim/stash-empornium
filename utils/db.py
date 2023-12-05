@@ -39,12 +39,16 @@ def upgrade():
             except TypeError:
                 con.execute(t)
             except sqlalchemy.exc.OperationalError:
-                logger.debug("Initializing alembic_version table")
-                con.execute(text("""CREATE TABLE alembic_version (
-            version_num VARCHAR(32) NOT NULL, 
-            CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
-    )"""))
-                con.execute(t)
+                try:
+                    con.execute(text("SELECT COUNT(*) FROM stash_tag")).first()  # Confirm that DB is not empty
+                    logger.debug("Initializing alembic_version table")
+                    con.execute(text("""CREATE TABLE alembic_version (
+                version_num VARCHAR(32) NOT NULL, 
+                CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+        )"""))
+                    con.execute(t)
+                except sqlalchemy.exc.OperationalError:
+                    pass  # DB was empty, so allow Alembic to create
         fm_upgrade()
         con.execute(text("VACUUM"))
         con.commit()
