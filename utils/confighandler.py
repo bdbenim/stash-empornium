@@ -1,12 +1,13 @@
-import tomlkit
 import argparse
-import os
 import logging
+import os
 import shutil
+
+import tomlkit
+
 from utils.customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
-# from __main__ import __version__
-__version__ = 'test'
+
 stash_headers = {
     "Content-type": "application/json",
 }
@@ -116,7 +117,6 @@ class ConfigHandler(Singleton):
             help="specify the directory containing configuration files",
             nargs=1,
         )
-        parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
         mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
         mutex.add_argument(
@@ -230,7 +230,8 @@ class ConfigHandler(Singleton):
                     value = default_tags["empornium"][option]  # type: ignore
                     self.tag_conf["empornium"][option] = value  # type: ignore
             for tag in default_tags["empornium"]["tags"]:  # type: ignore
-                if tag not in self.tag_conf["empornium"]["ignored_tags"] and tag not in self.tag_conf["empornium"]["tags"]:  # type: ignore
+                if tag not in self.tag_conf["empornium"]["ignored_tags"] and tag not in self.tag_conf["empornium"][
+                    "tags"]:  # type: ignore
                     value = default_tags["empornium"]["tags"][tag]  # type: ignore
                     self.tag_conf["empornium"]["tags"][tag] = value  # type: ignore
         except Exception as e:
