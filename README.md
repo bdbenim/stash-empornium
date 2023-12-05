@@ -67,19 +67,13 @@ pip install -r requirements.txt
 sudo apt-get install -y ffmpeg mktorrent
 ```
 
-You can optionally install waitress as a production WSGI server:
-
-```bash
-pip install waitress
-```
-
 ### Userscript
 
 #### Dependencies
 
 - [Tampermonkey](https://www.tampermonkey.net)
 
-Currently the script does not work with other userscript managers, though this may change in the future.
+Currently, the script does not work with other userscript managers, though this may change in the future.
 
 The userscript can be installed [here][2]. Place the other files on the same machine as your stash server and ensure
 dependencies are installed.

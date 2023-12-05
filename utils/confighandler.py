@@ -1,11 +1,12 @@
-import tomlkit
 import argparse
-import os
 import logging
+import os
 import shutil
+
+import tomlkit
+
 from utils.customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
-from __main__ import __version__
 
 stash_headers = {
     "Content-type": "application/json",
@@ -84,7 +85,7 @@ class ConfigHandler(Singleton):
     log_level: int
     args: argparse.Namespace
     conf: tomlkit.TOMLDocument
-    tagconf: tomlkit.TOMLDocument
+    tag_conf: tomlkit.TOMLDocument
     port: int
     username: str
     password: str
@@ -96,7 +97,7 @@ class ConfigHandler(Singleton):
     torrent_clients: list[TorrentClient] = []
 
     def __init__(self):
-        if not (self.initialized):
+        if not self.initialized:
             self.parse_args()
             self.logging_init()
             self.configure()
@@ -105,6 +106,7 @@ class ConfigHandler(Singleton):
     def logging_init(self) -> None:
         self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
         logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=self.log_level)
+        # logging.basicConfig(format="%(levelname)-5.5s [%(name)s] %(message)s", level=self.log_level)
         self.logger = logging.getLogger(__name__)
 
     def parse_args(self) -> None:
@@ -115,7 +117,6 @@ class ConfigHandler(Singleton):
             help="specify the directory containing configuration files",
             nargs=1,
         )
-        parser.add_argument("--version", action="version", version=f"stash-empornium {__version__}")
         mutex = parser.add_argument_group("Output", "options for setting the log level").add_mutually_exclusive_group()
         mutex.add_argument("-q", "--quiet", dest="level", action="count", default=2, help="output less")
         mutex.add_argument(
@@ -130,26 +131,26 @@ class ConfigHandler(Singleton):
             type=str.upper,
         )
 
-        redisgroup = parser.add_argument_group("redis", "options for connecting to a redis server")
-        redisgroup.add_argument("--flush", help="flush redis cache", action="store_true")
-        cache = redisgroup.add_mutually_exclusive_group()
+        redis_group = parser.add_argument_group("redis", "options for connecting to a redis server")
+        redis_group.add_argument("--flush", help="flush redis cache", action="store_true")
+        cache = redis_group.add_mutually_exclusive_group()
         cache.add_argument("--no-cache", help="do not retrieve cached values", action="store_true")
         cache.add_argument("--overwrite", help="overwrite cached values", action="store_true")
 
         self.args = parser.parse_args()
 
-    def renameKey(self, section: str, oldkey: str, newkey: str, conf: tomlkit.TOMLDocument) -> None:
-        if oldkey in conf[section]:  # type: ignore
-            conf[section][newkey] = self.conf[section][oldkey]  # type: ignore
-            del conf[section][oldkey]  # type: ignore
+    def rename_key(self, section: str, old_key: str, new_key: str, conf: tomlkit.TOMLDocument) -> None:
+        if old_key in conf[section]:  # type: ignore
+            conf[section][new_key] = self.conf[section][old_key]  # type: ignore
+            del conf[section][old_key]  # type: ignore
             self.update_file()
-            self.logger.info(f"Key '{oldkey}' renamed to '{newkey}'")
+            self.logger.info(f"Key '{old_key}' renamed to '{new_key}'")
 
     def update_file(self) -> None:
         with open(self.config_file, "w") as f:
             tomlkit.dump(self.conf, f)
         with open(self.tag_config_file, "w") as f:
-            tomlkit.dump(self.tagconf, f)
+            tomlkit.dump(self.tag_conf, f)
 
     def backup_config(self) -> None:
         conf_bak = self.config_file + ".bak"
@@ -200,38 +201,39 @@ class ConfigHandler(Singleton):
             if os.path.isfile(self.tag_config_file):
                 self.logger.debug(f"Found tag config at {self.tag_config_file}")
                 with open(self.tag_config_file) as f:
-                    self.tagconf = tomlkit.load(f)
+                    self.tag_conf = tomlkit.load(f)
             else:
                 self.logger.info(f"Config file not found at {self.tag_config_file}, creating")
-                self.tagconf = tomlkit.document()
+                self.tag_conf = tomlkit.document()
                 if "empornium" in self.conf:
                     emp = self.conf["empornium"]
-                    self.tagconf.append("empornium", emp)  # type: ignore
+                    self.tag_conf.append("empornium", emp)  # type: ignore
                     del self.conf["empornium"]
                 if "empornium.tags" in self.conf:
                     emptags = self.conf["empornium.tags"]
-                    if "empornium" not in self.tagconf:
-                        self.tagconf.append("empornium", tomlkit.table(True))
-                    self.tagconf["empornium"].append("tags", emptags)  # type: ignore
+                    if "empornium" not in self.tag_conf:
+                        self.tag_conf.append("empornium", tomlkit.table(True))
+                    self.tag_conf["empornium"].append("tags", emptags)  # type: ignore
                     del self.conf["empornium.tags"]
                 else:
                     with open("default-tags.toml") as f:
-                        self.tagconf = tomlkit.load(f)
+                        self.tag_conf = tomlkit.load(f)
             with open("default-tags.toml") as f:
                 default_tags = tomlkit.load(f)
-            if "empornium" not in self.tagconf:
+            if "empornium" not in self.tag_conf:
                 emp = tomlkit.table(True)
                 emp.append("tags", tomlkit.table(False))
-                self.tagconf.append("empornium", emp)
+                self.tag_conf.append("empornium", emp)
             for option in default_tags["empornium"]:  # type: ignore
-                if option not in self.tagconf["empornium"]:
-                    self.tagconf["empornium"].add(tomlkit.comment("Option imported automatically"))  # type: ignore
+                if option not in self.tag_conf["empornium"]:
+                    self.tag_conf["empornium"].add(tomlkit.comment("Option imported automatically"))  # type: ignore
                     value = default_tags["empornium"][option]  # type: ignore
-                    self.tagconf["empornium"][option] = value  # type: ignore
+                    self.tag_conf["empornium"][option] = value  # type: ignore
             for tag in default_tags["empornium"]["tags"]:  # type: ignore
-                if tag not in self.tagconf["empornium"]["ignored_tags"] and tag not in self.tagconf["empornium"]["tags"]:  # type: ignore
+                if tag not in self.tag_conf["empornium"]["ignored_tags"] and tag not in self.tag_conf["empornium"][
+                    "tags"]:  # type: ignore
                     value = default_tags["empornium"]["tags"][tag]  # type: ignore
-                    self.tagconf["empornium"]["tags"][tag] = value  # type: ignore
+                    self.tag_conf["empornium"]["tags"][tag] = value  # type: ignore
         except Exception as e:
             self.logger.error(f"Failed to read tag config file: {e}")
         try:
@@ -319,14 +321,14 @@ class ConfigHandler(Singleton):
         if section in self.conf:
             if key in self.conf[section]:  # type: ignore
                 return self.conf[section][key]  # type: ignore
-        if section in self.tagconf and key in self.tagconf[section]:  # type: ignore
-            return self.tagconf[section][key]  # type: ignore
+        if section in self.tag_conf and key in self.tag_conf[section]:  # type: ignore
+            return self.tag_conf[section][key]  # type: ignore
         return default
 
     def set(self, section: str, key: str, value) -> None:
         if section not in self.conf:
-            if section in self.tagconf:
-                self.tagconf[section][key] = value  # type: ignore
+            if section in self.tag_conf:
+                self.tag_conf[section][key] = value  # type: ignore
                 return
             self.conf[section] = {}
         self.conf[section][key] = value  # type: ignore
@@ -338,18 +340,18 @@ class ConfigHandler(Singleton):
                     del self.conf[section][key]  # type: ignore
             else:
                 del self.conf[section]
-        elif section in self.tagconf:
+        elif section in self.tag_conf:
             if key:
-                if key in self.tagconf[section]:  # type: ignore
-                    del self.tagconf[section][key]  # type: ignore
+                if key in self.tag_conf[section]:  # type: ignore
+                    del self.tag_conf[section][key]  # type: ignore
             else:
-                del self.tagconf[section]
+                del self.tag_conf[section]
 
     def items(self, section: str) -> dict:
         if section in self.conf:
             return CaseInsensitiveDict(self.conf[section])  # type: ignore
-        if section in self.tagconf:
-            return CaseInsensitiveDict(self.tagconf[section])  # type: ignore
+        if section in self.tag_conf:
+            return CaseInsensitiveDict(self.tag_conf[section])  # type: ignore
         return {}
 
     def __iter__(self):
@@ -357,7 +359,7 @@ class ConfigHandler(Singleton):
             yield section
 
     def __contains__(self, __key: object) -> bool:
-        return self.conf.__contains__(__key) or self.tagconf.__contains__(__key)
+        return self.conf.__contains__(__key) or self.tag_conf.__contains__(__key)
 
     def __getitem__(self, key: str):
-        return self.conf.__getitem__(key) if self.conf.__contains__(key) else self.tagconf.__getitem__(key)
+        return self.conf.__getitem__(key) if self.conf.__contains__(key) else self.tag_conf.__getitem__(key)

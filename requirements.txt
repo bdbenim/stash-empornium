@@ -8,3 +8,4 @@ tomlkit == 0.12.*
 Flask-WTF == 1.2.*
 bootstrap-Flask == 2.3.*
 Flask-SQLAlchemy == 3.1.*
+Flask-Migrate == 4.0.5
