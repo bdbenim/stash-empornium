@@ -9,7 +9,6 @@ import shutil
 import string
 import subprocess
 import tempfile
-import time
 import urllib.parse
 from collections.abc import Generator
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -64,10 +63,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
     include_gallery = j["gallery"]
+    tracker = j["tracker"]
 
     logger.info(
         f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens {
-        ' and including gallery' if include_gallery else ''}."
+            ' and including gallery' if include_gallery else ''}."
     )
 
     template = (
@@ -323,7 +323,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ##############
 
     for performer in scene["performers"]:
-        performer_tag = tags.process_performer(performer)
+        performer_tag = tags.process_performer(performer, tracker)
 
         # image
         logger.debug(f'Downloading performer image from {performer["image_path"]}')
@@ -433,9 +433,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ########
 
     for tag in scene["tags"]:
-        tags.process_tag(tag["name"])
+        tags.process_tag(tag["name"], tracker)
         for parent in tag["parents"]:
-            tags.process_tag(parent["name"])
+            tags.process_tag(parent["name"], tracker)
 
     if config.get("metadata", "tag_codec") and stash_file["video_codec"] is not None:
         tags.add(stash_file["video_codec"])

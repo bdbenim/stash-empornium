@@ -118,23 +118,38 @@ class TagHandler:
         current scene."""
         return {key: self.sort_tag_list(key) for key in self.tag_sets}
 
-    def process_tag(self, tag: str) -> None:
+    def process_tag(self, tag: str, tracker: str) -> None:
         """Check for the appropriate EMP tag
         mapping for a provided tag and add it to
         the working lists, or generate a suggested
         mapping."""
+        s_tag: StashTag
         s_tag = get_or_create(StashTag, tagname=tag)
         if s_tag.ignored:
             return
+        tag_list: list[GazelleTag]
+        match tracker:
+            case "EMP":
+                tag_list = s_tag.emp_tags
+            case "PB":
+                tag_list = s_tag.pb_tags
+            case "FC":
+                tag_list = s_tag.fc_tags
+            case "HF":
+                tag_list = s_tag.hf_tags
+            case "ENT":
+                tag_list = s_tag.ent_tags
+            case _:
+                raise ValueError('Tracker must be one of ["EMP", "PB", "FC", "HF", "ENT"]')
         if s_tag.emp_tags:
-            for e_tag in s_tag.emp_tags:
+            for e_tag in tag_list:
                 self.tags.add(e_tag.tagname)
         else:
             self.tag_suggestions[tag] = empify(tag)
         for cat in s_tag.categories:
             self.tag_sets[cat.name].add(s_tag.display if s_tag.display else tag)
 
-    def process_performer(self, performer: dict) -> str:
+    def process_performer(self, performer: dict, tracker: str) -> str:
         # also include alias tags?
         logger = logging.getLogger(__name__)
         logger.debug(performer)
@@ -142,7 +157,7 @@ class TagHandler:
         self.tags.add(performer_tag)
         gender = performer["gender"] if performer["gender"] else "FEMALE"  # Should this default be configurable?
         for tag in performer["tags"]:
-            self.process_tag(tag["name"])
+            self.process_tag(tag["name"], tracker)
         if len(self.countries) > 0:
             cca2 = performer["country"]
             g = "m" if (gender == "MALE" or gender == "TRANSGENDER_MALE") else "f"
@@ -160,13 +175,13 @@ class TagHandler:
                 self.tags.add("uncircumcised.cock")
         if gender not in ("MALE", "TRANSGENDER_MALE"):
             if self.conf["performers"]["tag_ethnicity"] and "ethnicity" in performer and performer[
-              "ethnicity"] in ETHNICITY_MAP:  # type: ignore
+                "ethnicity"] in ETHNICITY_MAP:  # type: ignore
                 self.add(ETHNICITY_MAP[performer["ethnicity"]])
             if self.conf["performers"]["tag_eye_color"] and "eye_color" in performer and len(
                     performer["eye_color"]) > 0:  # type: ignore
                 self.add(performer["eye_color"] + ".eyes")
             if self.conf["performers"]["tag_hair_color"] and "hair_color" in performer and performer[
-              "hair_color"] in HAIR_COLOR_MAP:  # type: ignore
+                "hair_color"] in HAIR_COLOR_MAP:  # type: ignore
                 self.add(HAIR_COLOR_MAP[performer["hair_color"]])
             tattoos = "tattoos" in performer and len(performer["tattoos"]) > 0
             piercings = "piercings" in performer and len(performer["piercings"]) > 0
@@ -287,19 +302,31 @@ def setup(app: Flask):
     db_init(app, tag_map, tag_lists)
 
 
-def accept_suggestions(tags: MutableMapping[str, str]) -> None:
+def accept_suggestions(tags: MutableMapping[str, str], tracker: str) -> None:
     """Adds the provided tag mappings to the db, 
     creating the tags as required"""
     logger = logging.getLogger(__name__)
     logger.info("Saving tag mappings")
     logger.debug(f"Tags: {tags}")
-    for st, et in tags.items():
-        s_tag = get_or_create(StashTag, tagname=st)
-        etags = []
-        for tag in et.split():
-            etags.append(get_or_create_no_commit(GazelleTag, tagname=tag))
-        s_tag.emp_tags = etags
-        db.session.commit()
+    with db.session.begin():
+        for st, gt in tags.items():
+            s_tag = get_or_create_no_commit(StashTag, tagname=st)
+            g_tags = []
+            for tag in gt.split():
+                g_tags.append(get_or_create_no_commit(GazelleTag, tagname=tag))
+            match tracker:
+                case "EMP":
+                    s_tag.emp_tags = g_tags
+                case "PB":
+                    s_tag.pb_tags = g_tags
+                case "FC":
+                    s_tag.fc_tags = g_tags
+                case "HF":
+                    s_tag.hf_tags = g_tags
+                case "ENT":
+                    s_tag.ent_tags = g_tags
+                case _:
+                    raise ValueError('Tracker must be one of ["EMP", "PB", "FC", "HF", "ENT"]')
 
 
 def reject_suggestions(tags: list[str]) -> None:

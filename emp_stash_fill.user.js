@@ -138,6 +138,23 @@ function generate(data, callback) {
     });
 }
 
+function getTracker() {
+    switch (location.hostname) {
+        case "www.empornium.is" || "www.empornium.sx":
+            return "EMP"
+        case "femdomcult.org":
+            return "FC"
+        case "www.happyfappy.org":
+            return "HF"
+        case "www.enthralled.me":
+            return "ENT"
+        case "pornbay.org":
+            return "PB"
+        default:
+            return ""
+    }
+}
+
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -183,7 +200,6 @@ async function popJob() {
     });
     return job;
 }
-
 
 
 (function () {
@@ -639,6 +655,7 @@ async function popJob() {
                 scene_id: idInput.value,
                 file_id: fileSelect.value,
                 announce_url: announceURL,
+                tracker: getTracker(),
                 template: templateSelect.value,
                 screens: screensToggle.checked,
                 gallery: galleryToggle.checked,
@@ -697,7 +714,7 @@ async function popJob() {
                             optionsAsString += "<option value='" + file.id + "'>" + file.width + "×" + file.height + ", " + file.format + ", " + file.video_codec + "/" + file.audio_codec + ", " + duration + "</option>";
                         }
                         this.context.fileSelect.innerHTML = optionsAsString;
-                        if (scene.galleries.length == 0) {
+                        if (scene.galleries.length === 0) {
                             this.context.galleryToggle.checked = false;
                             this.context.galleryToggle.disabled = true;
                         } else {
@@ -773,8 +790,12 @@ async function popJob() {
                 let scene_id = window.location.href.split("/scenes/")[1].split('?')[0];
                 const data = await stash.callGQL({"query": "{findScene(id:" + scene_id + "){title files{id}}}"})
                 generate({
-                    scene_id: scene_id, file_id: data.data.findScene.files[0].id, announce_url: announceURL, // template: "",
-                    screens: true, gallery: false, // TODO actually get these values from the user
+                    scene_id: scene_id,
+                    file_id: data.data.findScene.files[0].id,
+                    announce_url: announceURL,
+                    tracker: getTracker(),// template: "",
+                    screens: true,
+                    gallery: false, // TODO actually get these values from the user
                 }, function (r) {
                     pushJob(r.response.id);
                     window.location = new URL("/upload.php", EMPORNIUM).href;
