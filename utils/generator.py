@@ -323,7 +323,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ##############
 
     for performer in scene["performers"]:
-        performer_tag = tags.processPerformer(performer)
+        performer_tag = tags.process_performer(performer)
 
         # image
         logger.debug(f'Downloading performer image from {performer["image_path"]}')
@@ -433,9 +433,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ########
 
     for tag in scene["tags"]:
-        tags.processTag(tag["name"])
+        tags.process_tag(tag["name"])
         for parent in tag["parents"]:
-            tags.processTag(parent["name"])
+            tags.process_tag(parent["name"])
 
     if config.get("metadata", "tag_codec") and stash_file["video_codec"] is not None:
         tags.add(stash_file["video_codec"])
@@ -502,7 +502,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     # TEMPLATE #
     ############
 
-    tmp_tag_lists = tags.sortTagLists()
+    tmp_tag_lists = tags.sort_tag_lists()
 
     # Prevent error in case date is missing
     date = scene["date"]

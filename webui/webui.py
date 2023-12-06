@@ -18,7 +18,7 @@ from webui.forms import (
 )
 
 from utils.confighandler import ConfigHandler
-from utils.taghandler import TagHandler
+from utils.taghandler import query_maps
 from utils.db import get_or_create, StashTag, GazelleTag, db, get_or_create_no_commit, Category, from_dict, to_dict
 from werkzeug.exceptions import HTTPException
 
@@ -62,7 +62,7 @@ def tag(id):
 
 @settings_page.route("/tags/<page>", methods=["GET", "POST"])
 def tag_settings(page):
-    pagination = TagHandler().queryMaps(page=int(page))
+    pagination = query_maps(page=int(page))
     form = TagMapForm(s_tags=pagination.items)
     if form.validate_on_submit():
         tag = form.update_self()
