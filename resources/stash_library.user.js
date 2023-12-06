@@ -4,10 +4,22 @@
 // navigation change is detected
 // version 0.33.1
 
+const TRACKERS = [
+    "www.empornium.is",
+    "www.empornium.sx",
+    "femdomcult.org",
+    "www.happyfappy.org",
+    "www.enthralled.me",
+    "pornbay.org",
+];
+
+if (!unsafeWindow.TRACKERS) {
+    unsafeWindow.TRACKERS = TRACKERS;
+}
 
 (function () {
     'use strict';
-    if (location.hostname !== 'www.empornium.is' && location.hostname !== 'www.empornium.sx') {
+    if (!TRACKERS.includes(location.hostname)) {
         const stash = function () {
 
             const {fetch: originalFetch} = window;
