@@ -207,6 +207,10 @@ async function popJob() {
 
     // if (location.hostname === "www.empornium.is" || location.hostname === "www.empornium.sx") {
     if (unsafeWindow.TRACKERS.includes(location.hostname)) {
+        let tag_form_input = document.getElementById("taginput");
+        if (!tag_form_input) {
+            tag_form_input = document.getElementById("tags"); // FemdomCult uses a different ID for some reason
+        }
 
         let parent = document.getElementsByClassName("thin")[0];
 
@@ -521,7 +525,7 @@ async function popJob() {
                                                                 acceptTags.push({
                                                                     name: tagDisplay.value, emp: tagInput.value,
                                                                 });
-                                                                document.getElementById("taginput").value += " " + tagInput.value;
+                                                                tag_form_input.value += " " + tagInput.value;
                                                             }
                                                             GM_xmlhttpRequest({
                                                                 method: "POST",
@@ -579,7 +583,7 @@ async function popJob() {
                                                             ignoreTags.push(stashTag);
                                                         } else {
                                                             acceptTags.push({name: stashTag, emp: empTag});
-                                                            document.getElementById("taginput").value += " " + empTag;
+                                                            tag_form_input.value += " " + empTag;
                                                         }
                                                     }
                                                     head.remove();
@@ -669,7 +673,7 @@ async function popJob() {
                     fill({
                         statusArea: statusArea,
                         description: document.getElementById("desc"),
-                        tags: document.getElementById("taginput"),
+                        tags: tag_form_input,
                         cover: document.getElementById("image"),
                         title: document.getElementById("title"),
                         instructions: instructions,
@@ -753,7 +757,7 @@ async function popJob() {
                 fill({
                     statusArea: statusArea,
                     description: document.getElementById("desc"),
-                    tags: document.getElementById("taginput"),
+                    tags: tag_form_input,
                     cover: document.getElementById("image"),
                     title: document.getElementById("title"),
                     instructions: instructions,
