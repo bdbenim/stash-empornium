@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -14,6 +15,7 @@ import requests
 from PIL import Image, ImageSequence
 
 from utils.confighandler import ConfigHandler, stash_headers
+from utils.packs import prep_dir
 
 logger = logging.getLogger(__name__)
 use_redis = False
@@ -21,7 +23,7 @@ try:
     import redis
 
     use_redis = True
-except:
+except ImportError:
     logger.info("Redis module not found, using local caching only")
 
 CHUNK_SIZE = 5000
@@ -41,12 +43,12 @@ class ImageHandler:
     overwrite: bool = False
 
     def __init__(self) -> None:
-        self.configureCache()
+        self.configure_cache()
         self.img_host_token, self.cookies = connectionInit()
 
-    def configureCache(self) -> None:
-        redisHost: str = conf.get("redis", "host", "")  # type: ignore
-        redisPort: int = conf.get("redis", "port", 6379)  # type: ignore
+    def configure_cache(self) -> None:
+        redis_host: str = conf.get("redis", "host", "")  # type: ignore
+        redis_port: int = conf.get("redis", "port", 6379)  # type: ignore
         user = conf.get("redis", "username", "")
         password = conf.get("redis", "password", "")
         use_ssl: bool = conf.get("redis", "ssl", False)  # type: ignore
@@ -56,19 +58,22 @@ class ImageHandler:
         enable = use_redis and not conf.get("redis", "disable", False)
         self.overwrite = overwrite
         self.no_cache = no_cache
-        if not no_cache and redisHost is not None and enable and self.redis is None:
+        if not no_cache and redis_host is not None and enable and self.redis is None:
             try:
                 self.redis = redis.Redis(
-                    redisHost, redisPort, username=user, password=password, ssl=use_ssl, decode_responses=True
+                    redis_host, redis_port, username=user, password=password, ssl=use_ssl, decode_responses=True
                 )
                 # It doesn't matter if this exists or not. An exception will be raised if not connected,
                 # so we can "check" for any arbitrary value to see if connected
-                self.redis.exists("connectioncheck")
+                self.redis.exists("connection_check")
                 logger.debug(
-                    f"Successfully connected to redis at {redisHost}:{redisPort}{' using ssl' if use_ssl else ''}"
+                    f"Successfully connected to redis at {redis_host}:{redis_port}{' using ssl' if use_ssl else ''}"
                 )
-            except Exception as e:
-                logger.error(f"Failed to connect to redis: {e}")
+            except redis.exceptions.AuthenticationError as e:
+                logger.error(f"Failed to authenticate with redis: {e} Check the username and password.")
+                self.redis = None
+            except redis.exceptions.ConnectionError as e:
+                logger.error(f"Failed to connect to redis: {e} Check that the host and port are correct.")
                 self.redis = None
         else:
             logger.debug("Not connecting to redis")
@@ -151,26 +156,44 @@ class ImageHandler:
             logger.error(f"No preview found for scene {scene['id']}")
         pipe.send(preview_url)
 
-    def generate_contact_sheet(self, stash_file: dict[str, Any]) -> Optional[str]:
+    def generate_contact_sheet(self, stash_file: dict[str, Any], screens_dir: str | None = None) -> Optional[str]:
+        """
+        Generates a contact sheet for a stash video file, uploads it, and returns the URL. If caching is enabled
+        and the image has been uploaded before, the existing URL will be returned without re-uploading the image.
+        If `screens_dir` is provided, then the image will be copied to that directory with the filename
+        contact_sheet.jpg.
+        :param stash_file: The file from which to generate the contact sheet
+        :type stash_file: dict
+        :param screens_dir: Where to save images for inclusion in the torrent
+        :type screens_dir: str
+        :return: The URL of the uploaded image, or ``None`` if uploading fails
+        :rtype: str
+        """
         contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
+        os.chmod(contact_sheet_file[1], 0o666)  # Ensures torrent client can read the file
         cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
         logger.info("Generating contact sheet")
         contact_sheet_remote_url = self.get_images(stash_file["id"], "contact")[0]
-        if contact_sheet_remote_url is None:
+        if contact_sheet_remote_url is None or screens_dir:
             process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             logger.debug(f"vcsi output:\n{process.stdout}")
             if process.returncode != 0:
                 logger.error("Couldn't generate contact sheet")
                 return None
 
+            if screens_dir:
+                prep_dir(screens_dir)  # Ensure directory exists
+                shutil.copy(contact_sheet_file[1], os.path.join(screens_dir, 'contact_sheet.jpg'))
+
             logger.info("Uploading contact sheet")
-            contact_sheet_remote_url, digest = self.getURL(contact_sheet_file[1], "image/jpeg", "jpg")
             if contact_sheet_remote_url is None:
-                logger.error("Failed to upload contact sheet")
-                return None
-            os.remove(contact_sheet_file[1])
-            if digest is not None:
-                self.set_images(stash_file["id"], "contact", [digest])
+                contact_sheet_remote_url, digest = self.getURL(contact_sheet_file[1], "image/jpeg", "jpg")
+                if contact_sheet_remote_url is None:
+                    logger.error("Failed to upload contact sheet")
+                    return None
+                os.remove(contact_sheet_file[1])
+                if digest is not None:
+                    self.set_images(stash_file["id"], "contact", [digest])
         return contact_sheet_remote_url
 
     def generate_screens(self, stash_file: dict[str, Any], num_frames: int = 10) -> Sequence[Optional[str]]:
