@@ -512,7 +512,9 @@ async function popJob() {
                                                         tagInput.setAttribute("type", "text");
                                                         tagInput.autocomplete = "on";
                                                         tagInput.value = j.data.suggestions[key];
-                                                        unsafeWindow.AutoComplete.addInput(tagInput, "/tags.php");
+                                                        if (unsafeWindow.AutoComplete) {
+                                                            unsafeWindow.AutoComplete.addInput(tagInput, "/tags.php");
+                                                        }
 
                                                         empTagBox.appendChild(tagInput);
                                                         row.appendChild(empTagBox);
