@@ -65,6 +65,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     include_gallery = j["gallery"]
     tracker = j["tracker"]  # 'EMP', 'PB', 'FC', 'HF' or 'ENT'
     include_screens = tracker == 'FC'  # TODO user customization
+    img_host = "imgbox" if tracker == 'HF' else "jerking"
 
     yield info("Starting generation")
 
@@ -220,7 +221,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     # Generate contact sheet and include it in the torrent directory if include_screens is True
     screens_dir = os.path.join(get_torrent_directory(scene), 'screens') if include_screens else None
-    contact_sheet_remote_url = images.generate_contact_sheet(stash_file, screens_dir)
+    contact_sheet_remote_url = images.generate_contact_sheet(stash_file, img_host, screens_dir)
     if contact_sheet_remote_url is None:
         yield error("Failed to generate contact sheet")
         return
@@ -228,7 +229,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     #########
     # COVER #
     #########
-
+    # TODO Move this into image handler
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
@@ -280,11 +281,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     torrent_proc = mp.Process(target=gen_torrent, args=(send_pipe, stash_file, announce_url, new_dir))
     torrent_proc.start()
 
-    cover_remote_url = images.getURL(cover_file[1], cover_mime_type, cover_ext)[0]
+    cover_remote_url = images.get_url(cover_file[1], cover_mime_type, cover_ext, img_host)[0]
     if cover_remote_url is None:
         yield error("Failed to upload cover")
         return
-    cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
+    cover_resized_url = images.get_url(cover_file[1], cover_mime_type, cover_ext, img_host, width=800)[0]
     os.remove(cover_file[1])
 
     ###########
@@ -293,7 +294,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     preview_recv: Connection
     preview_send: Connection
     preview_recv, preview_send = mp.Pipe(False)
-    preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene))
+    preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene, img_host))
     if config.get("backend", "use_preview", False):
         preview_proc.start()
     # del preview_send  # Ensures connection can be automatically closed if garbage collected
@@ -377,7 +378,8 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ###########
 
     if gen_screens:
-        screens_urls = images.generate_screens(stash_file=stash_file)  # TODO customize number of screens from config
+        screens_urls = images.generate_screens(stash_file=stash_file,
+                                               host=img_host)  # TODO customize number of screens from config
         if screens_urls is None or None in screens_urls:
             yield error("Failed to generate screens")
             return
@@ -471,10 +473,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     logger.info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = images.getURL(
+        performers[performer_name]["image_remote_url"] = images.get_url(
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
+            img_host,
             default=imagehandler.PERFORMER_DEFAULT_IMAGE,
         )[0]
         os.remove(performers[performer_name]["image_path"])
@@ -485,10 +488,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     logo_url = imagehandler.STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
-        logo_url = images.getURL(
+        logo_url = images.get_url(
             studio_img_file[1],
             studio_img_mime_type,
             studio_img_ext,
+            img_host,
         )[0]
         if logo_url is None:
             logo_url = imagehandler.STUDIO_DEFAULT_LOGO
@@ -501,7 +505,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     gallery_contact_url = None
     if gallery_proc:
         gallery_proc.join(timeout=60)
-        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]  # type: ignore
+        gallery_contact_url = images.get_url(gallery_contact, "image/jpeg", "jpg", img_host)[0]  # type: ignore
         os.remove(gallery_contact)  # type: ignore
 
     ############
