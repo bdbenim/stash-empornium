@@ -66,14 +66,14 @@ const STASH_DEFAULT = "http://localhost:9999";
 const STASH_API_KEY_DEFAULT = null;
 const EMPORNIUM_DEFAULT = "https://www.empornium.is";
 
-var BACKEND = GM_getValue("backend_url", BACKEND_DEFAULT);
-var STASH = GM_getValue("stash_url", STASH_DEFAULT);
-var STASH_API_KEY = GM_getValue("stash_api_key", STASH_API_KEY_DEFAULT);
-var EMPORNIUM = GM_getValue("empornium", EMPORNIUM_DEFAULT);
+const BACKEND = GM_getValue("backend_url", BACKEND_DEFAULT);
+const STASH = GM_getValue("stash_url", STASH_DEFAULT);
+const STASH_API_KEY = GM_getValue("stash_api_key", STASH_API_KEY_DEFAULT);
+const EMPORNIUM = GM_getValue("empornium", EMPORNIUM_DEFAULT);
 
 function store(key, prompt_text, default_value) {
-    let oldvalue = GM_getValue(key, default_value);
-    GM_setValue(key, prompt(prompt_text, oldvalue) || oldvalue);
+    let old_value = GM_getValue(key, default_value);
+    GM_setValue(key, prompt(prompt_text, old_value) || old_value);
 }
 
 GM_registerMenuCommand("Set backend URL", () => {
@@ -811,7 +811,7 @@ async function popJob() {
                     file_id: data.data.findScene.files[0].id,
                     announce_url: announceURL,
                     tracker: tracker,
-                 // template: "",
+                    // template: "",
                     screens: true,
                     gallery: false, // TODO actually get these values from the user
                 }, function (r) {
