@@ -546,7 +546,9 @@ async function popJob() {
                                                                 url: new URL("/suggestions", BACKEND).href,
                                                                 responseType: "json",
                                                                 data: JSON.stringify({
-                                                                    accept: acceptTags, ignore: ignoreTags,
+                                                                    accept: acceptTags,
+                                                                    ignore: ignoreTags,
+                                                                    tracker: getTracker(),
                                                                 }),
                                                                 context: {
                                                                     statusArea: statusArea,
@@ -607,7 +609,9 @@ async function popJob() {
                                                         url: new URL("/suggestions", BACKEND).href,
                                                         responseType: "json",
                                                         data: JSON.stringify({
-                                                            accept: acceptTags, ignore: ignoreTags,
+                                                            accept: acceptTags,
+                                                            ignore: ignoreTags,
+                                                            tracker: getTracker(),
                                                         }),
                                                         context: {
                                                             statusArea: statusArea,
@@ -831,7 +835,9 @@ async function popJob() {
                 btn.setAttribute("title", "Upload to Empornium");
                 btn.classList.add("btn", "btn-secondary", "minimal");
                 btn.innerHTML = '<?xml version="1.0" encoding="UTF-8"?> <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20px" height="20px" viewBox="0 0 20 20" version="1.1"> <g id="surface1"> <path style=" stroke:none;fill-rule:nonzero;fill:rgb(100%,100%,100%);fill-opacity:1;" d="M 16.605469 10.332031 L 9.222656 10.332031 L 10.277344 14.378906 C 10.5 15.226562 10.703125 15.773438 10.886719 16.015625 C 11.074219 16.261719 11.339844 16.382812 11.6875 16.382812 C 12.121094 16.382812 12.371094 16.21875 12.429688 15.894531 C 12.492188 15.570312 12.402344 14.945312 12.160156 14.011719 L 11.515625 11.542969 L 16.921875 11.542969 L 17.28125 12.925781 C 17.585938 14.082031 17.742188 14.972656 17.757812 15.59375 C 17.773438 16.214844 17.605469 16.875 17.253906 17.582031 C 16.898438 18.289062 16.359375 18.816406 15.625 19.167969 C 14.894531 19.519531 13.90625 19.699219 12.664062 19.699219 C 11.460938 19.699219 10.351562 19.523438 9.339844 19.175781 C 8.328125 18.828125 7.484375 18.351562 6.8125 17.742188 C 6.144531 17.136719 5.613281 16.46875 5.226562 15.742188 C 4.839844 15.011719 4.464844 13.953125 4.101562 12.558594 L 2.679688 7.101562 C 2.253906 5.464844 2.136719 4.175781 2.335938 3.230469 C 2.53125 2.285156 3.066406 1.558594 3.941406 1.058594 C 4.820312 0.554688 5.910156 0.300781 7.21875 0.300781 C 8.820312 0.300781 10.21875 0.605469 11.414062 1.210938 C 12.613281 1.820312 13.550781 2.621094 14.230469 3.625 C 14.910156 4.625 15.488281 6.035156 15.960938 7.847656 Z M 10.097656 7.285156 L 9.738281 5.917969 C 9.488281 4.949219 9.273438 4.324219 9.097656 4.039062 C 8.917969 3.757812 8.671875 3.617188 8.351562 3.617188 C 7.953125 3.617188 7.742188 3.738281 7.710938 3.976562 C 7.679688 4.214844 7.800781 4.863281 8.074219 5.917969 L 8.429688 7.285156 Z M 10.097656 7.285156 "/> </g> </svg>';
-                btn.onclick = trackerUpload;
+                btn.onclick = function (ev) {
+                    trackerUpload("EMP", EMPORNIUM);
+                };
                 grp.insertBefore(btn, document.getElementById("operation-menu").parentElement.parentElement)
                 // grp.appendChild(btn);
             });
