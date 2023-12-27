@@ -54,8 +54,6 @@ def upgrade():
         con.commit()
 
 
-# alembic_version = db.Table("alembic_version", Column(name="version_num", type_=String(32)))
-
 emp_tag_map = db.Table(
     "emp_tags",
     Column("stashtag_id",
@@ -96,6 +94,15 @@ ent_tag_map = db.Table(
            ForeignKey("gazelle_tags.id", ondelete="CASCADE"), primary_key=True)
 )
 
+# Default tag maps to be used if tracker-specific maps are unavailable
+def_tag_map = db.Table(
+    "def_tags",
+    Column("stashtag_id",
+           ForeignKey("stash_tag.id", ondelete="CASCADE"), primary_key=True),
+    Column("gazelletag_id",
+           ForeignKey("gazelle_tags.id", ondelete="CASCADE"), primary_key=True)
+)
+
 list_tags = db.Table(
     "tag_categories",
     Column("stashtag", ForeignKey("stash_tag.id", ondelete="CASCADE"), primary_key=True),
@@ -122,6 +129,9 @@ class GazelleTag(db.Model):
     ent_stash_tags: Mapped[list["StashTag"]] = db.relationship(secondary=ent_tag_map,
                                                                back_populates="ent_tags",
                                                                passive_deletes=True)  # type: ignore
+    def_stash_tags: Mapped[list["StashTag"]] = db.relationship(secondary=def_tag_map,
+                                                               back_populates="def_tags",
+                                                               passive_deletes=True)  # type: ignore
 
 
 class StashTag(db.Model):
@@ -144,6 +154,9 @@ class StashTag(db.Model):
                                                         passive_deletes=True)  # type: ignore
     ent_tags: Mapped[list[GazelleTag]] = db.relationship("GazelleTag", secondary=ent_tag_map,
                                                          back_populates="ent_stash_tags",
+                                                         passive_deletes=True)  # type: ignore
+    def_tags: Mapped[list[GazelleTag]] = db.relationship("GazelleTag", secondary=def_tag_map,
+                                                         back_populates="def_stash_tags",
                                                          passive_deletes=True)  # type: ignore
     categories: Mapped[list["Category"]] = db.relationship("Category", secondary=list_tags,
                                                            back_populates="tags",
