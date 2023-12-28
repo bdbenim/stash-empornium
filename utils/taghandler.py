@@ -268,8 +268,8 @@ def db_init(app: Flask, tag_map: MutableMapping, tag_lists):
             s_tag = get_or_create(StashTag, tagname=st)
             for tag in str(et).split():
                 e_tag = get_or_create(GazelleTag, tagname=tag)
-                if e_tag not in s_tag.emp_tags:
-                    s_tag.emp_tags.append(e_tag)
+                if e_tag not in s_tag.def_tags:
+                    s_tag.def_tags.append(e_tag)
             for cat, cat_obj in cats.items():
                 if st in tag_lists[cat] or st.lower() in tag_lists[cat]:
                     if cat_obj not in s_tag.categories:
