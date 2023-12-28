@@ -2,21 +2,20 @@ from flask_bootstrap import SwitchField
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import (
-    StringField,
     Form,
     FieldList,
     FormField,
-    SubmitField,
     SelectField,
     StringField,
     SubmitField,
     URLField,
     SelectMultipleField,
 )
-from wtforms.widgets import Input, PasswordInput
 from wtforms.validators import URL, DataRequired, Optional
-from webui.validators import PortRange, ConditionallyRequired, Directory, Tag
+from wtforms.widgets import Input, PasswordInput
+
 from utils.db import StashTag, Category
+from webui.validators import PortRange, ConditionallyRequired, Directory, Tag
 
 
 class PasswordField(StringField):
@@ -230,11 +229,46 @@ class TagAdvancedForm(FlaskForm):
             "title": "(Optional) How you want this tag to be displayed in your presentation",
         }
     )
+    def_tags = StringField(
+        "Default Tags",
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "(Optional) The tag(s) that this will correspond to on any tracker that does not have its own tags set",
+        },
+    )
     emp_tags = StringField(
         "EMP Tags",
         render_kw={
             "data-toggle": "tooltip",
             "title": "(Optional) The tag(s) that this corresponds to on Empornium",
+        },
+    )
+    pb_tags = StringField(
+        "PB Tags",
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "(Optional) The tag(s) that this corresponds to on Pornbay",
+        },
+    )
+    fc_tags = StringField(
+        "FC Tags",
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "(Optional) The tag(s) that this corresponds to on Femdom Cult",
+        },
+    )
+    ent_tags = StringField(
+        "ENT Tags",
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "(Optional) The tag(s) that this corresponds to on Enthralled",
+        },
+    )
+    hf_tags = StringField(
+        "HF Tags",
+        render_kw={
+            "data-toggle": "tooltip",
+            "title": "(Optional) The tag(s) that this corresponds to on Happy Fappy",
         },
     )
     categories = SelectMultipleField(choices=getCategories)  # type: ignore
@@ -245,7 +279,12 @@ class TagAdvancedForm(FlaskForm):
         if "tag" in kwargs:
             tag: StashTag = kwargs["tag"]
             kwargs["stash_tag"] = tag.tagname
+            kwargs["def_tags"] = " ".join([et.tagname for et in tag.def_tags])
             kwargs["emp_tags"] = " ".join([et.tagname for et in tag.emp_tags])
+            kwargs["pb_tags"] = " ".join([et.tagname for et in tag.pb_tags])
+            kwargs["fc_tags"] = " ".join([et.tagname for et in tag.fc_tags])
+            kwargs["ent_tags"] = " ".join([et.tagname for et in tag.ent_tags])
+            kwargs["hf_tags"] = " ".join([et.tagname for et in tag.hf_tags])
             kwargs["display"] = tag.display
             kwargs["categories"] = [cat.name for cat in tag.categories]
             kwargs["ignored"] = tag.ignored
