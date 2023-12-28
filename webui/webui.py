@@ -18,7 +18,7 @@ from webui.forms import (
 )
 
 from utils.confighandler import ConfigHandler
-from utils.taghandler import TagHandler
+from utils.taghandler import query_maps
 from utils.db import get_or_create, StashTag, GazelleTag, db, get_or_create_no_commit, Category, from_dict, to_dict
 from werkzeug.exceptions import HTTPException
 
@@ -46,9 +46,29 @@ def tag(id):
             stag.ignored = form.data["ignored"]
             stag.display = form.data["display"]
             etags = []
+            for et in form.data["def_tags"].split():
+                etags.append(get_or_create_no_commit(GazelleTag, tagname=et))
+            stag.def_tags = etags
+            etags = []
             for et in form.data["emp_tags"].split():
                 etags.append(get_or_create_no_commit(GazelleTag, tagname=et))
             stag.emp_tags = etags
+            etags = []
+            for et in form.data["pb_tags"].split():
+                etags.append(get_or_create_no_commit(GazelleTag, tagname=et))
+            stag.pb_tags = etags
+            etags = []
+            for et in form.data["fc_tags"].split():
+                etags.append(get_or_create_no_commit(GazelleTag, tagname=et))
+            stag.fc_tags = etags
+            etags = []
+            for et in form.data["ent_tags"].split():
+                etags.append(get_or_create_no_commit(GazelleTag, tagname=et))
+            stag.ent_tags = etags
+            etags = []
+            for et in form.data["hf_tags"].split():
+                etags.append(get_or_create_no_commit(GazelleTag, tagname=et))
+            stag.hf_tags = etags
             cats = []
             for cat in form.data["categories"]:
                 cats.append(get_or_create_no_commit(Category, name=cat))
@@ -62,7 +82,7 @@ def tag(id):
 
 @settings_page.route("/tags/<page>", methods=["GET", "POST"])
 def tag_settings(page):
-    pagination = TagHandler().queryMaps(page=int(page))
+    pagination = query_maps(page=int(page))
     form = TagMapForm(s_tags=pagination.items)
     if form.validate_on_submit():
         tag = form.update_self()

@@ -1,20 +1,20 @@
 """This module provides an object for storing and processing stash scene tags
 for uploading to empornium."""
 
-from typing import Literal
-import os
-
-from tomlkit.items import AbstractTable
-import tomlkit
-from utils.confighandler import ConfigHandler
 import json
-import re
 import logging
+import os
+import re
+from collections.abc import MutableMapping
+from typing import Literal
+
+import tomlkit
+from flask import Flask
+from tomlkit.items import AbstractTable
+
+from utils.confighandler import ConfigHandler
 from utils.customtypes import CaseInsensitiveDict
 from utils.db import db, StashTag, GazelleTag, get_or_create, get_or_create_no_commit, Category
-from collections.abc import MutableMapping
-
-from flask import Flask
 
 HAIR_COLOR_MAP = CaseInsensitiveDict(
     {
@@ -43,6 +43,7 @@ ETHNICITY_MAP = CaseInsensitiveDict(
 
 DEMONYMS: dict[str, list[str]] = {}
 
+
 def empify(tag: str) -> str:
     """Return an EMP-compatible tag for a given input
     tag. This function replaces all whitespace and 
@@ -51,11 +52,16 @@ def empify(tag: str) -> str:
     before finally converting the full string to
     lowercase."""
     logger = logging.getLogger(__name__)
-    newtag = re.sub(r"[^\w\s\._-]", "", tag).lower() #remove most special characters
-    newtag = re.sub(r"[\s\._-]+", ".", newtag) # replace remaining special chars and whitespace with '.'
-    newtag = newtag[:32] # truncate to max length
-    logger.debug(f"Reformatted tag '{tag}' to '{newtag}'")
-    return newtag
+    new_tag = re.sub(r"[^\w\s._-]", "", tag).lower()  # remove most special characters
+    new_tag = re.sub(r"[\s._-]+", ".", new_tag)  # replace remaining special chars and whitespace with '.'
+    new_tag = new_tag[:32]  # truncate to max length
+    logger.debug(f"Reformatted tag '{tag}' to '{new_tag}'")
+    return new_tag
+
+
+def query_maps(page=1, per_page=50):
+    return StashTag.query.paginate(page=page, per_page=per_page)
+
 
 class TagHandler:
     conf: ConfigHandler
@@ -74,13 +80,14 @@ class TagHandler:
         self.conf: ConfigHandler = ConfigHandler()  # type: ignore
         for key in Category.query.all():
             self.tag_sets[key.name] = set()
-        
+
         if "performers" in self.conf:
             t = self.conf["performers"]
             if isinstance(t, AbstractTable):
                 if "cup_sizes" in t:
                     sizes = t["cup_sizes"]
                     if isinstance(sizes, AbstractTable):
+                        op: Literal[-1, 0, 1]
                         for tag in sizes:
                             size = sizes[tag].as_string()
                             op = 0
@@ -88,14 +95,13 @@ class TagHandler:
                                 op = -1
                             elif '+' in size or '>' in size:
                                 op = 1
-                            size = self.processTits(size)
+                            size = self.process_tits(size)
                             self.cup_sizes[tag] = (size, op)
 
         with open("countries.json") as c:
             self.countries = json.load(c)
 
-
-    def sortTagList(self, tagset: str) -> list[str]:
+    def sort_tag_list(self, tagset: str) -> list[str]:
         """Return a sorted list for a given
         tag set name, or an empty list if
         the requested set does not exist."""
@@ -105,33 +111,47 @@ class TagHandler:
             return tmp
         return []
 
-    def sortTagLists(self) -> dict[str, list[str]]:
+    def sort_tag_lists(self) -> dict[str, list[str]]:
         """Returns a dictionary where the keys are
         the names of custom lists and the associated
         values are the sorted lists of tags from the
         current scene."""
-        return {key: self.sortTagList(key) for key in self.tag_sets}
+        return {key: self.sort_tag_list(key) for key in self.tag_sets}
 
-    def processTag(self, tag: str) -> None:
+    def process_tag(self, tag: str, tracker: str) -> None:
         """Check for the appropriate EMP tag
         mapping for a provided tag and add it to
         the working lists, or generate a suggested
         mapping."""
+        s_tag: StashTag
         s_tag = get_or_create(StashTag, tagname=tag)
         if s_tag.ignored:
             return
-        if s_tag.emp_tags:
-            for e_tag in s_tag.emp_tags:
-                self.tags.add(e_tag.tagname)
-        else:
+        tag_list: list[GazelleTag]
+        match tracker:
+            case "EMP":
+                tag_list = s_tag.emp_tags
+            case "PB":
+                tag_list = s_tag.pb_tags
+            case "FC":
+                tag_list = s_tag.fc_tags
+            case "HF":
+                tag_list = s_tag.hf_tags
+            case "ENT":
+                tag_list = s_tag.ent_tags
+            case _:
+                raise ValueError('Tracker must be one of ["EMP", "PB", "FC", "HF", "ENT"]')
+        if len(tag_list) == 0:
+            tag_list = s_tag.def_tags
+        if len(tag_list) == 0:
             self.tag_suggestions[tag] = empify(tag)
+        else:
+            for e_tag in tag_list:
+                self.tags.add(e_tag.tagname)
         for cat in s_tag.categories:
             self.tag_sets[cat.name].add(s_tag.display if s_tag.display else tag)
 
-    def queryMaps(self, page=1, per_page=50):
-        return StashTag.query.paginate(page=page, per_page=per_page)
-
-    def processPerformer(self, performer: dict) -> str:
+    def process_performer(self, performer: dict, tracker: str) -> str:
         # also include alias tags?
         logger = logging.getLogger(__name__)
         logger.debug(performer)
@@ -139,7 +159,7 @@ class TagHandler:
         self.tags.add(performer_tag)
         gender = performer["gender"] if performer["gender"] else "FEMALE"  # Should this default be configurable?
         for tag in performer["tags"]:
-            self.processTag(tag["name"])
+            self.process_tag(tag["name"], tracker)
         if len(self.countries) > 0:
             cca2 = performer["country"]
             g = "m" if (gender == "MALE" or gender == "TRANSGENDER_MALE") else "f"
@@ -156,11 +176,14 @@ class TagHandler:
             elif performer["circumcised"] == "UNCUT":
                 self.tags.add("uncircumcised.cock")
         if gender not in ("MALE", "TRANSGENDER_MALE"):
-            if self.conf["performers"]["tag_ethnicity"] and "ethnicity" in performer and performer["ethnicity"] in ETHNICITY_MAP:  # type: ignore
+            if self.conf["performers"]["tag_ethnicity"] and "ethnicity" in performer and performer[
+                "ethnicity"] in ETHNICITY_MAP:  # type: ignore
                 self.add(ETHNICITY_MAP[performer["ethnicity"]])
-            if self.conf["performers"]["tag_eye_color"] and "eye_color" in performer and len(performer["eye_color"]) > 0:  # type: ignore
+            if self.conf["performers"]["tag_eye_color"] and "eye_color" in performer and len(
+                    performer["eye_color"]) > 0:  # type: ignore
                 self.add(performer["eye_color"] + ".eyes")
-            if self.conf["performers"]["tag_hair_color"] and "hair_color" in performer and performer["hair_color"] in HAIR_COLOR_MAP:  # type: ignore
+            if self.conf["performers"]["tag_hair_color"] and "hair_color" in performer and performer[
+                "hair_color"] in HAIR_COLOR_MAP:  # type: ignore
                 self.add(HAIR_COLOR_MAP[performer["hair_color"]])
             tattoos = "tattoos" in performer and len(performer["tattoos"]) > 0
             piercings = "piercings" in performer and len(performer["piercings"]) > 0
@@ -180,7 +203,7 @@ class TagHandler:
                 elif fake_tits == "augmented" or fake_tits == "fake":
                     self.add("fake.tits")
             if "measurements" in performer and len(performer["measurements"]) > 0:
-                tits = self.processTits(performer["measurements"], fake_tits)
+                tits = self.process_tits(performer["measurements"], fake_tits)
                 if tits >= 0:
                     for key, (value, op) in self.cup_sizes.items():
                         match op:
@@ -192,10 +215,10 @@ class TagHandler:
                                     self.add(key)
                             case 1:
                                 if tits >= value:
-                                    self.add(key)            
+                                    self.add(key)
         return performer_tag
 
-    def processTits(self, measurements: str, fake_tits: str = "") -> int:
+    def process_tits(self, measurements: str, fake_tits: str = "") -> int:
         # TODO process size/type combo tags, e.g. big.natural.tits
         logger = logging.getLogger(__name__)
         cup_size = re.sub(r"[^A-Z]", "", measurements.upper())
@@ -210,9 +233,8 @@ class TagHandler:
                 return -1
             if letter == "A":
                 return 0
-            return len(cup_size) + 3 # DD->5, DDD->6, etc
-        return ord(cup_size) - 64 # A->1, B->2, C->3, etc
-
+            return len(cup_size) + 3  # DD->5, DDD->6, etc
+        return ord(cup_size) - 64  # A->1, B->2, C->3, etc
 
     def add(self, tag: str) -> str:
         """Convert a tag to en EMP-compatible
@@ -223,7 +245,6 @@ class TagHandler:
         self.tags.add(tag)
         return tag
 
-
     def clear(self) -> None:
         """Reset the working tag sets without
         clearing the mapping or custom list
@@ -232,6 +253,7 @@ class TagHandler:
             self.tag_sets[tagset].clear()
         self.tag_suggestions.clear()
         self.tags.clear()
+
 
 def db_init(app: Flask, tag_map: MutableMapping, tag_lists):
     logger = logging.getLogger(__name__)
@@ -258,44 +280,59 @@ def db_init(app: Flask, tag_map: MutableMapping, tag_lists):
         db.session.commit()
         logger.info("Updated db")
 
+
 def setup(app: Flask):
-    tagstoml = os.path.join(ConfigHandler().config_dir, "tags.toml")
+    tags_toml = os.path.join(ConfigHandler().config_dir, "tags.toml")
 
     with open("default-tags.toml") as f:
         conf = tomlkit.load(f)
 
-    if os.path.exists(tagstoml):
-        with open(tagstoml) as f:
+    if os.path.exists(tags_toml):
+        with open(tags_toml) as f:
             conf2 = tomlkit.load(f)
         if 'empornium.tags' in conf2:
-            conf2['empornium']['tags'] = conf2["empornium.tags"] # type: ignore
+            conf2['empornium']['tags'] = conf2["empornium.tags"]  # type: ignore
         conf.update(conf2)
-    
-    tag_map = CaseInsensitiveDict(conf["empornium"]["tags"]) # type: ignore
+
+    tag_map = CaseInsensitiveDict(conf["empornium"]["tags"])  # type: ignore
     tag_lists = {}
-    for lst, tags in conf["empornium"].items(): # type: ignore
+    for lst, tags in conf["empornium"].items():  # type: ignore
         if lst == "tags":
             continue
         tag_lists[lst] = tags
-    
+
     db_init(app, tag_map, tag_lists)
 
-def acceptSuggestions(tags: MutableMapping[str, str]) -> None:
+
+def accept_suggestions(tags: MutableMapping[str, str], tracker: str) -> None:
     """Adds the provided tag mappings to the db, 
     creating the tags as required"""
     logger = logging.getLogger(__name__)
     logger.info("Saving tag mappings")
     logger.debug(f"Tags: {tags}")
-    for st,et in tags.items():
-        s_tag = get_or_create(StashTag, tagname=st)
-        etags = []
-        for tag in et.split():
-            etags.append(get_or_create_no_commit(GazelleTag, tagname=tag))
-        s_tag.emp_tags = etags
-        db.session.commit()
+    with db.session.begin():
+        for st, gt in tags.items():
+            s_tag = get_or_create_no_commit(StashTag, tagname=st)
+            g_tags = []
+            for tag in gt.split():
+                g_tags.append(get_or_create_no_commit(GazelleTag, tagname=tag))
+            match tracker:
+                case "EMP":
+                    s_tag.emp_tags = g_tags
+                case "PB":
+                    s_tag.pb_tags = g_tags
+                case "FC":
+                    s_tag.fc_tags = g_tags
+                case "HF":
+                    s_tag.hf_tags = g_tags
+                case "ENT":
+                    s_tag.ent_tags = g_tags
+                case _:
+                    raise ValueError('Tracker must be one of ["EMP", "PB", "FC", "HF", "ENT"]')
 
-def rejectSuggestions(tags: list[str]) -> None:
-    "Marks all supplied tags as ignored"
+
+def reject_suggestions(tags: list[str]) -> None:
+    """Marks all supplied tags as ignored"""
     logger = logging.getLogger(__name__)
     logger.debug(f"Ignoring tags: {tags}")
     for tag in tags:

@@ -9,7 +9,6 @@ import shutil
 import string
 import subprocess
 import tempfile
-import time
 import urllib.parse
 from collections.abc import Generator
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -21,7 +20,7 @@ from flask import render_template, render_template_string
 
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
-from utils.packs import link, readGallery
+from utils.packs import link, read_gallery, get_torrent_directory
 from utils.paths import mapPath
 
 MEDIA_INFO = shutil.which("mediainfo")
@@ -64,9 +63,14 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     announce_url = j["announce_url"]
     gen_screens = j["screens"]
     include_gallery = j["gallery"]
+    tracker = j["tracker"]  # 'EMP', 'PB', 'FC', 'HF' or 'ENT'
+    include_screens = tracker == 'FC'  # TODO user customization
+    img_host = "imgbox" if tracker == 'HF' else "jerking"
+
+    yield info("Starting generation")
 
     logger.info(
-        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens {
+        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{
         ' and including gallery' if include_gallery else ''}."
     )
 
@@ -109,7 +113,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         elif scene[key] is None:
             scene[key] = ""
 
-    new_dir = None
+    new_dir = get_torrent_directory(scene) if include_screens else None
     image_dir = None
     image_temp = False
     gallery_contact = None
@@ -117,7 +121,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     image_count = 0
     if include_gallery:
         try:
-            new_dir, image_dir, image_temp = readGallery(scene)  # type: ignore
+            new_dir, image_dir, image_temp = read_gallery(scene)  # type: ignore
             gallery_contact = tempfile.mkstemp("-gallery_contact.jpg")[1]
             files = [os.path.join(image_dir, file) for file in os.listdir(image_dir)]
             image_count = len(files)
@@ -200,22 +204,32 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     if resolution is not None and config.get("metadata", "tag_resolution"):
         tags.add(resolution)
 
-    ###########
-    # TORRENT #
-    ###########
+    yield info("Uploading images")
+    try:
+        images = imagehandler.ImageHandler()
+    except KeyboardInterrupt:
+        raise
+    except Exception:
+        yield error("Failed to initialize image handler")
+        return
+    if config.args.flush:
+        images.clear()
 
-    yield info("Making torrent")
-    receive_pipe: Connection
-    send_pipe: Connection
-    receive_pipe, send_pipe = mp.Pipe(False)
-    torrent_proc = mp.Process(target=gen_torrent, args=(send_pipe, stash_file, announce_url, new_dir))
-    torrent_proc.start()
-    # del send_pipe  # Ensures connection can be automatically closed if garbage collected
+    #################
+    # CONTACT SHEET #
+    #################
+
+    # Generate contact sheet and include it in the torrent directory if include_screens is True
+    screens_dir = os.path.join(get_torrent_directory(scene), 'screens') if include_screens else None
+    contact_sheet_remote_url = images.generate_contact_sheet(stash_file, img_host, screens_dir)
+    if contact_sheet_remote_url is None:
+        yield error("Failed to generate contact sheet")
+        return
 
     #########
     # COVER #
     #########
-
+    # TODO Move this into image handler
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
@@ -252,23 +266,26 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     else:
         with open(cover_file[1], "wb") as fp:
             fp.write(cover_response.content)
+    if screens_dir:
+        os.chmod(cover_file[1], 0o666)  # Ensures torrent client can read the file
+        shutil.copy(cover_file[1], os.path.join(screens_dir, f"cover.{cover_ext}"))
 
-    yield info("Uploading images")
-    try:
-        images = imagehandler.ImageHandler()
-    except KeyboardInterrupt:
-        raise
-    except Exception:
-        yield error("Failed to initialize image handler")
-        return
-    if config.args.flush:
-        images.clear()
+    ###########
+    # TORRENT #
+    ###########
 
-    cover_remote_url = images.getURL(cover_file[1], cover_mime_type, cover_ext)[0]
+    yield info("Making torrent")
+    receive_pipe: Connection
+    send_pipe: Connection
+    receive_pipe, send_pipe = mp.Pipe(False)
+    torrent_proc = mp.Process(target=gen_torrent, args=(send_pipe, stash_file, announce_url, new_dir))
+    torrent_proc.start()
+
+    cover_remote_url = images.get_url(cover_file[1], cover_mime_type, cover_ext, img_host)[0]
     if cover_remote_url is None:
         yield error("Failed to upload cover")
         return
-    cover_resized_url = images.getURL(cover_file[1], cover_mime_type, cover_ext, width=800)[0]
+    cover_resized_url = images.get_url(cover_file[1], cover_mime_type, cover_ext, img_host, width=800)[0]
     os.remove(cover_file[1])
 
     ###########
@@ -277,7 +294,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     preview_recv: Connection
     preview_send: Connection
     preview_recv, preview_send = mp.Pipe(False)
-    preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene))
+    preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene, img_host))
     if config.get("backend", "use_preview", False):
         preview_proc.start()
     # del preview_send  # Ensures connection can be automatically closed if garbage collected
@@ -323,7 +340,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ##############
 
     for performer in scene["performers"]:
-        performer_tag = tags.processPerformer(performer)
+        performer_tag = tags.process_performer(performer, tracker)
 
         # image
         logger.debug(f'Downloading performer image from {performer["image_path"]}')
@@ -356,22 +373,13 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             "tag": performer_tag,
         }
 
-    #################
-    # CONTACT SHEET #
-    #################
-
-    # upload images and paste in description
-    contact_sheet_remote_url = images.generate_contact_sheet(stash_file)
-    if contact_sheet_remote_url is None:
-        yield error("Failed to generate contact sheet")
-        return
-
     ###########
     # SCREENS #
     ###########
 
     if gen_screens:
-        screens_urls = images.generate_screens(stash_file=stash_file)  # TODO customize number of screens from config
+        screens_urls = images.generate_screens(stash_file=stash_file,
+                                               host=img_host)  # TODO customize number of screens from config
         if screens_urls is None or None in screens_urls:
             yield error("Failed to generate screens")
             return
@@ -433,9 +441,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ########
 
     for tag in scene["tags"]:
-        tags.processTag(tag["name"])
+        tags.process_tag(tag["name"], tracker)
         for parent in tag["parents"]:
-            tags.processTag(parent["name"])
+            tags.process_tag(parent["name"], tracker)
 
     if config.get("metadata", "tag_codec") and stash_file["video_codec"] is not None:
         tags.add(stash_file["video_codec"])
@@ -465,10 +473,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     logger.info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = images.getURL(
+        performers[performer_name]["image_remote_url"] = images.get_url(
             performers[performer_name]["image_path"],
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
+            img_host,
             default=imagehandler.PERFORMER_DEFAULT_IMAGE,
         )[0]
         os.remove(performers[performer_name]["image_path"])
@@ -479,10 +488,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     logo_url = imagehandler.STUDIO_DEFAULT_LOGO
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
-        logo_url = images.getURL(
+        logo_url = images.get_url(
             studio_img_file[1],
             studio_img_mime_type,
             studio_img_ext,
+            img_host,
         )[0]
         if logo_url is None:
             logo_url = imagehandler.STUDIO_DEFAULT_LOGO
@@ -495,14 +505,14 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     gallery_contact_url = None
     if gallery_proc:
         gallery_proc.join(timeout=60)
-        gallery_contact_url = images.getURL(gallery_contact, "image/jpeg", "jpg")[0]  # type: ignore
+        gallery_contact_url = images.get_url(gallery_contact, "image/jpeg", "jpg", img_host)[0]  # type: ignore
         os.remove(gallery_contact)  # type: ignore
 
     ############
     # TEMPLATE #
     ############
 
-    tmp_tag_lists = tags.sortTagLists()
+    tmp_tag_lists = tags.sort_tag_lists()
 
     # Prevent error in case date is missing
     date = scene["date"]

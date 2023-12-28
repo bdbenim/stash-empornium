@@ -2,12 +2,24 @@
 // Forked from https://github.com/7dJx1qP/stash-userscripts
 // Exports utility functions and a Stash class that emits events whenever a GQL response is received and whenever a page
 // navigation change is detected
-// version 0.33.1
+// version 0.33.2
 
+const TRACKERS = [
+    "www.empornium.is",
+    "www.empornium.sx",
+    "femdomcult.org",
+    "www.happyfappy.org",
+    "www.enthralled.me",
+    "pornbay.org",
+];
+
+if (!unsafeWindow.TRACKERS) {
+    unsafeWindow.TRACKERS = TRACKERS;
+}
 
 (function () {
     'use strict';
-    if (location.hostname !== 'www.empornium.is' && location.hostname !== 'www.empornium.sx') {
+    if (!TRACKERS.includes(location.hostname)) {
         const stash = function () {
 
             const {fetch: originalFetch} = window;
