@@ -141,11 +141,13 @@ class TagHandler:
                 tag_list = s_tag.ent_tags
             case _:
                 raise ValueError('Tracker must be one of ["EMP", "PB", "FC", "HF", "ENT"]')
-        if s_tag.emp_tags:
+        if len(tag_list) == 0:
+            tag_list = s_tag.def_tags
+        if len(tag_list) == 0:
+            self.tag_suggestions[tag] = empify(tag)
+        else:
             for e_tag in tag_list:
                 self.tags.add(e_tag.tagname)
-        else:
-            self.tag_suggestions[tag] = empify(tag)
         for cat in s_tag.categories:
             self.tag_sets[cat.name].add(s_tag.display if s_tag.display else tag)
 
