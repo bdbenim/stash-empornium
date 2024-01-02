@@ -13,7 +13,9 @@ based on scenes from a local [stash][1] instance.
 
 ## Installation
 
-For instructions on installing the backend server, refer to the [Installation](https://github.com/bdbenim/stash-empornium/wiki/Installation) page on the wiki.
+The backend can be installed by cloning this repository or by running the Docker image [`bdbenim/stash-empornium`](https://hub.docker.com/r/bdbenim/stash-empornium).
+
+For detailed instructions on installing the backend server, refer to the [Installation](https://github.com/bdbenim/stash-empornium/wiki/Installation) page on the wiki.
 
 ### Userscript
 
