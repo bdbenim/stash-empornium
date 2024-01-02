@@ -208,6 +208,7 @@ def to_dict() -> dict[str, Any]:
             "name": tag.tagname,
             "display": tag.display,
             "ignored": tag.ignored,
+            "defaults": [e.id for e in tag.def_tags],
             "emp_tags": [e.id for e in tag.emp_tags],
             "hf_tags": [h.id for h in tag.hf_tags],
             "fc_tags": [h.id for h in tag.fc_tags],
@@ -262,6 +263,10 @@ def from_dict(data: dict[str, Any]) -> None:
                 cat = Category.query.filter_by(id=tag_id).first()
                 assert cat is not None
                 stag.categories.append(cat)
+            for tag_id in tag["defaults"]:
+                etag = GazelleTag.query.filter_by(id=tag_id).first()
+                assert etag is not None
+                stag.def_tags.append(etag)
             for tag_id in tag["emp_tags"]:
                 etag = GazelleTag.query.filter_by(id=tag_id).first()
                 assert etag is not None
