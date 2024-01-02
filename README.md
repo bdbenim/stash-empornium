@@ -13,59 +13,9 @@ based on scenes from a local [stash][1] instance.
 
 ## Installation
 
-### Using Docker
+The backend can be installed by cloning this repository or by running the Docker image [`bdbenim/stash-empornium`](https://hub.docker.com/r/bdbenim/stash-empornium).
 
-The docker version is recommended as it comes bundled with all required and recommended backend dependencies. To run the
-backend as a docker container, copy and paste the following commands:
-
-```bash
-docker pull bdbenim/stash-empornium:latest
-docker run \
---name stash-empornium \
--p 9932:9932 \
---mount type=bind,src=/path/to/config,target=/config \
---mount type=bind,src=/path/to/save/torrents,target=/torrents \
---mount type=bind,src=/media,target=/media \
-bdbenim/stash-empornium:latest
-```
-
-> [!NOTE]
-> Make sure that the target for your `/media` mount matches what stash sees. You may have to change the target, not just
-> the source, to achieve this.
-
-You can configure additional mount points by copying the same syntax as above. This may be useful if your stash library
-uses multiple directory locations. When in doubt, refer to the File Info tab of the scene in stash to get the file path
-as stash sees it:
-
-![Screenshot illustrating the file info tab of a scene in stash](https://github.com/bdbenim/stash-empornium/assets/97994155/2491dfee-fbbf-405f-96cc-0759a8bd0062)
-
-### Without Using Docker
-
-The backend can also be run directly by intalling its dependencies and running the python script.
-
-#### Backend Dependencies
-
-- Python3
-    - flask
-    - requests
-    - vcsi
-    - configupdater
-    - cairosvg
-    - tomlkit
-    - waitress (optional)
-    - redis (optional)
-- ffmpeg
-- mktorrent
-- mediainfo (optional)
-
-Run the following commands to install the backend and dependencies (may vary slightly by OS):
-
-```bash
-git clone https://github.com/bdbenim/stash-empornium.git
-cd stash-empornium
-pip install -r requirements.txt
-sudo apt-get install -y ffmpeg mktorrent
-```
+For detailed instructions on installing the backend server, refer to the [Installation](https://github.com/bdbenim/stash-empornium/wiki/Installation) page on the wiki.
 
 ### Userscript
 
@@ -75,8 +25,7 @@ sudo apt-get install -y ffmpeg mktorrent
 
 Currently, the script does not work with other userscript managers, though this may change in the future.
 
-The userscript can be installed [here][2]. Place the other files on the same machine as your stash server and ensure
-dependencies are installed.
+The userscript can be installed [here][2].
 
 [2]: https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
 
