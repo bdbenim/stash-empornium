@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
+// @version      1.1.1
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -26,10 +26,12 @@
 // @downloadURL  https://github.com/bdbenim/stash-empornium/raw/main/emp_stash_fill.user.js
 // @require      https://code.jquery.com/jquery-3.7.1.min.js#sha256=fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a
 // @require      https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
-// @require      https://github.com/bdbenim/stash-empornium/raw/main/resources/stash_library.user.js#sha256=a3495315fb08ecb26ddc0ef02ace3c81aac1e389fa1096c8a1ef5e4717f5eac3
+// @require      https://github.com/bdbenim/stash-empornium/raw/main/resources/stash_library.user.js#sha256=d8c4092ba2dcdc5ff1beff34e0e9df216a631fda0cc6e6f03db1f3d554c78999
 // ==/UserScript==
 
 // Changelog:
+// v1.1.1
+//  - Fix stash_library.user.js checksum
 // v1.1.0
 //  - Add support additional trackers:
 //    - Pornbay
