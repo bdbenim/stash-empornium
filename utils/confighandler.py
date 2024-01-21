@@ -6,77 +6,8 @@ import shutil
 import tomlkit
 
 from utils.customtypes import CaseInsensitiveDict, Singleton
+from utils.stash import stash_headers
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
-
-stash_headers = {
-    "Content-type": "application/json",
-}
-
-stash_query = """
-findScene(id: "{}") {{
-    title
-    details
-    director
-    date
-    galleries {{
-        folder {{
-            path
-        }}
-        files {{
-            path
-        }}
-    }}
-    studio {{
-        name
-        url
-        image_path
-        parent_studio {{
-            url
-        }}
-    }}
-    tags {{
-        name
-        parents {{
-            name
-        }}
-    }}
-    performers {{
-        name
-        circumcised
-        country
-        eye_color
-        fake_tits
-        gender
-        hair_color
-        height_cm
-        measurements
-        piercings
-        image_path
-        tags {{
-            name
-        }}
-        tattoos
-    }}
-    paths {{
-        screenshot
-        preview
-    }}
-    files {{
-        id
-        path
-        basename
-        width
-        height
-        format
-        duration
-        video_codec
-        audio_codec
-        frame_rate
-        bit_rate
-        size
-    }}
-}}
-"""
 
 
 class ConfigHandler(Singleton):

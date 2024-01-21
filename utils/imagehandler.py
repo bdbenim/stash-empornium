@@ -16,7 +16,8 @@ import pyimgbox
 import requests
 from PIL import Image, ImageSequence
 
-from utils.confighandler import ConfigHandler, stash_headers
+from utils.confighandler import ConfigHandler
+from utils.stash import stash_headers
 from utils.packs import prep_dir
 
 logger = logging.getLogger(__name__)

@@ -19,7 +19,8 @@ from cairosvg import svg2png
 from flask import render_template, render_template_string
 
 from utils import imagehandler, taghandler
-from utils.confighandler import ConfigHandler, stash_headers, stash_query
+from utils.confighandler import ConfigHandler
+from utils.stash import stash_headers, find_scene
 from utils.packs import link, read_gallery, get_torrent_directory
 from utils.paths import mapPath
 
@@ -92,13 +93,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     #################
 
     logger.info("Querying stash")
-    stash_request_body = {"query": "{" + stash_query.format(scene_id) + "}"}
-    stash_response = requests.post(
-        urllib.parse.urljoin(config.get("stash", "url", "http://localhost:9999"), "/graphql"),  # type: ignore
-        json=stash_request_body,
-        headers=stash_headers,
-    )
-
+    stash_response = find_scene(scene_id)
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
     if scene is None:
