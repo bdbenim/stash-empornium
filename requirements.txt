@@ -1,7 +1,7 @@
 Flask == 3.0.*
 requests == 2.31.*
 vcsi == 7.0.*
-waitress == 2.1.*
+waitress == 3.0.*
 cairosvg == 2.7.*
 redis[hiredis] == 5.0.*
 tomlkit == 0.12.*
