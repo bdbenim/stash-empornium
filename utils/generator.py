@@ -84,7 +84,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     performers = {}
     screens_urls = []
-    studio_tag = ""
 
     tags = taghandler.TagHandler()
 
@@ -308,32 +307,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     # TAGS #
     ########
 
-    for tag in scene["tags"]:
-        tags.process_tag(tag["name"], tracker)
-        for parent in tag["parents"]:
-            tags.process_tag(parent["name"], tracker)
-
-    if config.get("metadata", "tag_codec") and stash_file["video_codec"] is not None:
-        tags.add(stash_file["video_codec"])
-
-    if config.get("metadata", "tag_date") and scene["date"] is not None and len(scene["date"]) > 0:
-        year, month, day = scene["date"].split("-")
-        tags.add(year)
-        tags.add(f"{year}.{month}")
-        tags.add(f"{year}.{month}.{day}")
-
-    if config.get("metadata", "tag_framerate"):
-        tags.add(str(round(stash_file["frame_rate"])) + ".fps")
-
-    if scene["studio"] and scene["studio"]["url"] is not None:
-        studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
-        tags.add(studio_tag)
-    if (
-            scene["studio"] is not None
-            and scene["studio"]["parent_studio"] is not None
-            and scene["studio"]["parent_studio"]["url"] is not None
-    ):
-        tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
+    studio_tag = process_scene_tags(scene, stash_file, tags, tracker)
 
     ##########
     # UPLOAD #
@@ -490,6 +464,33 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.debug(e)
 
     logger.info("Done")
+
+
+def process_scene_tags(scene, stash_file, tags, tracker):
+    studio_tag = ""
+    for tag in scene["tags"]:
+        tags.process_tag(tag["name"], tracker)
+        for parent in tag["parents"]:
+            tags.process_tag(parent["name"], tracker)
+    if config.get("metadata", "tag_codec") and stash_file["video_codec"] is not None:
+        tags.add(stash_file["video_codec"])
+    if config.get("metadata", "tag_date") and scene["date"] is not None and len(scene["date"]) > 0:
+        year, month, day = scene["date"].split("-")
+        tags.add(year)
+        tags.add(f"{year}.{month}")
+        tags.add(f"{year}.{month}.{day}")
+    if config.get("metadata", "tag_framerate"):
+        tags.add(str(round(stash_file["frame_rate"])) + ".fps")
+    if scene["studio"] and scene["studio"]["url"] is not None:
+        studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
+        tags.add(studio_tag)
+    if (
+            scene["studio"] is not None
+            and scene["studio"]["parent_studio"] is not None
+            and scene["studio"]["parent_studio"]["url"] is not None
+    ):
+        tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
+    return studio_tag
 
 
 def process_scene_performers(performers, scene, tags, tracker):
