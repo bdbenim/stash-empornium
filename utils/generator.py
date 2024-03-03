@@ -240,36 +240,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     # PERFORMERS #
     ##############
 
-    for performer in scene["performers"]:
-        performer_tag = tags.process_performer(performer, tracker)
-
-        # image
-        logger.debug(f'Downloading performer image from {performer["image_path"]}')
-        performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
-        performer_image_mime_type = performer_image_response.headers["Content-Type"]
-        logger.debug(f"Got image with mime type {performer_image_mime_type}")
-        match performer_image_mime_type:
-            case "image/jpeg":
-                performer_image_ext = "jpg"
-            case "image/png":
-                performer_image_ext = "png"
-            case "image/webp":
-                performer_image_ext = "webp"
-            case _:
-                logger.warning(f"Unrecognized performer image mime type: {performer_image_mime_type}")
-                continue
-        performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
-        with open(performer_image_file[1], "wb") as fp:
-            fp.write(performer_image_response.content)
-
-        # store data
-        performers[performer["name"]] = {
-            "image_path": performer_image_file[1],
-            "image_mime_type": performer_image_mime_type,
-            "image_ext": performer_image_ext,
-            "image_remote_url": None,
-            "tag": performer_tag,
-        }
+    process_scene_performers(performers, scene, tags, tracker)
 
     ###########
     # SCREENS #
@@ -519,6 +490,40 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.debug(e)
 
     logger.info("Done")
+
+
+def process_scene_performers(performers, scene, tags, tracker):
+    logger = logging.getLogger(__name__)
+    for performer in scene["performers"]:
+        performer_tag = tags.process_performer(performer, tracker)
+
+        # image
+        logger.debug(f'Downloading performer image from {performer["image_path"]}')
+        performer_image_response = requests.get(performer["image_path"], headers=stash_headers)
+        performer_image_mime_type = performer_image_response.headers["Content-Type"]
+        logger.debug(f"Got image with mime type {performer_image_mime_type}")
+        match performer_image_mime_type:
+            case "image/jpeg":
+                performer_image_ext = "jpg"
+            case "image/png":
+                performer_image_ext = "png"
+            case "image/webp":
+                performer_image_ext = "webp"
+            case _:
+                logger.warning(f"Unrecognized performer image mime type: {performer_image_mime_type}")
+                continue
+        performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
+        with open(performer_image_file[1], "wb") as fp:
+            fp.write(performer_image_response.content)
+
+        # store data
+        performers[performer["name"]] = {
+            "image_path": performer_image_file[1],
+            "image_mime_type": performer_image_mime_type,
+            "image_ext": performer_image_ext,
+            "image_remote_url": None,
+            "tag": performer_tag,
+        }
 
 
 def get_studio_logo(scene):
