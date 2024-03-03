@@ -256,11 +256,8 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             case "image/webp":
                 performer_image_ext = "webp"
             case _:
-                yield (error(
-                    f"Unrecognized performer image mime type: {performer_image_mime_type}",
-                    "Unrecognized performer image format",
-                ))
-                return
+                logger.warning(f"Unrecognized performer image mime type: {performer_image_mime_type}")
+                continue
         performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
             fp.write(performer_image_response.content)
@@ -317,7 +314,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         info_recv, info_send = mp.Pipe(False)
         info_proc = mp.Process(target=gen_media_info, args=(info_send, stash_file["path"]))
         info_proc.start()
-        # del info_send  # Ensures connection can be automatically closed if garbage collected
 
     #########
     # TITLE #
