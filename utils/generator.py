@@ -234,37 +234,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     # STUDIO LOGO #
     ###############
 
-    studio_img_ext = ""
-    studio_img_mime_type = ""
-    studio_img_file = None
-    if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
-        logger.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
-        studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
-        studio_img_mime_type = studio_img_response.headers["Content-Type"]
-        match studio_img_mime_type:
-            case "image/jpeg":
-                studio_img_ext = "jpg"
-            case "image/png":
-                studio_img_ext = "png"
-            case "image/svg+xml":
-                studio_img_ext = "svg"
-            case "image/webp":
-                studio_img_ext = "webp"
-            case _:
-                studio_img_ext = "unk"
-                yield (warning(
-                    f"Unknown studio logo file type: {studio_img_mime_type}", "Unrecognized studio image file type"
-                ))
-        studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
-        with open(studio_img_file[1], "wb") as fp:
-            fp.write(studio_img_response.content)
-        if studio_img_ext == "svg":
-            png_file = tempfile.mkstemp(suffix="-studio.png")
-            svg2png(url=studio_img_file[1], write_to=png_file[1])
-            os.remove(studio_img_file[1])
-            studio_img_file = png_file
-            studio_img_mime_type = "image/png"
-            studio_img_ext = "png"
+    studio_img_ext, studio_img_file, studio_img_mime_type = yield from get_studio_logo(scene)
 
     ##############
     # PERFORMERS #
@@ -553,6 +523,42 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.debug(e)
 
     logger.info("Done")
+
+
+def get_studio_logo(scene):
+    logger = logging.getLogger(__name__)
+    studio_img_ext = ""
+    studio_img_mime_type = ""
+    studio_img_file = None
+    if scene["studio"] is not None and "default=true" not in scene["studio"]["image_path"]:
+        logger.debug(f'Downloading studio image from {scene["studio"]["image_path"]}')
+        studio_img_response = requests.get(scene["studio"]["image_path"], headers=stash_headers)
+        studio_img_mime_type = studio_img_response.headers["Content-Type"]
+        match studio_img_mime_type:
+            case "image/jpeg":
+                studio_img_ext = "jpg"
+            case "image/png":
+                studio_img_ext = "png"
+            case "image/svg+xml":
+                studio_img_ext = "svg"
+            case "image/webp":
+                studio_img_ext = "webp"
+            case _:
+                studio_img_ext = "unk"
+                yield (warning(
+                    f"Unknown studio logo file type: {studio_img_mime_type}", "Unrecognized studio image file type"
+                ))
+        studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
+        with open(studio_img_file[1], "wb") as fp:
+            fp.write(studio_img_response.content)
+        if studio_img_ext == "svg":
+            png_file = tempfile.mkstemp(suffix="-studio.png")
+            svg2png(url=studio_img_file[1], write_to=png_file[1])
+            os.remove(studio_img_file[1])
+            studio_img_file = png_file
+            studio_img_mime_type = "image/png"
+            studio_img_ext = "png"
+    return studio_img_ext, studio_img_file, studio_img_mime_type
 
 
 def get_cover(cover_mime_type, cover_response, screens_dir, path):
