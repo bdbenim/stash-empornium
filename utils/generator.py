@@ -165,36 +165,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         scene["title"] = stash_file["basename"]
 
     ht = stash_file["height"]
-    resolution = None
-    # these are stash's heuristics, see pkg/models/resolution.go
-    if 144 <= ht < 240:
-        resolution = "144p"
-    elif 240 <= ht < 360:
-        resolution = "240p"
-    elif 360 <= ht < 480:
-        resolution = "360p"
-    elif 480 <= ht < 540:
-        resolution = "480p"
-    elif 540 <= ht < 720:
-        resolution = "540p"
-    elif 720 <= ht < 1080:
-        resolution = "720p"
-    elif 1080 <= ht < 1440:
-        resolution = "1080p"
-    elif 1440 <= ht < 1920:
-        resolution = "1440p"
-    elif 1920 <= ht < 2560:
-        resolution = "2160p"
-    elif 2560 <= ht < 3000:
-        resolution = "5K"
-    elif 3000 <= ht < 3584:
-        resolution = "6K"
-    elif 3584 <= ht < 3840:
-        resolution = "7K"
-    elif 3840 <= ht < 6143:
-        resolution = "8K"
-    elif ht >= 6143:
-        resolution = "8K+"
+    resolution = get_resolution(ht)
 
     if resolution is not None and config.get("metadata", "tag_resolution"):
         tags.add(resolution)
@@ -617,6 +588,40 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.debug(e)
 
     logger.info("Done")
+
+
+def get_resolution(ht):
+    resolution = None
+    # these are stash's heuristics, see pkg/models/resolution.go
+    if 144 <= ht < 240:
+        resolution = "144p"
+    elif 240 <= ht < 360:
+        resolution = "240p"
+    elif 360 <= ht < 480:
+        resolution = "360p"
+    elif 480 <= ht < 540:
+        resolution = "480p"
+    elif 540 <= ht < 720:
+        resolution = "540p"
+    elif 720 <= ht < 1080:
+        resolution = "720p"
+    elif 1080 <= ht < 1440:
+        resolution = "1080p"
+    elif 1440 <= ht < 1920:
+        resolution = "1440p"
+    elif 1920 <= ht < 2560:
+        resolution = "2160p"
+    elif 2560 <= ht < 3000:
+        resolution = "5K"
+    elif 3000 <= ht < 3584:
+        resolution = "6K"
+    elif 3584 <= ht < 3840:
+        resolution = "7K"
+    elif 3840 <= ht < 6143:
+        resolution = "8K"
+    elif ht >= 6143:
+        resolution = "8K+"
+    return resolution
 
 
 def gen_torrent(

@@ -100,7 +100,7 @@ findTags(tag_filter: {{ name: {{ value: "{}", modifier: EQUALS }} }}) {{
     tag_id = response.json()["data"]["findTags"]["tags"][0]["id"]
 
     scene_query = """
-findScenes(filter: {{ per_page: 100, page: 1 }}, scene_filter: {{ tags: {{ value: {}, modifier: INCLUDES }} }}) {{
+findScenes(scene_filter: {{ tags: {{ value: {}, modifier: INCLUDES }} }}) {{
     count
     scenes {{
         id
@@ -108,4 +108,5 @@ findScenes(filter: {{ per_page: 100, page: 1 }}, scene_filter: {{ tags: {{ value
     }}
 }}
     """
-    return stash_request({"query": "{" + scene_query.format(tag_id) + "}"}).json()["data"]["findScenes"]
+    query = "{" + scene_query.format(tag_id) + "}"
+    return stash_request({"query": query}).json()["data"]["findScenes"]
