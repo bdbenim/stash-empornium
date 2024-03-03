@@ -199,42 +199,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     cover_response = requests.get(scene["paths"]["screenshot"], headers=stash_headers)
     cover_mime_type = cover_response.headers["Content-Type"]
     logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
-    cover_gen = False
-    match cover_mime_type:
-        case "image/jpeg":
-            cover_ext = "jpg"
-        case "image/png":
-            cover_ext = "png"
-        case "image/webp":
-            cover_ext = "webp"
-        case _:
-            cover_gen = True
-            cover_ext = "png"
-            cover_mime_type = "image/png"
-            logger.warning(f"Unrecognized cover format")  # TODO return warnings to client
-    cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
-    if cover_gen:
-        cmd = [
-            "ffmpeg",
-            "-ss",
-            "30",
-            "-i",
-            stash_file["path"],
-            "-vf",
-            "thumbnail=300",
-            "-frames:v",
-            "1",
-            cover_file[1],
-            "-y",
-        ]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        logger.debug(f"ffmpeg output:\n{proc.stdout}")
-    else:
-        with open(cover_file[1], "wb") as fp:
-            fp.write(cover_response.content)
-    if screens_dir:
-        os.chmod(cover_file[1], 0o666)  # Ensures torrent client can read the file
-        shutil.copy(cover_file[1], os.path.join(screens_dir, f"cover.{cover_ext}"))
+    cover_ext, cover_file, cover_mime_type = get_cover(cover_mime_type, cover_response, screens_dir, stash_file["path"])
 
     ###########
     # TORRENT #
@@ -588,6 +553,47 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.debug(e)
 
     logger.info("Done")
+
+
+def get_cover(cover_mime_type, cover_response, screens_dir, path):
+    logger = logging.getLogger(__name__)
+    cover_gen = False
+    match cover_mime_type:
+        case "image/jpeg":
+            cover_ext = "jpg"
+        case "image/png":
+            cover_ext = "png"
+        case "image/webp":
+            cover_ext = "webp"
+        case _:
+            cover_gen = True
+            cover_ext = "png"
+            cover_mime_type = "image/png"
+            logger.warning(f"Unrecognized cover format")  # TODO return warnings to client
+    cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
+    if cover_gen:
+        cmd = [
+            "ffmpeg",
+            "-ss",
+            "30",
+            "-i",
+            path,
+            "-vf",
+            "thumbnail=300",
+            "-frames:v",
+            "1",
+            cover_file[1],
+            "-y",
+        ]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        logger.debug(f"ffmpeg output:\n{proc.stdout}")
+    else:
+        with open(cover_file[1], "wb") as fp:
+            fp.write(cover_response.content)
+    if screens_dir:
+        os.chmod(cover_file[1], 0o666)  # Ensures torrent client can read the file
+        shutil.copy(cover_file[1], os.path.join(screens_dir, f"cover.{cover_ext}"))
+    return cover_ext, cover_file, cover_mime_type
 
 
 def get_resolution(ht):
