@@ -145,7 +145,8 @@ function generate(data, callback) {
 
 function getTracker() {
     switch (location.hostname) {
-        case "www.empornium.is" || "www.empornium.sx":
+        case "www.empornium.is":
+        case "www.empornium.sx":
             return "EMP"
         case "femdomcult.org":
             return "FC"
