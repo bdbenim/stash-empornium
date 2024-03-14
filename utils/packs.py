@@ -66,22 +66,28 @@ def zip_files(files: list[str], dest: str, name: str):
             z.write(file, basename)
 
 
-def get_torrent_directory(scene: dict[str, Any]) -> str | None:
+def get_torrent_directory(scene: dict[str, Any] = None, title: str = None) -> str | None:
     """
     Returns a directory name for a given Stash scene.
+    :param title:
     :param scene:
     :raises: ValueError if media_directory not specified in config
     :return: The path for the torrent contents
     """
-    dirname: str = conf.get("backend", "media_directory")  # type: ignore
-    if not dirname:
+    if scene is None and title is None:
+        raise ValueError("a title or scene must be provided")
+    parent: str = conf.get("backend", "media_directory")  # type: ignore
+    if not parent:
         raise ValueError("media_directory not specified in config")
-    if scene["title"]:
-        dirname = os.path.join(dirname, scene["title"])
+    if title:
+        directory = title
+    elif scene and scene["title"]:
+        directory = scene["title"]
+    elif scene:
+        directory = ".".join(scene["files"][0]["basename"].split(".")[:-1])
     else:
-        title = ".".join(scene["files"][0]["basename"].split(".")[:-1])
-        dirname = os.path.join(dirname, title)
-    return dirname
+        raise ValueError("unable to create directory for torrent")
+    return os.path.join(parent, directory)
 
 
 def read_gallery(scene: dict[str, Any]) -> tuple[str, str, bool] | None:

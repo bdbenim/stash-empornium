@@ -124,7 +124,7 @@ def fill():
 @csrf.exempt
 def submit_job():
     j = request.get_json()
-    job_id = generator.add_job(j)
+    job_id = generator.add_job(j, "pack" in j and j["pack"])
     return json.dumps({"id": job_id})
 
 

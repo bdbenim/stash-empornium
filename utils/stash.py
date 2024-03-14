@@ -105,6 +105,58 @@ findScenes(scene_filter: {{ tags: {{ value: {}, modifier: INCLUDES }} }}) {{
     scenes {{
         id
         title
+        details
+        director
+        date
+        studio {{
+            name
+            url
+            image_path
+            parent_studio {{
+                url
+            }}
+        }}
+        tags {{
+            name
+            parents {{
+                name
+            }}
+        }}
+        performers {{
+            name
+            circumcised
+            country
+            eye_color
+            fake_tits
+            gender
+            hair_color
+            height_cm
+            measurements
+            piercings
+            image_path
+            tags {{
+                name
+            }}
+            tattoos
+        }}
+        paths {{
+            screenshot
+            preview
+        }}
+        files {{
+            id
+            path
+            basename
+            width
+            height
+            format
+            duration
+            video_codec
+            audio_codec
+            frame_rate
+            bit_rate
+            size
+        }}
     }}
 }}
     """

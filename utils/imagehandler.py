@@ -177,7 +177,7 @@ class ImageHandler:
             logger.error(f"No preview found for scene {scene['id']}")
         pipe.send(preview_url)
 
-    def generate_contact_sheet(self, stash_file: dict[str, Any], host: str, screens_dir: str | None = None) -> Optional[
+    def generate_contact_sheet(self, stash_file: dict[str, Any], host: str, screens_dir: str | None = None, pack=False) -> Optional[
         str]:
         """
         Generates a contact sheet for a stash video file, uploads it, and returns the URL. If caching is enabled
@@ -206,7 +206,8 @@ class ImageHandler:
 
             if screens_dir:
                 prep_dir(screens_dir)  # Ensure directory exists
-                shutil.copy(contact_sheet_file[1], os.path.join(screens_dir, 'contact_sheet.jpg'))
+                filename = stash_file["basename"] + ".jpg" if pack else 'contact_sheet.jpg'
+                shutil.copy(contact_sheet_file[1], os.path.join(screens_dir, filename))
 
             logger.info("Uploading contact sheet")
             if contact_sheet_remote_url is None:
