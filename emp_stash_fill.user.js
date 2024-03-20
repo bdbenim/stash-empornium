@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      1.1.1
+// @version      1.1.2
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -30,6 +30,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v1.1.2
+//  - Fix bug when checking tracker hostname
 // v1.1.1
 //  - Fix stash_library.user.js checksum
 // v1.1.0
