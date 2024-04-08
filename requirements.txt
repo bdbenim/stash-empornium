@@ -1,13 +1,13 @@
 Flask == 3.0.*
 requests == 2.31.*
 vcsi == 7.0.*
-waitress == 2.1.*
+waitress == 3.0.*
 cairosvg == 2.7.*
 redis[hiredis] == 5.0.*
 tomlkit == 0.12.*
 Flask-WTF == 1.2.*
-bootstrap-Flask == 2.3.*
+bootstrap-Flask == 2.4.*
 Flask-SQLAlchemy == 3.1.*
-Flask-Migrate == 4.0.5
+Flask-Migrate == 4.0.7
 pyimgbox == 1.0.7
-Pillow ~= 10.2.0
+Pillow ~= 10.3.0
