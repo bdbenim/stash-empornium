@@ -217,7 +217,47 @@ async function popJob() {
         GM_setValue("EMP_URL", old_key);
     }
 
-    // if (location.hostname === "www.empornium.is" || location.hostname === "www.empornium.sx") {
+    function fillListener(statusArea, instructions, idInput, fileSelect, announceURL, templateSelect, screensToggle, galleryToggle, tag_form_input) {
+        return () => {
+            let suggestionsHead = document.getElementById("suggestions-head");
+            let suggestionsBody = document.getElementById("suggestions-body");
+            if (suggestionsHead) suggestionsHead.remove();
+            if (suggestionsBody) suggestionsBody.remove();
+
+            statusArea.innerHTML = "";
+            instructions.innerHTML = "";
+            generate({
+                scene_id: idInput.value,
+                file_id: fileSelect.value,
+                announce_url: announceURL,
+                tracker: getTracker(),
+                template: templateSelect.value,
+                screens: screensToggle.checked,
+                gallery: galleryToggle.checked,
+            }, function (response) {
+                if (response.status !== 200) {
+                    statusArea.innerHTML = "<span style='color: red;'>Error submitting job. Is the backend updated?</span>";
+                    return;
+                }
+                if ("id" in response.response) {
+                    job_id = response.response.id;
+                    fill({
+                        statusArea: statusArea,
+                        description: document.getElementById("desc"),
+                        tags: tag_form_input,
+                        cover: document.getElementById("image"),
+                        title: document.getElementById("title"),
+                        instructions: instructions,
+                    }, job_id);
+                } else {
+                    console.error("No job ID returned from stash-empornium");
+                }
+            });
+
+        };
+    }
+
+
     if (unsafeWindow.TRACKERS.includes(location.hostname)) {
         let tag_form_input = document.getElementById("taginput");
         if (!tag_form_input) {
@@ -264,9 +304,14 @@ async function popJob() {
         fillButton.setAttribute("value", "fill from");
         fillButton.style.marginLeft = "12pt";
 
+        let packButton = document.createElement("input");
+        packButton.setAttribute("type", "submit");
+        packButton.setAttribute("value", "create pack");
+        packButton.style.marginLeft = "12pt";
+
         let stashButton = document.createElement("input");
         stashButton.setAttribute("type", "submit");
-        stashButton.setAttribute("value", "Open Stash");
+        stashButton.setAttribute("value", "open stash");
         stashButton.style.marginLeft = "12pt";
 
         let moreOptions = document.createElement("div");
@@ -666,43 +711,9 @@ async function popJob() {
             })
         }
 
-        fillButton.addEventListener("click", () => {
-            let suggestionsHead = document.getElementById("suggestions-head");
-            let suggestionsBody = document.getElementById("suggestions-body");
-            if (suggestionsHead) suggestionsHead.remove();
-            if (suggestionsBody) suggestionsBody.remove();
+        fillButton.addEventListener("click", fillListener(statusArea, instructions, idInput, fileSelect, announceURL, templateSelect, screensToggle, galleryToggle, tag_form_input));
 
-            statusArea.innerHTML = "";
-            instructions.innerHTML = "";
-            generate({
-                scene_id: idInput.value,
-                file_id: fileSelect.value,
-                announce_url: announceURL,
-                tracker: getTracker(),
-                template: templateSelect.value,
-                screens: screensToggle.checked,
-                gallery: galleryToggle.checked,
-            }, function (response) {
-                if (response.status !== 200) {
-                    statusArea.innerHTML = "<span style='color: red;'>Error submitting job. Is the backend updated?</span>";
-                    return;
-                }
-                if ("id" in response.response) {
-                    job_id = response.response.id;
-                    fill({
-                        statusArea: statusArea,
-                        description: document.getElementById("desc"),
-                        tags: tag_form_input,
-                        cover: document.getElementById("image"),
-                        title: document.getElementById("title"),
-                        instructions: instructions,
-                    }, job_id);
-                } else {
-                    console.error("No job ID returned from stash-empornium");
-                }
-            });
-
-        });
+        packButton.addEventListener("click", fillListener(statusArea, instructions, idInput, fileSelect, announceURL, templateSelect, screensToggle, galleryToggle, tag_form_input));
 
         stashButton.addEventListener("click", function () {
             let idInput = document.getElementById("stash_id");
@@ -761,6 +772,7 @@ async function popJob() {
         body.appendChild(titleDisplay);
         body.appendChild(fileSelect);
         body.appendChild(fillButton);
+        body.appendChild(packButton);
         body.appendChild(stashButton);
         body.appendChild(moreOptions);
         body.appendChild(statusArea);
