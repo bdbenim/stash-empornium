@@ -326,7 +326,8 @@ def settings(page):
                     conf.delete("file.maps", map)
                 elif form.submit.data:
                     template_context["message"] = "Settings saved"
-                    conf.conf["file.maps"].clear()  # type: ignore
+                    if "file.maps" in conf.conf:
+                        conf.conf["file.maps"].clear()  # type: ignore
                     for map in form.file_maps:
                         conf.set("file.maps", map.data["local_path"], map.data["remote_path"])
             case "database":
