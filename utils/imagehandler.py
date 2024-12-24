@@ -239,7 +239,7 @@ class ImageHandler:
         cmds.clear()
         for path in paths:
             digests.append(getDigest(path))
-            cmds.append((path, "image/jpeg", "jpg", self.img_host_token, self.cookies, "jerking", 5_000_000))
+            cmds.append((path, "image/jpeg", "jpg", self.img_host_token, self.cookies, host, 5_000_000))
         logger.debug(f"Digests: {digests}")
         with Pool() as p:
             screens = p.starmap(img_host_upload, cmds)
