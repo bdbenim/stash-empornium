@@ -98,12 +98,13 @@ class ImageHandler:
         elif self.redis is not None:
             value = self.redis.get(f"{PREFIX}:{host}:{key}")
             if value is not None:
-                self.urls[key] = str(value)
+                self.urls[host][key] = str(value)
                 return str(value)
+            # TODO deprecate the following code
             elif host == "jerking":
                 value = self.redis.get(f"{PREFIX}:{key}")
                 if value is not None:
-                    self.urls[key] = str(value)
+                    self.urls[host][key] = str(value)
                     self.redis.rename(f"{PREFIX}:{key}", f"{PREFIX}:jerking:{key}")
                     return str(value)
         return None
