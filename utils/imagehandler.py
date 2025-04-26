@@ -263,7 +263,6 @@ class ImageHandler:
             default: str | None = STUDIO_DEFAULT_LOGO,
     ) -> tuple[str | None, str | None]:
         # Return cached url if available
-        digest = None
         if width > 0:
             with Image.open(img_path) as img:
                 img.thumbnail((width, img.height))
@@ -313,21 +312,6 @@ class ImageHandler:
                 if cursor == 0:
                     break
             logger.debug(f"Cleared {url_count} local cache entries and {count} remote entries")
-
-
-# def connection_init():
-#     img_host_request = requests.get("https://jerking.empornium.ph/json")
-#     m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
-#     try:
-#         assert m is not None
-#     except:
-#         logger.critical("Unable to get auth token for image host.")
-#         raise
-#     img_host_token = m.group(1)
-#     cookies = img_host_request.cookies
-#     cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
-#     cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
-#     return img_host_token, cookies
 
 
 def is_webp_animated(path: str):
@@ -404,23 +388,14 @@ def jerking_upload(
         )
     }
     request_body = {
-        # "thumb_width": 160,
-        # "thumb_height": 160,
-        # "thumb_crop": False,
-        # "medium_width": 800,
-        # "medium_crop": "false",
         "type": "file",
         "action": "upload",
-        # "timestamp": int(time.time() * 1e3),  # Time in milliseconds
-        # "auth_token": img_host_token,
         "nsfw": 1,
         "format": "json",
     }
     headers = {
         "accept": "application/json",
         "X-API-Key": conf.get("hamster", "api_key"),
-        # "origin": "https://jerking.empornium.ph",
-        # "referer": "https://jerking.empornium.ph/",
     }
     url = "https://hamster.is/api/1/upload"
     response = requests.post(url, files=files, data=request_body, headers=headers)
@@ -466,8 +441,6 @@ def generate_screen(path: str, seek: str) -> str:
         screen_file[1],
     ]
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    # url, digest = self.jerking_upload(screen_file[1], "image/jpeg", "jpg")
-    # return jerking_upload(screen_file[1], "image/jpeg", "jpg", img_host_token, cookies)
     return screen_file[1]
 
 
@@ -486,7 +459,6 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
     total_height = 0
 
     for file in files:
-        img = None
         try:
             with Image.open(file) as img:
                 w = img.width
