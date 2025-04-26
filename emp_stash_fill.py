@@ -111,6 +111,7 @@ def process_suggestions():
         for tag in j["ignore"]:
             ignored_tags.append(tag)
     taghandler.accept_suggestions(accepted_tags, j["tracker"])
+    taghandler.reject_suggestions(ignored_tags)
     return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
 
 
