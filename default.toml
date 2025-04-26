@@ -26,6 +26,9 @@ use_preview = false
 ## Use the preview GIF as the upload cover. Ignored if 'use_preview' is false
 animated_cover = true
 
+[hamster]
+api_key = ""
+
 # [rtorrent]
 ## Hostname or IP address
 # host = "localhost"

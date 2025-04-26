@@ -46,7 +46,7 @@ class ImageHandler:
     def __init__(self) -> None:
         self.urls: dict[str, dict[str, str]] = {"jerking": {}, "imgbox": {}}
         self.configure_cache()
-        self.img_host_token, self.cookies = connection_init()
+        # self.img_host_token, self.cookies = connection_init()
 
     def configure_cache(self) -> None:
         redis_host: str = conf.get("redis", "host", "")  # type: ignore
@@ -239,7 +239,7 @@ class ImageHandler:
         cmds.clear()
         for path in paths:
             digests.append(getDigest(path))
-            cmds.append((path, "image/jpeg", "jpg", self.img_host_token, self.cookies, "jerking", 5_000_000))
+            cmds.append((path, "image/jpeg", "jpg", "jerking", 5_000_000))
         logger.debug(f"Digests: {digests}")
         with Pool() as p:
             screens = p.starmap(img_host_upload, cmds)
@@ -274,7 +274,7 @@ class ImageHandler:
         if url is not None:
             logger.debug(f"Found url {url} in cache")
             return url, digest
-        url = img_host_upload(img_path, img_mime_type, image_ext, self.img_host_token, self.cookies, host, 5_000_000)
+        url = img_host_upload(img_path, img_mime_type, image_ext, host, 5_000_000)
         if url:
             self.add(digest, host, url)
             return url, digest
@@ -315,19 +315,19 @@ class ImageHandler:
             logger.debug(f"Cleared {url_count} local cache entries and {count} remote entries")
 
 
-def connection_init():
-    img_host_request = requests.get("https://jerking.empornium.ph/json")
-    m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
-    try:
-        assert m is not None
-    except:
-        logger.critical("Unable to get auth token for image host.")
-        raise
-    img_host_token = m.group(1)
-    cookies = img_host_request.cookies
-    cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
-    cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
-    return img_host_token, cookies
+# def connection_init():
+#     img_host_request = requests.get("https://jerking.empornium.ph/json")
+#     m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
+#     try:
+#         assert m is not None
+#     except:
+#         logger.critical("Unable to get auth token for image host.")
+#         raise
+#     img_host_token = m.group(1)
+#     cookies = img_host_request.cookies
+#     cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
+#     cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
+#     return img_host_token, cookies
 
 
 def is_webp_animated(path: str):
@@ -342,8 +342,8 @@ def img_host_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
-        img_host_token: str,
-        cookies,
+        # img_host_token: str,
+        # cookies,
         host: str,
         max_size: int = 5_000_000
 ) -> str | None:
@@ -384,7 +384,7 @@ def img_host_upload(
 
     match host:
         case "jerking":
-            return jerking_upload(img_path, img_mime_type, image_ext, img_host_token, cookies)
+            return jerking_upload(img_path, img_mime_type, image_ext)
         case "imgbox":
             return imgbox_upload(img_path, img_mime_type, image_ext)
 
@@ -393,8 +393,8 @@ def jerking_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
-        img_host_token: str,
-        cookies,
+        # API_key: str,
+        # cookies,
 ) -> str | None:
     files = {
         "source": (
@@ -404,36 +404,34 @@ def jerking_upload(
         )
     }
     request_body = {
-        "thumb_width": 160,
-        "thumb_height": 160,
-        "thumb_crop": False,
-        "medium_width": 800,
-        "medium_crop": "false",
+        # "thumb_width": 160,
+        # "thumb_height": 160,
+        # "thumb_crop": False,
+        # "medium_width": 800,
+        # "medium_crop": "false",
         "type": "file",
         "action": "upload",
-        "timestamp": int(time.time() * 1e3),  # Time in milliseconds
-        "auth_token": img_host_token,
-        "nsfw": 0,
+        # "timestamp": int(time.time() * 1e3),  # Time in milliseconds
+        # "auth_token": img_host_token,
+        "nsfw": 1,
+        "format": "json",
     }
     headers = {
         "accept": "application/json",
-        "origin": "https://jerking.empornium.ph",
-        "referer": "https://jerking.empornium.ph/",
+        "X-API-Key": conf.get("hamster", "api_key"),
+        # "origin": "https://jerking.empornium.ph",
+        # "referer": "https://jerking.empornium.ph/",
     }
-    url = "https://jerking.empornium.ph/json"
-    response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
+    url = "https://hamster.is/api/1/upload"
+    response = requests.post(url, files=files, data=request_body, headers=headers)
     j = None
     try:
         j = response.json()
         assert "error" not in j
     except AssertionError:
-        logger.debug("Error uploading image, retrying connection")
-        connection_init()
-        response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
-        if j and "error" in j:
-            logger.error(f"Error uploading image: {response.json()['error']['message']}")
-            return None
-    url: str = response.json()["image"]["image"]["url"]
+        logger.debug("Error uploading image: " + j["error"]["message"])
+        return None
+    url: str = j["image"]["url"]
     return url
 
 
