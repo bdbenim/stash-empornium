@@ -46,7 +46,6 @@ class ImageHandler:
     def __init__(self) -> None:
         self.urls: dict[str, dict[str, str]] = {"jerking": {}, "imgbox": {}}
         self.configure_cache()
-        # self.img_host_token, self.cookies = connection_init()
 
     def configure_cache(self) -> None:
         redis_host: str = conf.get("redis", "host", "")  # type: ignore
@@ -377,8 +376,6 @@ def jerking_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
-        # API_key: str,
-        # cookies,
 ) -> str | None:
     files = {
         "source": (
@@ -395,8 +392,13 @@ def jerking_upload(
     }
     headers = {
         "accept": "application/json",
-        "X-API-Key": conf.get("hamster", "api_key"),
+        "X-API-Key": conf.get("hamster", "api_key", default=""),
     }
+
+    if headers["X-API-Key"] == "":
+        logger.error("No API key provided for hamster.is Please go to https://hamster.is/settings/api to get one")
+        return None
+
     url = "https://hamster.is/api/1/upload"
     response = requests.post(url, files=files, data=request_body, headers=headers)
     j = None

@@ -27,6 +27,7 @@ use_preview = false
 animated_cover = true
 
 [hamster]
+## This can be generated at https://hamster.is/settings/api
 api_key = ""
 
 # [rtorrent]
