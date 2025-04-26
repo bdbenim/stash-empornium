@@ -92,7 +92,6 @@ class ImageHandler:
     def get(self, key: str, host: str) -> Optional[str]:
         if self.no_cache or self.overwrite:
             return None
-        print(self.urls)
         if key in self.urls[host]:
             return self.urls[host][key]
         elif self.redis is not None:
