@@ -10,11 +10,12 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy files and install Python dependencies
-COPY . .
+COPY ./requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
 
 # Remove build-essential as it is only needed during pip install
-RUN apt-get remove -y build-essential
+# RUN apt-get remove -y build-essential
 
 # Run the Flask app when the container is executed
 ENTRYPOINT ["python", "emp_stash_fill.py", "--configdir", "/config"]
