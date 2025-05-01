@@ -188,6 +188,13 @@ class Deluge(TorrentClient):
         self.password = settings["password"] if "password" in settings else ""
         self.__connect()
 
+    def reconnect_if_needed(self):
+        if not self.connected():
+            self.logger.info("Reconnecting to Deluge")
+            self.__connect()
+        else:
+            self.logger.info("Already connected to Deluge")
+
     def __connect(self):
         self.__login()
         result = requests.post(

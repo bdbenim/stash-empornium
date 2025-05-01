@@ -655,6 +655,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     for client in config.torrent_clients:
         try:
+            client.reconnect_if_needed()
             path = new_dir if new_dir else stash_file["path"]
             client.add(torrent_paths[0], path)
         except Exception as e:
