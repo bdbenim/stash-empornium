@@ -42,6 +42,7 @@ app.config["BOOTSTRAP_BOOTSWATCH_THEME"] = "cyborg"
 app.register_blueprint(settings_page)
 db_path = os.path.abspath(os.path.join(config.config_dir, "db.sqlite3"))
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+app.config['SESSION_COOKIE_NAME'] = 'session_stash_empornium'
 db.db.init_app(app)
 # Ensure FOREIGN KEY for sqlite3
 if 'sqlite:' in app.config['SQLALCHEMY_DATABASE_URI']:
