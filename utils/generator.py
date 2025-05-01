@@ -653,6 +653,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     yield json.dumps(result)
 
+    logger.info(f"Adding torrent to {len(config.torrent_clients)} clients")
+    config.configureTorrents()
+    logger.info(f"Adding torrent to {len(config.torrent_clients)} clients")
     for client in config.torrent_clients:
         try:
             client.reconnect_if_needed()
