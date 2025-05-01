@@ -1,5 +1,6 @@
 import base64
 import datetime
+import html
 import json
 import logging
 import math
@@ -163,12 +164,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         yield error(f"Couldn't find file {stash_file['path']}")
         return
 
-    if new_dir:
-        link(stash_file["path"], new_dir)
-
-    if len(scene["title"]) == 0:
-        scene["title"] = stash_file["basename"]
-
     ht = stash_file["height"]
     resolution = None
     # these are stash's heuristics, see pkg/models/resolution.go
@@ -203,6 +198,65 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     if resolution is not None and config.get("metadata", "tag_resolution"):
         tags.add(resolution)
+
+    # TODO there should be a mapping for studios (eg map 'Mr. LuckyPOV' to 'MrLuckyPOV.com')
+    title = html.unescape(render_template_string(
+        config.get("backend", "title_template", ""),  # type: ignore
+        **{
+            "studio": scene["studio"]["name"].replace(" ", "") if scene["studio"] else "",
+            "performers": [p["name"] for p in scene["performers"] if p["gender"] != "MALE"],
+            "title": scene["title"],
+            "date": scene["date"],
+            "resolution": resolution if resolution is not None else "",
+            "codec": stash_file["video_codec"],
+            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+            "framerate": stash_file["frame_rate"],
+        },
+    ))
+
+    title_filename = render_template_string(
+        # config.get("backend", "title_template", ""),  # type: ignore
+        '{% if studio %}[{{studio}}] {% endif %}{% if date %}{{date}}. {% endif %}{{performers|join(".")}}{% if performers %}. {% endif %}{{title}}.{{resolution}}.{{codec}}',
+        **{
+
+            # "studio": urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.") if scene["studio"] and scene["studio"]["url"] is not None else "",
+            # TODO line below wont work for studio such as 'bubblebratz (onlyfans)'
+            # a good logic could be: if parent studio = OF or MV or etc: use it
+            "studio": scene["studio"]["name"].replace(" ", "") if scene["studio"] else "",
+            "performers": [p["name"] for p in scene["performers"] if p["gender"] != "MALE"],
+            "title": scene["title"],
+            "date": datetime.datetime.strptime(scene["date"], "%Y-%m-%d").strftime("%y.%m.%d"),
+            "resolution": resolution if resolution is not None else "",
+            "codec": stash_file["video_codec"],
+            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+            "framerate": stash_file["frame_rate"],
+        },
+    )
+
+    # symlink and rename file
+    dirname: str = config.get("backend", "media_directory")  # type: ignore
+    if not dirname:
+        raise ValueError("media_directory not specified in config")
+    valid_chars = ".- %s%s" % (string.ascii_letters, string.digits)
+
+    # logger.warn(title_filename)
+    title_filename = html.unescape(title_filename)
+    # logger.warn(title_filename)
+    newname = "".join(c for c in title_filename if c in valid_chars)
+    newname = newname.replace(" ", ".") + os.path.splitext(stash_file["path"])[1]
+    newname = newname.replace("-", ".").replace("..", ".").replace("..", ".")
+    newpath = os.path.join(dirname, newname)
+    if not os.path.islink(newpath) or not os.readlink(newpath) == stash_file["path"]:
+        os.symlink(stash_file["path"], newpath)
+    stash_file["path"] = newpath
+    stash_file["basename"] = newname
+    # end
+
+    if new_dir:
+        link(stash_file["path"], new_dir)
+
+    if len(scene["title"]) == 0:
+        scene["title"] = stash_file["basename"]
 
     yield info("Uploading images")
     try:
@@ -421,24 +475,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         info_proc.start()
         # del info_send  # Ensures connection can be automatically closed if garbage collected
 
-    #########
-    # TITLE #
-    #########
-
-    title = render_template_string(
-        config.get("backend", "title_template", ""),  # type: ignore
-        **{
-            "studio": scene["studio"]["name"] if scene["studio"] else "",
-            "performers": [p["name"] for p in scene["performers"]],
-            "title": scene["title"],
-            "date": scene["date"],
-            "resolution": resolution if resolution is not None else "",
-            "codec": stash_file["video_codec"],
-            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-            "framerate": stash_file["frame_rate"],
-        },
-    )
-
     ########
     # TAGS #
     ########
@@ -597,6 +633,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
                 else cover_remote_url,
                 "tags": " ".join(tags.tags),
                 "description": description,
+                # "description": html.unescape(description),
                 "torrent_path": torrent_paths[0],
                 "file_path": stash_file["path"],
                 "anon": config.get("backend", "anon", False),
