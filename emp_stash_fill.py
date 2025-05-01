@@ -87,6 +87,7 @@ def submit():
     logger.debug(f"Torrent submitted: {j}")
     for client in config.torrent_clients:
         try:
+            time.sleep(2)
             client.start(j["torrent_path"])
         except Exception as e:
             logger.error(f"Error attempting to start torrent in {client.name}")
