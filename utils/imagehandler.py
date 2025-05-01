@@ -29,8 +29,10 @@ except ImportError:
     logger.info("Redis module not found, using local caching only")
 
 CHUNK_SIZE = 5000
-PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+# PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
+# STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+PERFORMER_DEFAULT_IMAGE = "https://images2.imgbox.com/f9/8e/EaV8MXbf_o.png"
+STUDIO_DEFAULT_LOGO = "https://images2.imgbox.com/02/b2/EpFHbaLi_o.png"
 PREFIX = "stash-empornium"
 HASH_PREFIX = f"{PREFIX}-file"
 
@@ -46,7 +48,12 @@ class ImageHandler:
     def __init__(self) -> None:
         self.urls: dict[str, dict[str, str]] = {"jerking": {}, "imgbox": {}}
         self.configure_cache()
-        self.img_host_token, self.cookies = connection_init()
+        # TODO put the following line behind an if condition
+        # if host = jerking
+        # this is only needed for jerking img host
+        # self.img_host_token, self.cookies = connection_init()
+        # else
+        self.img_host_token, self.cookies = "", ""
 
     def configure_cache(self) -> None:
         redis_host: str = conf.get("redis", "host", "")  # type: ignore
