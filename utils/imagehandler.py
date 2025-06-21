@@ -156,7 +156,6 @@ class ImageHandler:
             pipe.close()
             return
 
-        #TODO webp vs mp4/gif
         if host == "jerking":
             # Jerking (hamster) host supports webp, so try that first
             preview = requests.get(scene["paths"]["webp"], headers=stash_headers) if scene["paths"]["webp"] else None
