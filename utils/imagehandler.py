@@ -29,8 +29,20 @@ except ImportError:
     logger.info("Redis module not found, using local caching only")
 
 CHUNK_SIZE = 5000
-PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+DEFAULT_IMAGES = {
+    "pad": {
+        "jerking": "https://hamster.is/images/2025/06/21/pad.png",
+        "imgbox": "https://images2.imgbox.com/a4/e9/jPRwPkY8_o.png",
+    },
+    "performer": {
+        "jerking": "https://hamster.is/images/2025/06/21/image1e1b5be84a2d086f.png",
+        "imgbox": "https://images2.imgbox.com/8d/3b/RryYOgLG_o.png",
+    },
+    "studio": {
+        "jerking": "https://hamster.is/images/2025/06/21/stash41c25080a3611b50.png",
+        "imgbox": "https://images2.imgbox.com/be/38/pohu1oLT_o.png",
+    }
+}
 PREFIX = "stash-empornium"
 HASH_PREFIX = f"{PREFIX}-file"
 
@@ -46,7 +58,6 @@ class ImageHandler:
     def __init__(self) -> None:
         self.urls: dict[str, dict[str, str]] = {"jerking": {}, "imgbox": {}}
         self.configure_cache()
-        # self.img_host_token, self.cookies = connection_init()
 
     def configure_cache(self) -> None:
         redis_host: str = conf.get("redis", "host", "")  # type: ignore
@@ -140,6 +151,7 @@ class ImageHandler:
         preview_url = self.get_images(scene["files"][0]["id"], "preview", host)[0]
         if preview_url:
             pipe.send(preview_url)
+            pipe.close()
             return
 
         preview = requests.get(scene["paths"]["preview"], headers=stash_headers) if scene["paths"]["preview"] else None
@@ -157,6 +169,7 @@ class ImageHandler:
                 if proc.returncode:
                     logger.error("Error generating preview GIF")
                     pipe.send(None)
+                    pipe.close()
                     return
                 width = 310
                 while os.path.getsize(output) > 5000000:
@@ -166,6 +179,7 @@ class ImageHandler:
                     if proc.returncode:
                         logger.error("Error generating preview GIF")
                         pipe.send(None)
+                        pipe.close()
                         return
                     width -= 10
                 preview_url, digest = self.get_url(output, "image/gif", "gif", host, default=None)
@@ -175,6 +189,7 @@ class ImageHandler:
         else:
             logger.error(f"No preview found for scene {scene['id']}")
         pipe.send(preview_url)
+        pipe.close()
 
     def generate_contact_sheet(self, stash_file: dict[str, Any], host: str, screens_dir: str | None = None) -> Optional[
         str]:
@@ -260,7 +275,7 @@ class ImageHandler:
             image_ext: str,
             host: str,
             width: int = 0,
-            default: str | None = STUDIO_DEFAULT_LOGO,
+            default: str | None = DEFAULT_IMAGES["studio"]["jerking"],
     ) -> tuple[str | None, str | None]:
         # Return cached url if available
         if width > 0:
@@ -272,7 +287,11 @@ class ImageHandler:
         url = self.get(digest, host)
         if url is not None:
             logger.debug(f"Found url {url} in cache")
-            return url, digest
+            # Jerking image host has been phased out in favour of hamster:
+            if (host == "jerking" and "hamster.is" in url) or host != "jerking":
+                return url, digest
+            else:
+                print(f"Skipping url {url}")
         url = img_host_upload(img_path, img_mime_type, image_ext, host, 5_000_000)
         if url:
             self.add(digest, host, url)
@@ -377,8 +396,6 @@ def jerking_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
-        # API_key: str,
-        # cookies,
 ) -> str | None:
     files = {
         "source": (
@@ -395,8 +412,13 @@ def jerking_upload(
     }
     headers = {
         "accept": "application/json",
-        "X-API-Key": conf.get("hamster", "api_key"),
+        "X-API-Key": conf.get("hamster", "api_key", default=""),
     }
+
+    if headers["X-API-Key"] == "":
+        logger.error("No API key provided for hamster.is Please go to https://hamster.is/settings/api to get one")
+        return None
+
     url = "https://hamster.is/api/1/upload"
     response = requests.post(url, files=files, data=request_body, headers=headers)
     j = None

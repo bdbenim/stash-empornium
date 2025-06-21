@@ -14,7 +14,7 @@ from webui.forms import (
     SearchForm,
     FileMapForm,
     TorrentSettings,
-    DBImportExport
+    DBImportExport, HamsterForm
 )
 
 from utils.confighandler import ConfigHandler
@@ -231,6 +231,9 @@ def settings(page):
                     "data-toggle": "tooltip",
                     "title": "This is the path as stash sees it",
                 }
+        case "hamster":
+            template_context["settings_option"] = "your hamster account"
+            form = HamsterForm(api_key=conf.get(page, "api_key", ""))
         case "tags":
             return redirect(url_for(".tag_settings", page="maps"))
         case "database":
@@ -329,6 +332,11 @@ def settings(page):
                     conf.conf["file.maps"].clear()  # type: ignore
                     for map in form.file_maps:
                         conf.set("file.maps", map.data["local_path"], map.data["remote_path"])
+            case "hamster":
+                assert isinstance(form, HamsterForm)
+                if form.submit.data:
+                    template_context["message"] = "Settings saved"
+                    conf.set(page, "api_key", form.data["api_key"])
             case "database":
                 del template_context["message"]
                 assert isinstance(form, DBImportExport)

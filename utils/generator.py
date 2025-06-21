@@ -478,14 +478,14 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
             img_host,
-            default=imagehandler.PERFORMER_DEFAULT_IMAGE,
+            default=imagehandler.DEFAULT_IMAGES["performer"][img_host],
         )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            performers[performer_name]["image_remote_url"] = imagehandler.PERFORMER_DEFAULT_IMAGE
+            performers[performer_name]["image_remote_url"] = imagehandler.DEFAULT_IMAGES["performer"][img_host]
             logger.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+    logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
         logo_url = images.get_url(
@@ -495,7 +495,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             img_host,
         )[0]
         if logo_url is None:
-            logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+            logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
             logger.warning("Unable to upload studio image")
 
     if image_temp:
@@ -554,17 +554,20 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         "image_count": image_count,
         "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
+        "pad":  imagehandler.DEFAULT_IMAGES["pad"][img_host],
     }
 
     preview_url = None
     if config.get("backend", "use_preview", False):
         preview_proc.join(timeout=60)
-        preview_proc.close()
         try:
+            preview_proc.close()
             preview_send.close()
             preview_url = preview_recv.recv()
         except EOFError:
             error("Unable to upload preview GIF")
+        except ValueError:
+            error("Unable to generate preview GIF (too long)")
         template_context["preview"] = preview_url
 
     for key in tmp_tag_lists:
