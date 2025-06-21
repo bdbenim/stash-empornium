@@ -560,12 +560,14 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     preview_url = None
     if config.get("backend", "use_preview", False):
         preview_proc.join(timeout=60)
-        preview_proc.close()
         try:
+            preview_proc.close()
             preview_send.close()
             preview_url = preview_recv.recv()
         except EOFError:
             error("Unable to upload preview GIF")
+        except ValueError:
+            error("Unable to generate preview GIF (too long)")
         template_context["preview"] = preview_url
 
     for key in tmp_tag_lists:

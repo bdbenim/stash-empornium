@@ -139,6 +139,7 @@ class ImageHandler:
         preview_url = self.get_images(scene["files"][0]["id"], "preview", host)[0]
         if preview_url:
             pipe.send(preview_url)
+            pipe.close()
             return
 
         preview = requests.get(scene["paths"]["preview"], headers=stash_headers) if scene["paths"]["preview"] else None
@@ -156,6 +157,7 @@ class ImageHandler:
                 if proc.returncode:
                     logger.error("Error generating preview GIF")
                     pipe.send(None)
+                    pipe.close()
                     return
                 width = 310
                 while os.path.getsize(output) > 5000000:
@@ -165,6 +167,7 @@ class ImageHandler:
                     if proc.returncode:
                         logger.error("Error generating preview GIF")
                         pipe.send(None)
+                        pipe.close()
                         return
                     width -= 10
                 preview_url, digest = self.get_url(output, "image/gif", "gif", host, default=None)
@@ -174,6 +177,7 @@ class ImageHandler:
         else:
             logger.error(f"No preview found for scene {scene['id']}")
         pipe.send(preview_url)
+        pipe.close()
 
     def generate_contact_sheet(self, stash_file: dict[str, Any], host: str, screens_dir: str | None = None) -> Optional[
         str]:
