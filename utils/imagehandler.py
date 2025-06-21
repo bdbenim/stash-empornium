@@ -271,7 +271,11 @@ class ImageHandler:
         url = self.get(digest, host)
         if url is not None:
             logger.debug(f"Found url {url} in cache")
-            return url, digest
+            # Jerking image host has been phased out in favour of hamster:
+            if (host == "jerking" and "hamster.is" in url) or host != "jerking":
+                return url, digest
+            else:
+                print(f"Skipping url {url}")
         url = img_host_upload(img_path, img_mime_type, image_ext, host, 5_000_000)
         if url:
             self.add(digest, host, url)
