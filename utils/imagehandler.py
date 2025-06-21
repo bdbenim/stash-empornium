@@ -125,6 +125,10 @@ class ImageHandler:
         :param host: The image host: `jerking` or `imgbox`
         :return: A list of strings representing the URLs if found
         """
+
+        if host == "jerking" and key == "preview":
+            key = "webp"
+
         if self.no_cache or self.overwrite:
             logger.debug("Skipping cache check")
             return [None]
@@ -152,6 +156,24 @@ class ImageHandler:
             pipe.close()
             return
 
+        if host == "jerking":
+            # Jerking (hamster) host supports webp, so try that first
+            preview = requests.get(scene["paths"]["webp"], headers=stash_headers) if scene["paths"]["webp"] else None
+            if preview:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    output = os.path.join(tmpdir, "preview.webp")
+                    logger.debug(f"Writing preview image to {output}")
+                    with open(output, "wb") as f:
+                        f.write(preview.content)
+                    preview_url, digest = self.get_url(output, "image/webp", "webp", host, default=None)
+                    if digest:
+                        for file in scene["files"]:
+                            self.set_images(file["id"], "preview", [digest], host)
+                    if preview_url:
+                        pipe.send(preview_url)
+                        pipe.close()
+                        return
+        # If not using webp-compatible host, or if webp was not found, try mp4 preview
         preview = requests.get(scene["paths"]["preview"], headers=stash_headers) if scene["paths"]["preview"] else None
         if preview:
             with tempfile.TemporaryDirectory() as tempdir:
@@ -182,6 +204,7 @@ class ImageHandler:
                     width -= 10
                 preview_url, digest = self.get_url(output, "image/gif", "gif", host, default=None)
                 if digest:
+                    # TODO properly index file based on user selection
                     for file in scene["files"]:
                         self.set_images(file["id"], "preview", [digest], host)
         else:
@@ -356,7 +379,7 @@ def img_host_upload(
         return None
 
     # Convert animated webp to gif
-    if img_mime_type == "image/webp":
+    if img_mime_type == "image/webp" and host != "jerking":
         if is_webp_animated(img_path):
             with Image.open(img_path) as img:
                 img_path = img_path.strip(image_ext) + "gif"
