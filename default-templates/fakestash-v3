@@ -7,29 +7,32 @@
 [center][img=100]{{ studio_logo }}[/img][/center]
 {% if date %}
 [size=4][font=Arial Black]{{title}}[/font][/size]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{date}}
+[imgnm]https://images2.imgbox.com/cb/37/KJHJhoCB_o.png[/imgnm]{{date}}
 {% endif %}
 {% if details %}
 [b]Details[/b]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{details}}
+[imgnm]https://images2.imgbox.com/cb/37/KJHJhoCB_o.png[/imgnm]{{details}}
 {% endif %}
 
 [b]Includes[/b]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{sex_acts}}
+[imgnm]https://images2.imgbox.com/cb/37/KJHJhoCB_o.png[/imgnm]{{sex_acts}}
 
 
 [b]Performers[/b][br]
-[table=nball,left][tr]
-
-
-{% for name, details in performers.items() -%}
-[td=#30404d,124px][img=123]{% if details["image_remote_url"] %}{{details["image_remote_url"]}}{% else %}https://fapping.empornium.sx/images/2023/04/06/imageR8b7P.png{% endif %}[/img][url=/torrents.php?taglist={{details["tag"]}}][size=3][/size][color=white][bg=90%]{{name}}
-[br][/bg][/color][/url][/td]
-{% if not loop.last %}
-[td=8px][/td]
-
-{% endif %}{% endfor %}
-[td][/td][/tr][/table]
+[table=nball,left]
+{% for name, details in performers.items() %}
+    {% if loop.index0 % 3 == 0 %}
+        [tr]
+    {% endif %}
+    [td=#30404d,124px][img=123]{% if details["image_remote_url"] %}{{details["image_remote_url"]}}{% else %}https://images2.imgbox.com/68/17/kR2cHTel_o.png{% endif %}[/img][url=/torrents.php?taglist={{details["tag"]}}][size=3][/size][color=white][bg=90%]{{name}}[br][/bg][/color][/url][/td]
+    {% if loop.index0 % 3 != 2 and not loop.last %}
+        [td=8px][/td]
+    {% endif %}
+    {% if loop.index0 % 3 == 2 or loop.last %}
+        [/tr]
+    {% endif %}
+{% endfor %}
+[/table]
 
 
 
@@ -58,6 +61,6 @@
 [/spoiler]
 
 [/size]
-[img]https://fapping.empornium.sx/images/2022/02/24/space.png[/img]
+[img]https://images2.imgbox.com/b1/cf/wKmCNSD6_o.png[/img]
 [/bg][/td][td=#202b33][/td]
 [/tr][/table][/font][/color][/bg]
