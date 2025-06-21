@@ -14,12 +14,15 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v4
 
-      -
-        name: Docker meta
+      - name: Set up PR tag
+        if: github.event_name == 'pull_request'
+        id: pr_tag
+        run: echo "TAG=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+        
+      - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -31,9 +34,8 @@ jobs:
             type=semver,pattern={{major}}
             type=semver,pattern={{major}}.{{minor}}
 
-      -
-        name: Login to GHCR
-        if: github.event_name != 'pull_request'
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -45,6 +47,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
