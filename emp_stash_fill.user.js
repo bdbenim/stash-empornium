@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2
+// @version      1.1.3
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -30,6 +30,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v1.1.3
+//  - Add case for happyfappy.org as possible fix for wrong image host
 // v1.1.2
 //  - Fix bug when checking tracker hostname
 // v1.1.1
@@ -152,6 +154,7 @@ function getTracker() {
             return "EMP"
         case "femdomcult.org":
             return "FC"
+        case "happyfappy.org":
         case "www.happyfappy.org":
             return "HF"
         case "www.enthralled.me":
