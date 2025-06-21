@@ -328,6 +328,12 @@ class CategoryList(FlaskForm):
         self.validate()  # the errors on validation are cancelled in the line above
         return category
 
+class HamsterForm(FlaskForm):
+    api_key = StringField(
+        "API Key"
+    )
+    submit = SubmitField()
+
 
 class SearchResult(Form):
     stash_tag = StringField(render_kw={"readonly": True})
