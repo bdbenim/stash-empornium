@@ -478,14 +478,14 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
             img_host,
-            default=imagehandler.PERFORMER_DEFAULT_IMAGE,
+            default=imagehandler.DEFAULT_IMAGES["performer"][img_host],
         )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            performers[performer_name]["image_remote_url"] = imagehandler.PERFORMER_DEFAULT_IMAGE
+            performers[performer_name]["image_remote_url"] = imagehandler.DEFAULT_IMAGES["performer"][img_host]
             logger.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+    logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
         logo_url = images.get_url(
@@ -495,7 +495,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             img_host,
         )[0]
         if logo_url is None:
-            logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+            logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
             logger.warning("Unable to upload studio image")
 
     if image_temp:
@@ -554,7 +554,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         "image_count": image_count,
         "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
-        "pad":  imagehandler.getPad(img_host),
+        "pad":  imagehandler.DEFAULT_IMAGES["pad"][img_host],
     }
 
     preview_url = None

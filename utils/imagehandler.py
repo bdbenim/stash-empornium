@@ -29,8 +29,20 @@ except ImportError:
     logger.info("Redis module not found, using local caching only")
 
 CHUNK_SIZE = 5000
-PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+DEFAULT_IMAGES = {
+    "pad": {
+        "jerking": "https://hamster.is/images/2025/06/21/pad.png",
+        "imgbox": "https://images2.imgbox.com/a4/e9/jPRwPkY8_o.png",
+    },
+    "performer": {
+        "jerking": "https://hamster.is/images/2025/06/21/image1e1b5be84a2d086f.png",
+        "imgbox": "https://images2.imgbox.com/8d/3b/RryYOgLG_o.png",
+    },
+    "studio": {
+        "jerking": "https://hamster.is/images/2025/06/21/stash41c25080a3611b50.png",
+        "imgbox": "https://images2.imgbox.com/be/38/pohu1oLT_o.png",
+    }
+}
 PREFIX = "stash-empornium"
 HASH_PREFIX = f"{PREFIX}-file"
 
@@ -263,7 +275,7 @@ class ImageHandler:
             image_ext: str,
             host: str,
             width: int = 0,
-            default: str | None = STUDIO_DEFAULT_LOGO,
+            default: str | None = DEFAULT_IMAGES["studio"]["jerking"],
     ) -> tuple[str | None, str | None]:
         # Return cached url if available
         if width > 0:
@@ -508,10 +520,3 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
     # sheet.show()
     sheet.close()
     return output
-
-def getPad(host: str) -> str:
-    match host:
-        case "jerking":
-            return "https://hamster.is/images/2025/06/21/pad.png"
-        case _:
-            return "https://images2.imgbox.com/a4/e9/jPRwPkY8_o.png"
