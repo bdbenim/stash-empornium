@@ -2,11 +2,9 @@ import asyncio
 import hashlib
 import logging
 import os
-import re
 import shutil
 import subprocess
 import tempfile
-import time
 import uuid
 from multiprocessing import Pool
 from multiprocessing.connection import Connection
@@ -315,6 +313,7 @@ class ImageHandler:
         self.urls[host][key] = value
         if self.redis is not None:
             self.redis.set(f"{PREFIX}:{host}:{key}", value)
+        return None
 
     def clear(self) -> None:
         url_count = len(self.urls)
@@ -336,7 +335,7 @@ class ImageHandler:
 def is_webp_animated(path: str):
     with Image.open(path) as img:
         count = 0
-        for frame in ImageSequence.Iterator(img):
+        for _frame in ImageSequence.Iterator(img):
             count += 1
         return count > 1
 
@@ -345,8 +344,6 @@ def img_host_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
-        # img_host_token: str,
-        # cookies,
         host: str,
         max_size: int = 5_000_000
 ) -> str | None:
@@ -390,6 +387,7 @@ def img_host_upload(
             return jerking_upload(img_path, img_mime_type, image_ext)
         case "imgbox":
             return imgbox_upload(img_path, img_mime_type, image_ext)
+    return None
 
 
 def jerking_upload(
