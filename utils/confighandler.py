@@ -106,7 +106,6 @@ class ConfigHandler(Singleton):
     def logging_init(self) -> None:
         self.log_level = getattr(logging, self.args.log) if self.args.log else min(10 * self.args.level, 50)
         logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=self.log_level)
-        # logging.basicConfig(format="%(levelname)-5.5s [%(name)s] %(message)s", level=self.log_level)
         self.logger = logging.getLogger(__name__)
 
     def parse_args(self) -> None:
@@ -241,6 +240,15 @@ class ConfigHandler(Singleton):
             self.update_file()
         except:
             self.logger.error("Unable to save updated config")
+
+        # Set log level from config if it wasn't passed as an argument
+        if not self.args.log:
+            level = logging.INFO
+            try:
+                level = getattr(logging, self.conf["backend"]["log_level"].upper())
+            except AttributeError:
+                self.logger.error(f"Invalid log level \"{self.conf["backend"]["log_level"]}\". Should be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL. Defaulting to INFO")
+            logging.getLogger().setLevel(level)
 
         if not os.path.exists(self.template_dir):
             shutil.copytree("default-templates", self.template_dir, copy_function=shutil.copyfile)
