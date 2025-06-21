@@ -26,6 +26,7 @@ from utils.paths import mapPath
 
 MEDIA_INFO = shutil.which("mediainfo")
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
+MAX_FILENAME_LENGTH = 240
 config = ConfigHandler()
 
 jobs: list[Future] = []
@@ -214,38 +215,52 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         },
     ))
 
-    title_filename = render_template_string(
-        # config.get("backend", "title_template", ""),  # type: ignore
-        '{% if studio %}[{{studio}}] {% endif %}{% if date %}{{date}}. {% endif %}{{performers|join(".")}}{% if performers %}. {% endif %}{{title}}.{{resolution}}.{{codec}}',
-        **{
+    def generate_filename(perf_list):
+        rendered = render_template_string(
+            # config.get("backend", "title_template", ""),  # type: ignore
+            '{% if studio %}[{{studio}}] {% endif %}{% if date %}{{date}}. {% endif %}{{performers|join(".")}}{% if performers %}. {% endif %}{{title}}.{{resolution}}.{{codec}}',
+            **{
+    
+                # "studio": urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.") if scene["studio"] and scene["studio"]["url"] is not None else "",
+                "studio": scene["studio"]["name"].replace(" ", "") if scene["studio"] else "",
+                "performers": perf_list, #[p["name"] for p in scene["performers"] if p["gender"] != "MALE"],
+                "title": scene["title"],
+                "date": datetime.datetime.strptime(scene["date"], "%Y-%m-%d").strftime("%y.%m.%d"),
+                "resolution": resolution if resolution is not None else "",
+                "codec": stash_file["video_codec"],
+                "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+                "framerate": stash_file["frame_rate"],
+            },
+        )
+        valid_chars = ".- %s%s" % (string.ascii_letters, string.digits)
+        safe = "".join(c for c in rendered if c in valid_chars)
+        safe = safe.replace(" ", ".").replace("-", ".")
+        while ".." in safe:
+            safe = safe.replace("..", ".")
+        safe = html.unescape(safe)
+        return safe
 
-            # "studio": urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.") if scene["studio"] and scene["studio"]["url"] is not None else "",
-            # TODO line below wont work for studio such as 'bubblebratz (onlyfans)'
-            # a good logic could be: if parent studio = OF or MV or etc: use it
-            "studio": scene["studio"]["name"].replace(" ", "") if scene["studio"] else "",
-            "performers": [p["name"] for p in scene["performers"] if p["gender"] != "MALE"],
-            "title": scene["title"],
-            "date": datetime.datetime.strptime(scene["date"], "%Y-%m-%d").strftime("%y.%m.%d"),
-            "resolution": resolution if resolution is not None else "",
-            "codec": stash_file["video_codec"],
-            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-            "framerate": stash_file["frame_rate"],
-        },
-    )
+    # Iteratively shorten performer list if needed
+    performer_names = list(performers.keys())
+    trimmed_names = performer_names[:]
+    newname = generate_filename(performers)
+    ext = ".torrent"
+        
+    while len(newname + ext) > MAX_FILENAME_LENGTH and trimmed_performers:
+        trimmed.pop()
+        trimmed_performers = {k: performers[k] for k in trimmed_names}
+        newname = generate_filename(trimmed_performers)
+
 
     # symlink and rename file
     dirname: str = config.get("backend", "media_directory")  # type: ignore
     if not dirname:
         raise ValueError("media_directory not specified in config")
-    valid_chars = ".- %s%s" % (string.ascii_letters, string.digits)
 
-    # logger.warn(title_filename)
-    title_filename = html.unescape(title_filename)
-    # logger.warn(title_filename)
-    newname = "".join(c for c in title_filename if c in valid_chars)
-    newname = newname.replace(" ", ".") + os.path.splitext(stash_file["path"])[1]
-    newname = newname.replace("-", ".").replace("..", ".").replace("..", ".")
+    # Final result
     newpath = os.path.join(dirname, newname)
+            
+
     if not os.path.islink(newpath) or not os.readlink(newpath) == stash_file["path"]:
         os.symlink(stash_file["path"], newpath)
     stash_file["path"] = newpath
