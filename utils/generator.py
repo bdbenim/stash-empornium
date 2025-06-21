@@ -554,6 +554,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         "image_count": image_count,
         "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
+        "pad":  imagehandler.getPad(img_host),
     }
 
     preview_url = None

@@ -504,3 +504,10 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
     # sheet.show()
     sheet.close()
     return output
+
+def getPad(host: str) -> str:
+    match host:
+        case "jerking":
+            return "https://hamster.is/images/2025/06/21/pad.png"
+        case _:
+            return "https://images2.imgbox.com/a4/e9/jPRwPkY8_o.png"
