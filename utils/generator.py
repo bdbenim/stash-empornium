@@ -238,7 +238,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         while ".." in safe:
             safe = safe.replace("..", ".")
         safe = html.unescape(safe)
-        return safe
+        return safe + os.path.splitext(stash_file["path"])[1]
 
     # Iteratively shorten performer list if needed
     performer_names = list(performers.keys())
