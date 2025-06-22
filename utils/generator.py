@@ -631,11 +631,13 @@ def gen_torrent(
         pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
 ) -> list[str] | None:
     logger = logging.getLogger(__name__)
-    piece_size = int(math.log(stash_file["size"] / 2 ** 10, 2))
+    torrent_path = stash_file["path"]
+    max_piece_size = int(math.log(8 * 1024 * 1024, 2)) # = 23, corresponding to 8MB (2^23 bytes)
+    piece_size = min(int(math.log(stash_file["size"] / 2 ** 10, 2)), max_piece_size)
     tempdir = tempfile.TemporaryDirectory()
     basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
 
-    target = directory if directory else stash_file["path"]
+    target = directory if directory else torrent_path
 
     temp_path = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(d, stash_file["basename"] + ".torrent") for d in config.torrent_dirs]
@@ -654,6 +656,7 @@ def gen_torrent(
         temp_path,
         target,
     ]
+    logger.debug(f"Executing: {' '.join(cmd)}")
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     logger.debug(f"mktorrent output:\n{process.stdout}")
     if process.returncode != 0:
