@@ -223,7 +223,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     
                 # "studio": urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.") if scene["studio"] and scene["studio"]["url"] is not None else "",
                 "studio": scene["studio"]["name"].replace(" ", "") if scene["studio"] else "",
-                "performers": perf_list, #[p["name"] for p in scene["performers"] if p["gender"] != "MALE"],
+                "performers": perf_list,
                 "title": scene["title"],
                 "date": datetime.datetime.strptime(scene["date"], "%Y-%m-%d").strftime("%y.%m.%d"),
                 "resolution": resolution if resolution is not None else "",
@@ -241,15 +241,12 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         return safe + os.path.splitext(stash_file["path"])[1]
 
     # Iteratively shorten performer list if needed
-    performer_names = list(performers.keys())
-    trimmed_names = performer_names[:]
-    newname = generate_filename(performers)
-    ext = ".torrent"
+    performer_list = [p["name"] for p in scene["performers"] if p["gender"] != "MALE"]
+    newname = generate_filename(performer_list)
         
-    while len(newname + ext) > MAX_FILENAME_LENGTH and trimmed_performers:
-        trimmed.pop()
-        trimmed_performers = {k: performers[k] for k in trimmed_names}
-        newname = generate_filename(trimmed_performers)
+    while len(newname) + len(".torrent") > MAX_FILENAME_LENGTH and performer_list:
+        performer_list.pop()
+        newname = generate_filename(performer_list)
 
 
     # symlink and rename file
