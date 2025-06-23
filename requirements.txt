@@ -3,7 +3,7 @@ requests == 2.32.*
 vcsi == 7.0.*
 waitress == 3.0.*
 cairosvg == 2.8.*
-redis[hiredis] == 6.1.*
+redis[hiredis] == 6.2.*
 tomlkit == 0.13.*
 Flask-WTF == 1.2.*
 bootstrap-Flask == 2.5.*
