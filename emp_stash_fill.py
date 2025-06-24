@@ -6,7 +6,7 @@ __version__ = "0.19.1"
 
 # built-in
 import json
-import logging
+from loguru import logger
 import os
 import time
 from concurrent.futures import Future
@@ -31,7 +31,7 @@ ODBL_NOTICE = ("Contains information from https://github.com/mledoze/countries w
                "Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE")
 
 config = ConfigHandler()
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)

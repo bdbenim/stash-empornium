@@ -11,3 +11,4 @@ Flask-SQLAlchemy == 3.1.*
 Flask-Migrate == 4.1.0
 pyimgbox == 1.0.7
 Pillow == 10.3.0, < 11.0.0
+loguru == 0.7.*

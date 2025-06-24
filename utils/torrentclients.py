@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 from utils.paths import mapPath
 from utils import bencoder
 import os
@@ -10,12 +10,10 @@ class TorrentClient:
     "Base torrent client class"
     pathmaps: dict[str, str] = {}
     hashes: dict[str, str] = {}
-    logger: logging.Logger
     label: str = ""
     name: str = "Torrent Client"
 
     def __init__(self, settings: dict) -> None:
-        self.logger = logging.getLogger(__name__)
         if "pathmaps" in settings:
             self.pathmaps = settings["pathmaps"]
         if "label" in settings:
@@ -65,13 +63,13 @@ class RTorrent(TorrentClient):
         self.server = client.Server(uri)
         if "password" in settings:
             uri = uri.replace(settings["password"], "[REDACTED]")
-        self.logger.debug(f"Connecting to rtorrent at '{uri}'")
+        logger.debug(f"Connecting to rtorrent at '{uri}'")
 
     def add(self, torrent_path: str, file_path: str) -> None:
         super().add(torrent_path, file_path)
         file_path = mapPath(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
-        self.logger.debug(f"Adding torrent {torrent_path} to directory {dir}")
+        logger.debug(f"Adding torrent {torrent_path} to directory {dir}")
         with open(torrent_path, "rb") as torrent:
             self.server.load.raw_verbose(
                 "",
@@ -80,7 +78,7 @@ class RTorrent(TorrentClient):
                 f"d.custom1.set={self.label}",
                 "d.check_hash=",
             )
-        self.logger.info("Torrent added to rTorrent")
+        logger.info("Torrent added to rTorrent")
 
     def start(self, torrent_path: str) -> None:
         if torrent_path in RTorrent.hashes:
@@ -125,7 +123,7 @@ class Qbittorrent(TorrentClient):
         self.cookies = r.cookies
         self.logged_in = r.content.decode() == "Ok."
         if not self.logged_in:
-            self.logger.error("Failed to login to qBittorrent")
+            logger.error("Failed to login to qBittorrent")
 
     def add(self, torrent_path: str, file_path: str) -> None:
         super().add(torrent_path, file_path)
@@ -144,9 +142,9 @@ class Qbittorrent(TorrentClient):
             r = self._post("/torrents/add", options, files=files, timeout=15)
         if r.ok and r.content.decode() != "Fails.":
             self.recheck(hash)
-            self.logger.info("Torrent added to qBittorrent")
+            logger.info("Torrent added to qBittorrent")
         else:
-            self.logger.error("Failed to add torrent to qBittorrent")
+            logger.error("Failed to add torrent to qBittorrent")
 
     def recheck(self, infohash: str):
         if not self.logged_in:
@@ -243,7 +241,7 @@ class Deluge(TorrentClient):
                 timeout=30,
             )
         j = r.json()
-        self.logger.debug(f"Deluge response: {j}")
+        logger.debug(f"Deluge response: {j}")
         if "success" in j and j["success"]:
             torrent_path = j["files"][0]
             body = {
@@ -254,19 +252,19 @@ class Deluge(TorrentClient):
             try:
                 result = requests.post(self.url, json=body, cookies=self.cookies, timeout=5)
                 j = result.json()
-                self.logger.debug(f"Deluge response: {j}")
+                logger.debug(f"Deluge response: {j}")
                 if "result" in j and j["result"][0][0]:
                     infohash = j["result"][0][1]
                     self.recheck(infohash)
-                    self.logger.info("Torrent added to deluge")
+                    logger.info("Torrent added to deluge")
                 else:
-                    self.logger.error(
+                    logger.error(
                         f"Torrent uploaded to Deluge but failed to add: {j['error'] if 'error' in j and j['error'] else 'Unknown error'}"
                     )
             except requests.ReadTimeout:
-                self.logger.error("Failed to add torrent to Deluge (does it already exist?)")
+                logger.error("Failed to add torrent to Deluge (does it already exist?)")
         else:
-            self.logger.error("Failed to upload torrent to Deluge")
+            logger.error("Failed to upload torrent to Deluge")
 
     def recheck(self, infohash: str):
         body = {"method": "core.force_recheck", "params": [[infohash]], "id": 1}

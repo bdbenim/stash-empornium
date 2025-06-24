@@ -1,7 +1,7 @@
 import base64
 import datetime
 import json
-import logging
+from loguru import logger
 import math
 import multiprocessing as mp
 import os
@@ -41,23 +41,25 @@ def add_job(j: dict) -> int:
 
 
 def error(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).error(message)
+    logger.error(message)
     return json.dumps({"status": "error", "message": alt_message if alt_message else message})
 
 
 def warning(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).warning(message)
+    logger.warning(message)
     return json.dumps({"status": "error", "message": alt_message if alt_message else message})
 
 
 def info(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).info(message)
+    logger.info(message)
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
+
+def success(message: str, alt_message: str | None = None) -> str:
+    logger.success(message)
     return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
 
 
 def generate(j: dict) -> Generator[str, None, str | None]:
-    logger = logging.getLogger(__name__)
-
     scene_id = j["scene_id"]
     file_id = j["file_id"]
     announce_url = j["announce_url"]
@@ -624,13 +626,12 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.error(f"Error attempting to add torrent to {client.name}")
             logger.debug(e)
 
-    logger.info("Done")
+    logger.success("Done")
 
 
 def gen_torrent(
         pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
 ) -> list[str] | None:
-    logger = logging.getLogger(__name__)
     torrent_path = stash_file["path"]
     max_piece_size = int(math.log(8 * 1024 * 1024, 2)) # = 23, corresponding to 8MB (2^23 bytes)
     piece_size = min(int(math.log(stash_file["size"] / 2 ** 10, 2)), max_piece_size)

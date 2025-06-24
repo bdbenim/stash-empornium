@@ -1,6 +1,6 @@
 import asyncio
 import hashlib
-import logging
+from loguru import logger
 import os
 import shutil
 import subprocess
@@ -17,7 +17,6 @@ from PIL import Image, ImageSequence
 from utils.confighandler import ConfigHandler, stash_headers
 from utils.packs import prep_dir
 
-logger = logging.getLogger(__name__)
 use_redis = False
 try:
     import redis

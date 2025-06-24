@@ -2,7 +2,7 @@
 for uploading to empornium."""
 
 import json
-import logging
+from loguru import logger
 import os
 import re
 from collections.abc import MutableMapping
@@ -51,7 +51,6 @@ def empify(tag: str) -> str:
     all other characters that are not alphanumeric 
     before finally converting the full string to
     lowercase."""
-    logger = logging.getLogger(__name__)
     new_tag = re.sub(r"[^\w\s._-]", "", tag).lower()  # remove most special characters
     new_tag = re.sub(r"[\s._-]+", ".", new_tag)  # replace remaining special chars and whitespace with '.'
     new_tag = new_tag[:32]  # truncate to max length
@@ -153,7 +152,6 @@ class TagHandler:
 
     def process_performer(self, performer: dict, tracker: str) -> str:
         # also include alias tags?
-        logger = logging.getLogger(__name__)
         logger.debug(performer)
         performer_tag = empify(performer["name"])
         self.tags.add(performer_tag)
@@ -220,7 +218,6 @@ class TagHandler:
 
     def process_tits(self, measurements: str, fake_tits: str = "") -> int:
         # TODO process size/type combo tags, e.g. big.natural.tits
-        logger = logging.getLogger(__name__)
         cup_size = re.sub(r"[^A-Z]", "", measurements.upper())
         if cup_size == "":
             logger.error(f"No cup size found in {measurements}")
@@ -256,7 +253,6 @@ class TagHandler:
 
 
 def db_init(app: Flask, tag_map: MutableMapping, tag_lists):
-    logger = logging.getLogger(__name__)
     logger.info("Updating db")
     with app.app_context():
         cats: dict[str, Category] = {}
@@ -307,7 +303,6 @@ def setup(app: Flask):
 def accept_suggestions(tags: MutableMapping[str, str], tracker: str) -> None:
     """Adds the provided tag mappings to the db, 
     creating the tags as required"""
-    logger = logging.getLogger(__name__)
     logger.info("Saving tag mappings")
     logger.debug(f"Tags: {tags}")
     with db.session.begin():
@@ -333,7 +328,6 @@ def accept_suggestions(tags: MutableMapping[str, str], tracker: str) -> None:
 
 def reject_suggestions(tags: list[str]) -> None:
     """Marks all supplied tags as ignored"""
-    logger = logging.getLogger(__name__)
     logger.debug(f"Ignoring tags: {tags}")
     for tag in tags:
         s_tag = get_or_create_no_commit(StashTag, tagname=tag)
