@@ -1,4 +1,5 @@
-import logging
+from loguru import logger
+# import logging
 from typing import Any
 
 import sqlalchemy.exc
@@ -26,7 +27,6 @@ db = SQLAlchemy(model_class=Base)
 
 
 def upgrade():
-    logger = logging.getLogger(__name__)
     base_rev = '7990cc760362'
     t = text(f"INSERT INTO alembic_version VALUES('{base_rev}')")
     with db.engine.connect() as con:
