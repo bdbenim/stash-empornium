@@ -10,6 +10,9 @@ import tomlkit
 from utils.customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 
+LOG_MESSAGE_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>"
+DEBUG_MESSAGE_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+
 stash_headers = {
     "Content-type": "application/json",
 }
@@ -97,32 +100,32 @@ def logging_init(log: str, level: int = 0) -> None:
         case "DEBUG":
             print("Debug mode")
             logger.add(sys.stderr, filter=level_filter("DEBUG"),
-               format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
+                       format=DEBUG_MESSAGE_FORMAT)
             logger.add(sys.stderr, level="INFO",
-                       format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+                       format=LOG_MESSAGE_FORMAT)
         case "INFO":
-            logger.add(sys.stderr, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+            logger.add(sys.stderr, level="INFO", format=LOG_MESSAGE_FORMAT)
         case "WARNING":
-            logger.add(sys.stderr, level="WARNING", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+            logger.add(sys.stderr, level="WARNING", format=LOG_MESSAGE_FORMAT)
         case "ERROR":
-            logger.add(sys.stderr, level="ERROR", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+            logger.add(sys.stderr, level="ERROR", format=LOG_MESSAGE_FORMAT)
         case "CRITICAL":
-            logger.add(sys.stderr, level="CRITICAL", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+            logger.add(sys.stderr, level="CRITICAL", format=LOG_MESSAGE_FORMAT)
         case _:
             match level:
                 case 1:
                     logger.add(sys.stderr, filter=level_filter("DEBUG"),
-                       format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
+                               format=DEBUG_MESSAGE_FORMAT)
                     logger.add(sys.stderr, level="INFO",
-                               format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+                               format=LOG_MESSAGE_FORMAT)
                 case 3:
-                    logger.add(sys.stderr, level="WARNING", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+                    logger.add(sys.stderr, level="WARNING", format=LOG_MESSAGE_FORMAT)
                 case 4:
-                    logger.add(sys.stderr, level="ERROR", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+                    logger.add(sys.stderr, level="ERROR", format=LOG_MESSAGE_FORMAT)
                 case 5:
-                    logger.add(sys.stderr, level="CRITICAL", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+                    logger.add(sys.stderr, level="CRITICAL", format=LOG_MESSAGE_FORMAT)
                 case _:
-                    logger.add(sys.stderr, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>")
+                    logger.add(sys.stderr, level="INFO", format=LOG_MESSAGE_FORMAT)
 
 
 class ConfigHandler(Singleton):
