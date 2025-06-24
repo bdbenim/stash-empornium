@@ -18,3 +18,10 @@ dependencies = [
     "vcsi==7.0.*",
     "waitress==3.0.*",
 ]
+readme = "README.md"
+license = "Unlicense"
+
+[project.urls]
+Repository = "https://github.com/bdbenim/stash-empornium"
+Issues = "https://github.com/bdbenim/stash-empornium/issues"
+Docker = "https://hub.docker.com/r/bdbenim/stash-empornium"
