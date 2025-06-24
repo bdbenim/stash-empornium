@@ -86,15 +86,13 @@ findScene(id: "{}") {{
 
 
 def logging_init(log: str, level: int = 0) -> None:
-    print(f"Log values: {log}, {level}")
-
     def level_filter(level_name):
         def is_level(record):
             return record["level"].name == level_name
 
         return is_level
 
-    logger.remove(0)
+    logger.remove(1)
 
     match log.upper():
         case "DEBUG":
@@ -146,6 +144,10 @@ class ConfigHandler(Singleton):
 
     def __init__(self):
         if not self.initialized:
+            # Default to INFO
+            logger.remove(0)
+            logger.add(sys.stderr, level="INFO", format=LOG_MESSAGE_FORMAT)
+
             self.parse_args()
             if self.args.log != "NOTSET" or self.args.level != 2:
                 logging_init(self.args.log, self.args.level)
@@ -219,7 +221,7 @@ class ConfigHandler(Singleton):
             with open("default.toml") as f:
                 self.conf = tomlkit.load(f)
         else:
-            logger.info(f"Reading config from {self.config_file}")
+            logger.debug(f"Reading config from {self.config_file}")
             try:
                 with open(self.config_file) as f:
                     self.conf = tomlkit.load(f)
@@ -295,7 +297,7 @@ class ConfigHandler(Singleton):
             except KeyError:
                 pass
             except AssertionError:
-                logger.error(f"Invalid log level \"{self.conf["backend"]["log_level"]}\". Should be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL. Defaulting to INFO")
+                logger.warning(f"Invalid log level \"{self.conf["backend"]["log_level"]}\". Should be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL. Defaulting to INFO")
             logging_init(level)
 
         if not os.path.exists(self.template_dir):
