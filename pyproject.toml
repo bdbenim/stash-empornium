@@ -1,0 +1,27 @@
+[project]
+name = "stash-empornium"
+version = "0.19.2"
+requires-python = ">=3.12"
+dependencies = [
+    "bootstrap-flask==2.5.*",
+    "cairosvg==2.8.*",
+    "flask==3.1.*",
+    "flask-migrate==4.1.0",
+    "flask-sqlalchemy==3.1.*",
+    "flask-wtf==1.2.*",
+    "loguru==0.7.*",
+    "pillow>=10.3.0,<11.0.0",
+    "pyimgbox==1.0.7",
+    "redis[hiredis]==6.2.*",
+    "requests==2.32.*",
+    "tomlkit==0.13.*",
+    "vcsi==7.0.*",
+    "waitress==3.0.*",
+]
+readme = "README.md"
+license = "Unlicense"
+
+[project.urls]
+Repository = "https://github.com/bdbenim/stash-empornium"
+Issues = "https://github.com/bdbenim/stash-empornium/issues"
+Docker = "https://hub.docker.com/r/bdbenim/stash-empornium"
