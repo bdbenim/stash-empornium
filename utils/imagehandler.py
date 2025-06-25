@@ -13,6 +13,7 @@ from typing import Any, Optional, Sequence
 import pyimgbox
 import requests
 from PIL import Image, ImageSequence
+from requests import JSONDecodeError
 
 from utils.confighandler import ConfigHandler, stash_headers
 from utils.packs import prep_dir
@@ -395,6 +396,7 @@ def img_host_upload(
 
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > max_size:
+        logger.debug("Resizing image")
         CMD = ["ffmpeg", "-i", img_path, "-vf", "scale=iw:ih", "-y", img_path]
         proc = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
@@ -406,13 +408,13 @@ def img_host_upload(
 
     match host:
         case "jerking":
-            return jerking_upload(img_path, img_mime_type, image_ext)
+            return hamster_upload(img_path, img_mime_type, image_ext)
         case "imgbox":
-            return imgbox_upload(img_path, img_mime_type, image_ext)
+            return imgbox_upload(img_path)
     return None
 
 
-def jerking_upload(
+def hamster_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
@@ -446,16 +448,17 @@ def jerking_upload(
         j = response.json()
         assert "error" not in j
     except AssertionError:
-        logger.debug("Error uploading image: " + j["error"]["message"])
+        logger.error("Error uploading image: " + j["error"]["message"])
         return None
+    except JSONDecodeError:
+        logger.error("Error uploading image, invalid JSON in response")
+        logger.debug(f"Response: {response.text}")
     url: str = j["image"]["url"]
     return url
 
 
 def imgbox_upload(
-        img_path: str,
-        img_mime_type: str,
-        image_ext: str):
+        img_path: str):
     async def upload(path: str):
         async with pyimgbox.Gallery(adult=True) as gallery:
             submission: pyimgbox.Submission = await gallery.upload(path)
