@@ -45,6 +45,17 @@ HASH_PREFIX = f"{PREFIX}-file"
 conf = ConfigHandler()
 
 
+def save_failed_upload(path: str) -> None:
+    dir: str|None = conf.get("backend", "save_images")
+    if dir is not None:
+        prep_dir(dir)
+        filename = os.path.basename(path)
+        output = os.path.join(dir, filename)
+        with open(path, "rb") as f:
+            with open(output, "wb") as out:
+                out.write(f.read())
+
+
 class ImageHandler:
     digests: dict[str, dict[str, list[str]]] = {}
     redis = None
@@ -314,6 +325,7 @@ class ImageHandler:
         if url is not None:
             self.add(digest, host, url)
             return url, digest
+        save_failed_upload(img_path)
         return default, digest
 
     def set_images(self, scene_id: str, key: str, digests: list[str], host: str) -> None:
