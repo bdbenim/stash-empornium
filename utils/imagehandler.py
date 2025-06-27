@@ -134,8 +134,14 @@ class ImageHandler:
                     self.digests[scene_id] = {}
                 self.digests[scene_id][key] = str(digests).split(":")
                 urls = [self.get(digest, host) for digest in str(digests).split(":")]
-                logger.debug(f"Got {len(urls)} urls of type {key} for file {scene_id} from remote cache")
-                return urls
+
+                # Messy cleanup for bug where `None` sometimes gets cached as a URL
+                if urls != [None]:
+                    logger.debug(f"Got {len(urls)} urls of type {key} for file {scene_id} from remote cache")
+                    logger.debug(f"URLs: {urls}")
+                    return urls
+                else:
+                    self.redis.hdel(f"{HASH_PREFIX}:{scene_id}", key)
         logger.debug(f"No images found in cache for file {scene_id}")
         return [None]
 
@@ -223,7 +229,7 @@ class ImageHandler:
         cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
         logger.info("Generating contact sheet")
         contact_sheet_remote_url = self.get_images(stash_file["id"], "contact", host)[0]
-        if contact_sheet_remote_url is None or screens_dir:
+        if contact_sheet_remote_url is None or screens_dir is not None:
             process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             logger.debug(f"vcsi output:\n{process.stdout}")
             if process.returncode != 0:
