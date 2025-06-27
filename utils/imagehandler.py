@@ -106,13 +106,6 @@ class ImageHandler:
             if value is not None:
                 self.urls[host][key] = str(value)
                 return str(value)
-            # TODO deprecate the following code
-            elif host == "hamster":
-                value = self.redis.get(f"{PREFIX}:{key}")
-                if value is not None:
-                    self.urls[host][key] = str(value)
-                    self.redis.rename(f"{PREFIX}:{key}", f"{PREFIX}:hamster:{key}")
-                    return str(value)
         return None
 
     def get_images(self, scene_id: str, key: str, host: str) -> list[Optional[str]]:
