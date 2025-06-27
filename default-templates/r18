@@ -1,4 +1,4 @@
-{# 20231112 -#}
+{# 20250626 -#}
 [font=Helvetica][bg=#211e1e][table]
 
 Replace links and everything in {% raw %}{{curly brackets}}{% endraw %}
@@ -15,7 +15,7 @@ Replace links and everything in {% raw %}{{curly brackets}}{% endraw %}
 
 [/table]
 [/bg][bg=800px][size=2][color=White]
-[center][imgnm]{{cover}}[/imgnm][/center][imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{details}}
+[center][imgnm]{{cover}}[/imgnm][/center][imgnm]{{pad}}[/imgnm]{{details}}
 [size=3][/size]{% for name, details in performers.items() -%}[url=/torrents.php?taglist={{details["tag"]}}][color=#ff2962]{{name}}[/color][/url]   {% endfor %}{% if date %}   [color=#b2b2b2]{{date}}    {% endif %}{{duration}}[/color]
 
 [/color][/size][/bg][/bg]
@@ -35,13 +35,13 @@ Replace links and everything in {% raw %}{{curly brackets}}{% endraw %}
 
 [td=24px][/td][td=vat]
 [color=#626262]Uploader Description[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]REPLACEME
+[imgnm]{{pad}}[/imgnm]REPLACEME
 
 [color=#626262]Categories[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm][color=#ff2962]{{sex_acts}}[/color]
+[imgnm]{{pad}}[/imgnm][color=#ff2962]{{sex_acts}}[/color]
 
 [color=#626262]Studio[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm][img=100]{{ studio_logo }}[/img]
+[imgnm]{{pad}}[/imgnm][img=100]{{ studio_logo }}[/img]
 [/td]
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -51,13 +51,13 @@ Replace links and everything in {% raw %}{{curly brackets}}{% endraw %}
 [td=24px][/td]
 [td=vat,10%]
 [color=#626262]Resolution[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{resolution}}
+[imgnm]{{pad}}[/imgnm]{{resolution}}
 
 [color=#626262]Bitrate[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{bitrate}}
+[imgnm]{{pad}}[/imgnm]{{bitrate}}
 
 [color=#626262]Framerate[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{framerate}}
+[imgnm]{{pad}}[/imgnm]{{framerate}}
 [/td]
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,10 +67,10 @@ Replace links and everything in {% raw %}{{curly brackets}}{% endraw %}
 [td=24px][/td]
 [td=vat,10%]
 [color=#626262]Codec[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{codec}}
+[imgnm]{{pad}}[/imgnm]{{codec}}
 
 [color=#626262]DVD ID[/color]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{title}}
+[imgnm]{{pad}}[/imgnm]{{title}}
 [/td]
 
 
