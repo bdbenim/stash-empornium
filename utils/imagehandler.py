@@ -236,13 +236,13 @@ class ImageHandler:
                 logger.error("Couldn't generate contact sheet")
                 return None
 
-            if screens_dir:
+            if screens_dir is not None:
                 prep_dir(screens_dir)  # Ensure directory exists
                 shutil.copy(contact_sheet_file[1], os.path.join(screens_dir, 'contact_sheet.jpg'))
 
             logger.info("Uploading contact sheet")
             if contact_sheet_remote_url is None:
-                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host)
+                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host, default=None)
                 if contact_sheet_remote_url is None:
                     logger.error("Failed to upload contact sheet")
                     return None
@@ -311,7 +311,7 @@ class ImageHandler:
             else:
                 print(f"Skipping url {url}")
         url = img_host_upload(img_path, img_mime_type, image_ext, host, 5_000_000)
-        if url:
+        if url is not None:
             self.add(digest, host, url)
             return url, digest
         return default, digest
