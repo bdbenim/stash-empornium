@@ -238,7 +238,10 @@ class ImageHandler:
         """
         contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
         os.chmod(contact_sheet_file[1], 0o666)  # Ensures torrent client can read the file
-        cmd = ["vcsi", stash_file["path"], "-g", "3x6", "-o", contact_sheet_file[1]]
+
+        dimensions = conf.get("backend", "contact_sheet_layout", "3x6")
+
+        cmd = ["vcsi", stash_file["path"], "-g", dimensions, "-o", contact_sheet_file[1]]
         logger.info("Generating contact sheet")
         contact_sheet_remote_url = self.get_images(stash_file["id"], "contact", host)[0]
         if contact_sheet_remote_url is None or screens_dir is not None:
