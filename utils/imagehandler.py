@@ -46,11 +46,12 @@ conf = ConfigHandler()
 
 
 def save_failed_upload(path: str) -> None:
-    dir: str|None = conf.get("backend", "save_images")
-    if dir is not None:
-        prep_dir(dir)
+    dir_name: str | None = conf.get("backend", "save_images")
+    if dir_name is not None:
+        prep_dir(dir_name)
         filename = os.path.basename(path)
-        output = os.path.join(dir, filename)
+        output = os.path.join(dir_name, filename)
+        logger.info(f"Saving failed upload to {output}")
         with open(path, "rb") as f:
             with open(output, "wb") as out:
                 out.write(f.read())
