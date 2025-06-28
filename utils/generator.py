@@ -42,21 +42,21 @@ def add_job(j: dict) -> int:
 
 def error(message: str, alt_message: str | None = None) -> str:
     logger.error(message)
-    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message}) + '\n'
 
 
 def warning(message: str, alt_message: str | None = None) -> str:
     logger.warning(message)
-    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message}) + '\n'
 
 
 def info(message: str, alt_message: str | None = None) -> str:
     logger.info(message)
-    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
 
 def success(message: str, alt_message: str | None = None) -> str:
     logger.success(message)
-    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
 
 
 def generate(j: dict) -> Generator[str, None, str | None]:
@@ -67,7 +67,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     include_gallery = j["gallery"]
     tracker = j["tracker"]  # 'EMP', 'PB', 'FC', 'HF' or 'ENT'
     include_screens = tracker == 'FC'  # TODO user customization
-    img_host = "imgbox" if tracker == 'HF' else "hamster"
+    img_host = "imgbox" if tracker == 'HF' else "jerking"
 
     yield info("Starting generation")
 
@@ -616,7 +616,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     if len(tag_suggestions) > 0:
         result["data"]["suggestions"] = dict(tag_suggestions)
 
-    yield json.dumps(result)
+    yield json.dumps(result) + '\n'
 
     for client in config.torrent_clients:
         try:
