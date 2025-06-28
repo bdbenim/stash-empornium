@@ -67,7 +67,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     include_gallery = j["gallery"]
     tracker = j["tracker"]  # 'EMP', 'PB', 'FC', 'HF' or 'ENT'
     include_screens = tracker == 'FC'  # TODO user customization
-    img_host = "imgbox" if tracker == 'HF' else "jerking"
+    img_host = "imgbox" if tracker == 'HF' else "hamster"
 
     yield info("Starting generation")
 
