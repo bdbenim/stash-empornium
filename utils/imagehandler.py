@@ -18,26 +18,24 @@ from requests import JSONDecodeError
 from utils.confighandler import ConfigHandler, stash_headers
 from utils.packs import prep_dir
 
-use_redis = False
 try:
     import redis
-
-    use_redis = True
 except ImportError:
+    redis = None
     logger.info("Redis module not found, using local caching only")
 
 CHUNK_SIZE = 5000
 DEFAULT_IMAGES = {
     "pad": {
-        "jerking": "https://hamster.is/images/2025/06/21/pad.png",
+        "hamster": "https://hamster.is/images/2025/06/21/pad.png",
         "imgbox": "https://images2.imgbox.com/a4/e9/jPRwPkY8_o.png",
     },
     "performer": {
-        "jerking": "https://hamster.is/images/2025/06/21/image1e1b5be84a2d086f.png",
+        "hamster": "https://hamster.is/images/2025/06/21/image1e1b5be84a2d086f.png",
         "imgbox": "https://images2.imgbox.com/8d/3b/RryYOgLG_o.png",
     },
     "studio": {
-        "jerking": "https://hamster.is/images/2025/06/21/stash41c25080a3611b50.png",
+        "hamster": "https://hamster.is/images/2025/06/21/stash41c25080a3611b50.png",
         "imgbox": "https://images2.imgbox.com/be/38/pohu1oLT_o.png",
     }
 }
@@ -47,6 +45,18 @@ HASH_PREFIX = f"{PREFIX}-file"
 conf = ConfigHandler()
 
 
+def save_failed_upload(path: str) -> None:
+    dir_name: str | None = conf.get("backend", "save_images")
+    if dir_name is not None:
+        prep_dir(dir_name)
+        filename = os.path.basename(path)
+        output = os.path.join(dir_name, filename)
+        logger.info(f"Saving failed upload to {output}")
+        with open(path, "rb") as f:
+            with open(output, "wb") as out:
+                out.write(f.read())
+
+
 class ImageHandler:
     digests: dict[str, dict[str, list[str]]] = {}
     redis = None
@@ -54,7 +64,7 @@ class ImageHandler:
     overwrite: bool = False
 
     def __init__(self) -> None:
-        self.urls: dict[str, dict[str, str]] = {"jerking": {}, "imgbox": {}}
+        self.urls: dict[str, dict[str, str]] = {"hamster": {}, "imgbox": {}}
         self.configure_cache()
 
     def configure_cache(self) -> None:
@@ -67,7 +77,7 @@ class ImageHandler:
         overwrite = conf.args.overwrite
         flush = conf.args.flush
 
-        enable = use_redis and not conf.get("redis", "disable", False)
+        enable = redis is not None and not conf.get("redis", "disable", False)
         self.overwrite = overwrite
         self.no_cache = no_cache
         if not no_cache and redis_host is not None and enable and self.redis is None:
@@ -108,13 +118,6 @@ class ImageHandler:
             if value is not None:
                 self.urls[host][key] = str(value)
                 return str(value)
-            # TODO deprecate the following code
-            elif host == "jerking":
-                value = self.redis.get(f"{PREFIX}:{key}")
-                if value is not None:
-                    self.urls[host][key] = str(value)
-                    self.redis.rename(f"{PREFIX}:{key}", f"{PREFIX}:jerking:{key}")
-                    return str(value)
         return None
 
     def get_images(self, scene_id: str, key: str, host: str) -> list[Optional[str]]:
@@ -122,11 +125,11 @@ class ImageHandler:
         Get all URLs of a given image type for a scene.
         :param scene_id: The ID of the scene to look up
         :param key: The type of image: `contact`, `screens`, `preview`, or `cover`
-        :param host: The image host: `jerking` or `imgbox`
+        :param host: The image host: `hamster` or `imgbox`
         :return: A list of strings representing the URLs if found
         """
 
-        if host == "jerking" and key == "preview":
+        if host == "hamster" and key == "preview":
             key = "webp"
 
         if self.no_cache or self.overwrite:
@@ -143,8 +146,14 @@ class ImageHandler:
                     self.digests[scene_id] = {}
                 self.digests[scene_id][key] = str(digests).split(":")
                 urls = [self.get(digest, host) for digest in str(digests).split(":")]
-                logger.debug(f"Got {len(urls)} urls of type {key} for file {scene_id} from remote cache")
-                return urls
+
+                # Messy cleanup for bug where `None` sometimes gets cached as a URL
+                if urls != [None]:
+                    logger.debug(f"Got {len(urls)} urls of type {key} for file {scene_id} from remote cache")
+                    logger.debug(f"URLs: {urls}")
+                    return urls
+                else:
+                    self.redis.hdel(f"{HASH_PREFIX}:{scene_id}", key)
         logger.debug(f"No images found in cache for file {scene_id}")
         return [None]
 
@@ -156,8 +165,8 @@ class ImageHandler:
             pipe.close()
             return
 
-        if host == "jerking":
-            # Jerking (hamster) host supports webp, so try that first
+        if host == "hamster":
+            # hamster (hamster) host supports webp, so try that first
             preview = requests.get(scene["paths"]["webp"], headers=stash_headers) if scene["paths"]["webp"] else None
             if preview:
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -219,7 +228,7 @@ class ImageHandler:
         and the image has been uploaded before, the existing URL will be returned without re-uploading the image.
         If `screens_dir` is provided, then the image will be copied to that directory with the filename
         contact_sheet.jpg.
-        :param host: The image host: ``jerking`` or ``imgbox``
+        :param host: The image host: ``hamster`` or ``imgbox``
         :param stash_file: The file from which to generate the contact sheet
         :type stash_file: dict
         :param screens_dir: Where to save images for inclusion in the torrent
@@ -229,23 +238,23 @@ class ImageHandler:
         """
         contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
         os.chmod(contact_sheet_file[1], 0o666)  # Ensures torrent client can read the file
-        cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
+        cmd = ["vcsi", stash_file["path"], "-g", "3x6", "-o", contact_sheet_file[1]]
         logger.info("Generating contact sheet")
         contact_sheet_remote_url = self.get_images(stash_file["id"], "contact", host)[0]
-        if contact_sheet_remote_url is None or screens_dir:
+        if contact_sheet_remote_url is None or screens_dir is not None:
             process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             logger.debug(f"vcsi output:\n{process.stdout}")
             if process.returncode != 0:
                 logger.error("Couldn't generate contact sheet")
                 return None
 
-            if screens_dir:
+            if screens_dir is not None:
                 prep_dir(screens_dir)  # Ensure directory exists
                 shutil.copy(contact_sheet_file[1], os.path.join(screens_dir, 'contact_sheet.jpg'))
 
             logger.info("Uploading contact sheet")
             if contact_sheet_remote_url is None:
-                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host)
+                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host, default=None)
                 if contact_sheet_remote_url is None:
                     logger.error("Failed to upload contact sheet")
                     return None
@@ -296,7 +305,7 @@ class ImageHandler:
             image_ext: str,
             host: str,
             width: int = 0,
-            default: str | None = DEFAULT_IMAGES["studio"]["jerking"],
+            default: str | None = DEFAULT_IMAGES["studio"]["hamster"],
     ) -> tuple[str | None, str | None]:
         # Return cached url if available
         if width > 0:
@@ -308,15 +317,16 @@ class ImageHandler:
         url = self.get(digest, host)
         if url is not None:
             logger.debug(f"Found url {url} in cache")
-            # Jerking image host has been phased out in favour of hamster:
-            if (host == "jerking" and "hamster.is" in url) or host != "jerking":
+            # hamster image host has been phased out in favour of hamster:
+            if (host == "hamster" and "hamster.is" in url) or host != "hamster":
                 return url, digest
             else:
                 print(f"Skipping url {url}")
         url = img_host_upload(img_path, img_mime_type, image_ext, host, 5_000_000)
-        if url:
+        if url is not None:
             self.add(digest, host, url)
             return url, digest
+        save_failed_upload(img_path)
         return default, digest
 
     def set_images(self, scene_id: str, key: str, digests: list[str], host: str) -> None:
@@ -340,7 +350,7 @@ class ImageHandler:
 
     def clear(self) -> None:
         url_count = len(self.urls)
-        self.urls = {'jerking': {}, 'imgbox': {}}
+        self.urls = {'hamster': {}, 'imgbox': {}}
         if self.redis is not None:
             cursor = 0
             ns_keys = f"{PREFIX}*"
@@ -379,7 +389,7 @@ def img_host_upload(
         return None
 
     # Convert animated webp to gif
-    if img_mime_type == "image/webp" and host != "jerking":
+    if img_mime_type == "image/webp" and host != "hamster":
         if is_webp_animated(img_path):
             with Image.open(img_path) as img:
                 img_path = img_path.strip(image_ext) + "gif"
@@ -407,7 +417,7 @@ def img_host_upload(
         logger.debug(f"Resized {img_path}")
 
     match host:
-        case "jerking":
+        case "hamster":
             return hamster_upload(img_path, img_mime_type, image_ext)
         case "imgbox":
             return imgbox_upload(img_path)
