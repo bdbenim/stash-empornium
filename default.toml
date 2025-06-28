@@ -27,9 +27,9 @@ log_level = "INFO"
 ## Dimensions of generated contact sheets
 contact_sheet_layout = "3x6"
 
-[hamster]
+#[hamster]
 ## This can be generated at https://hamster.is/settings/api
-api_key = ""
+#api_key = ""
 
 # [rtorrent]
 ## Hostname or IP address

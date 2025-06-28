@@ -6,7 +6,9 @@ import os
 import shutil
 
 import tomlkit
+from pydantic import ValidationError
 
+from utils.models import Config
 from utils.customtypes import CaseInsensitiveDict, Singleton
 from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
 
@@ -283,10 +285,14 @@ class ConfigHandler(Singleton):
         except Exception as e:
             logger.error(f"Failed to read tag config file: {e}")
         try:
+            Config.model_validate(self.conf)
             self.backup_config()
             self.update_file()
-        except:
-            logger.error("Unable to save updated config")
+        except ValidationError as e:
+            logger.critical(f"Config file error: {e}")
+            exit(1)
+        except Exception as e:
+            logger.error(f"Unable to save updated config: {e}")
 
         # Set log level from config if it wasn't passed as an argument
         if self.args.log == "NOTSET" and self.args.level == 2:
@@ -356,9 +362,9 @@ class ConfigHandler(Singleton):
             assert api_key is not None
             stash_headers["apiKey"] = str(api_key)
 
-        self.configureTorrents()
+        self.configure_torrents()
 
-    def configureTorrents(self) -> None:
+    def configure_torrents(self) -> None:
         self.torrent_clients.clear()
         clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent}
         for client, clientType in clients.items():

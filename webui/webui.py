@@ -320,7 +320,7 @@ def settings(page):
                             maps[field["local_path"].data] = field["remote_path"].data
                     if len(maps) > 0:
                         conf.set(page, "pathmaps", maps)
-                conf.configureTorrents()
+                conf.configure_torrents()
             case "files":
                 del template_context["message"]
                 assert isinstance(form, FileMapForm)
