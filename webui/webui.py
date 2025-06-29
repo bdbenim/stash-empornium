@@ -275,6 +275,8 @@ def settings(page):
                     conf.set(page, "media_directory", form.data["media_directory"])
                 conf.set(page, "move_method", form.data["move_method"])
                 conf.set(page, "anon", form.data["anon"])
+                # Show updated title example:
+                form.title_example.data = render_template_string(form.title_template.data, **DUMMY_CONTEXT)
             case "stash":
                 conf.set(page, "url", form.data["url"])
                 if form.data["api_key"]:
