@@ -65,6 +65,7 @@ class BackendSettings(FlaskForm):
     date_format = StringField()
     date_example = StringField("Date Example:", render_kw={"readonly": True})
     title_template = StringField()
+    title_example = StringField("Title Example:", render_kw={"readonly": True})
     anon = SwitchField("Upload Anonymously")
     media_directory = StringField(
         validators=[Directory()],
