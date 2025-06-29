@@ -63,7 +63,7 @@ class BackendSettings(FlaskForm):
     torrent_directories = StringField("Torrent Directories", render_kw={"placeholder": ""})
     port = StringField("Port", validators=[PortRange(1024), DataRequired()])
     date_format = StringField()
-    example = StringField("Date Example:", render_kw={"readonly": True})
+    date_example = StringField("Date Example:", render_kw={"readonly": True})
     title_template = StringField()
     anon = SwitchField("Upload Anonymously")
     media_directory = StringField(

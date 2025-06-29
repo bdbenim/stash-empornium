@@ -30,7 +30,7 @@
     {% if form.date_format %}
         <script src="{{ url_for('static', filename='node_modules/strftime/strftime-min.js')}}"></script>
         <script>
-            let ex = document.getElementById("example");
+            let ex = document.getElementById("date_example");
             let format = document.getElementById("date_format");
             ex.value = strftime(format.value);
             format.addEventListener("input", (event) => {
