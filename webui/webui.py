@@ -1,6 +1,6 @@
 import json
 import tempfile
-from flask import Blueprint, abort, redirect, render_template, url_for, request, send_file
+from flask import Blueprint, abort, redirect, render_template, url_for, request, send_file, render_template_string
 from webui.forms import (
     TagMapForm,
     BackendSettings,
@@ -21,6 +21,17 @@ from utils.confighandler import ConfigHandler
 from utils.taghandler import query_maps
 from utils.db import get_or_create, StashTag, GazelleTag, db, get_or_create_no_commit, Category, from_dict, to_dict
 from werkzeug.exceptions import HTTPException
+
+DUMMY_CONTEXT = {
+    "title": "Big Buck Bunny",
+    "date": "2008-05-20",
+    "studio": "Blender Foundation",
+    "performers": ["Big Buck Bunny", "Frank", "Rinky", "Gimera"],
+    "resolution": "1080p",
+    "codec": "h264",
+    "duration": "10:00",
+    "framerate": "24"
+}
 
 conf = ConfigHandler()
 
@@ -158,12 +169,14 @@ def settings(page):
     match page:
         case "backend":
             template_context["settings_option"] = "your stash-empornium backend"
+            title_template = conf.get(page, "title_template", "")
             form = BackendSettings(
                 default_template=conf.get(page, "default_template", ""),
                 torrent_directories=", ".join(conf.get(page, "torrent_directories", "")),  # type: ignore
                 port=conf.get(page, "port", ""),
                 date_format=conf.get(page, "date_format", ""),
-                title_template=conf.get(page, "title_template", ""),
+                title_template=title_template,
+                title_example = render_template_string(title_template, **DUMMY_CONTEXT),
                 media_directory=conf.get(page, "media_directory", ""),
                 move_method=conf.get(page, "move_method", "copy"),
                 anon=conf.get(page, "anon", False),
@@ -262,6 +275,8 @@ def settings(page):
                     conf.set(page, "media_directory", form.data["media_directory"])
                 conf.set(page, "move_method", form.data["move_method"])
                 conf.set(page, "anon", form.data["anon"])
+                # Show updated title example:
+                form.title_example.data = render_template_string(form.title_template.data, **DUMMY_CONTEXT)
             case "stash":
                 conf.set(page, "url", form.data["url"])
                 if form.data["api_key"]:
