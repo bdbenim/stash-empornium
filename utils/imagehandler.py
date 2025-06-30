@@ -17,6 +17,7 @@ from requests import JSONDecodeError
 
 from utils.confighandler import ConfigHandler, stash_headers
 from utils.packs import prep_dir
+from utils.paths import delete_temp_file
 
 try:
     import redis
@@ -249,6 +250,7 @@ class ImageHandler:
             logger.debug(f"vcsi output:\n{process.stdout}")
             if process.returncode != 0:
                 logger.error("Couldn't generate contact sheet")
+                delete_temp_file(contact_sheet_file[1])
                 return None
 
             if screens_dir is not None:
@@ -257,13 +259,15 @@ class ImageHandler:
 
             logger.info("Uploading contact sheet")
             if contact_sheet_remote_url is None:
-                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host, default=None)
+                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host,
+                                                                default=None)
                 if contact_sheet_remote_url is None:
                     logger.error("Failed to upload contact sheet")
+                    delete_temp_file(contact_sheet_file[1])
                     return None
-                os.remove(contact_sheet_file[1])
                 if digest is not None:
                     self.set_images(stash_file["id"], "contact", [digest], host)
+        delete_temp_file(contact_sheet_file[1])
         return contact_sheet_remote_url
 
     def generate_screens(self, stash_file: dict[str, Any], host: str, num_frames: int = 10) -> Sequence[Optional[str]]:
