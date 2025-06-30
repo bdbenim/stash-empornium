@@ -21,7 +21,7 @@ from flask import render_template, render_template_string
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
 from utils.packs import link, read_gallery, get_torrent_directory
-from utils.paths import mapPath
+from utils.paths import mapPath, delete_temp_file
 
 MEDIA_INFO = shutil.which("mediainfo")
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
@@ -499,6 +499,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         if logo_url is None:
             logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
             logger.warning("Unable to upload studio image")
+        delete_temp_file(studio_img_file[1])
 
     if image_temp:
         shutil.rmtree(image_dir)  # type: ignore
