@@ -303,6 +303,8 @@ class ImageHandler:
         if len(digests) > 0:
             self.set_images(stash_file["id"], "screens", digests, host)
         logger.debug(f"Screens: {screens}")
+        for path in paths:
+            delete_temp_file(path)
         return screens
 
     def get_url(
