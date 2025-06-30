@@ -397,44 +397,6 @@ async function popJob() {
                                                     }
                                                 }
                                             }
-
-                                            if ("file" in j.data) {
-                                                // Temporary for debugging. Replace the button each time
-                                                // so that we don't add multiple copies of the listener
-                                                // function to the same button.
-                                                let newBtn = submitBtn.cloneNode();
-                                                newBtn.disabled = false;
-                                                submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-                                                newBtn.addEventListener("click", () => {
-                                                    newBtn.disabled = true;
-                                                    let formel = document.getElementById("upload_table");
-                                                    let formdata = new FormData(formel);
-                                                    formdata.set("file_input", b64toBlob(j.data.file.content, "application/x-bittorrent"), j.data.file.name);
-                                                    console.debug(formdata);
-                                                    const r = new XMLHttpRequest();
-                                                    r.onreadystatechange = function () {
-                                                        if (r.readyState === XMLHttpRequest.DONE) {
-                                                            document.open();
-                                                            document.write(r.responseText);
-                                                            document.close();
-                                                        }
-                                                    };
-                                                    r.open("POST", new URL("/upload.php", window.location).href);
-                                                    r.responseType = "text";
-                                                    r.send(formdata);
-
-                                                    GM_xmlhttpRequest({
-                                                        method: "POST",
-                                                        headers: {"Content-Type": "application/json"},
-                                                        url: new URL("/submit", BACKEND).href,
-                                                        responseType: "json",
-                                                        data: JSON.stringify({
-                                                            torrent_path: j.data.fill.torrent_path,
-                                                        }),
-                                                    });
-                                                });
-                                            }
-
                                             if ("suggestions" in j.data) {
                                                 let parent = document.getElementsByClassName("thin")[0];
 
@@ -655,6 +617,42 @@ async function popJob() {
                                                 parent.insertBefore(body, parent.children[7]);
                                                 parent.insertBefore(head, body);
                                             }
+                                        }
+                                        if ("file" in j.data) {
+                                            // Temporary for debugging. Replace the button each time
+                                            // so that we don't add multiple copies of the listener
+                                            // function to the same button.
+                                            let newBtn = submitBtn.cloneNode();
+                                            newBtn.disabled = false;
+                                            submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+                                            newBtn.addEventListener("click", () => {
+                                                newBtn.disabled = true;
+                                                let formel = document.getElementById("upload_table");
+                                                let formdata = new FormData(formel);
+                                                formdata.set("file_input", b64toBlob(j.data.file.content, "application/x-bittorrent"), j.data.file.name);
+                                                console.debug(formdata);
+                                                const r = new XMLHttpRequest();
+                                                r.onreadystatechange = function () {
+                                                    if (r.readyState === XMLHttpRequest.DONE) {
+                                                        document.open();
+                                                        document.write(r.responseText);
+                                                        document.close();
+                                                    }
+                                                };
+                                                r.open("POST", new URL("/upload.php", window.location).href);
+                                                r.responseType = "text";
+                                                r.send(formdata);
+
+                                                GM_xmlhttpRequest({
+                                                    method: "POST",
+                                                    headers: {"Content-Type": "application/json"},
+                                                    url: new URL("/submit", BACKEND).href,
+                                                    responseType: "json",
+                                                    data: JSON.stringify({
+                                                        torrent_path: j.data.fill.torrent_path,
+                                                    }),
+                                                });
+                                            });
                                         }
                                     } else if (j.status === "error") {
                                         this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
