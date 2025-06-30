@@ -396,6 +396,13 @@ class ConfigHandler(Singleton):
                 return
             self.conf[section] = {}
         self.conf[section][key] = value  # type: ignore
+    
+    def set_subkey(self, section: str, subsection: str, key: str, value):
+        if section not in self.conf:
+            self.conf[section] = {}
+        if subsection not in self.conf[section]:
+            self.conf[section][subsection] = {}
+        self.conf[section][subsection][key] = value
 
     def delete(self, section: str, key: str | None = None) -> None:
         if section in self.conf:
@@ -410,6 +417,11 @@ class ConfigHandler(Singleton):
                     del self.tag_conf[section][key]  # type: ignore
             else:
                 del self.tag_conf[section]
+
+    def delete_subkey(self, section: str, key: str, subkey: str) -> None:
+        if section in self.conf:
+            if key in self.conf[section] and subkey in self.conf[section][key]:
+                del self.conf[section][key][subkey]
 
     def items(self, section: str) -> dict:
         if section in self.conf:

@@ -362,7 +362,7 @@ class FileMapForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         maps = []
-        if "maps" in kwargs:
+        if "maps" in kwargs and kwargs["maps"] is not None:
             for remote, local in kwargs["maps"].items():
                 maps.append({"local_path": local, "remote_path": remote})
             kwargs["file_maps"] = maps
