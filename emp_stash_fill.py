@@ -2,11 +2,11 @@
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.18.1"
+__version__ = "0.21.2"
 
 # built-in
 import json
-import logging
+from loguru import logger
 import os
 import time
 from concurrent.futures import Future
@@ -31,7 +31,7 @@ ODBL_NOTICE = ("Contains information from https://github.com/mledoze/countries w
                "Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE")
 
 config = ConfigHandler()
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
@@ -111,6 +111,7 @@ def process_suggestions():
         for tag in j["ignore"]:
             ignored_tags.append(tag)
     taghandler.accept_suggestions(accepted_tags, j["tracker"])
+    taghandler.reject_suggestions(ignored_tags)
     return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
 
 

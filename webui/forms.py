@@ -63,8 +63,9 @@ class BackendSettings(FlaskForm):
     torrent_directories = StringField("Torrent Directories", render_kw={"placeholder": ""})
     port = StringField("Port", validators=[PortRange(1024), DataRequired()])
     date_format = StringField()
-    example = StringField("Date Example:", render_kw={"readonly": True})
+    date_example = StringField("Date Example", render_kw={"readonly": True})
     title_template = StringField()
+    title_example = StringField("Title Example", render_kw={"readonly": True})
     anon = SwitchField("Upload Anonymously")
     media_directory = StringField(
         validators=[Directory()],
@@ -327,6 +328,12 @@ class CategoryList(FlaskForm):
         self.__init__(formdata=None, **read_form_data)
         self.validate()  # the errors on validation are cancelled in the line above
         return category
+
+class HamsterForm(FlaskForm):
+    api_key = StringField(
+        "API Key"
+    )
+    submit = SubmitField()
 
 
 class SearchResult(Form):

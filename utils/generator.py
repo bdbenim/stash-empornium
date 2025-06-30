@@ -1,7 +1,7 @@
 import base64
 import datetime
 import json
-import logging
+from loguru import logger
 import math
 import multiprocessing as mp
 import os
@@ -41,23 +41,25 @@ def add_job(j: dict) -> int:
 
 
 def error(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).error(message)
-    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
+    logger.error(message)
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message}) + '\n'
 
 
 def warning(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).warning(message)
-    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
+    logger.warning(message)
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message}) + '\n'
 
 
 def info(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).info(message)
-    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
+    logger.info(message)
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
+
+def success(message: str, alt_message: str | None = None) -> str:
+    logger.success(message)
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
 
 
 def generate(j: dict) -> Generator[str, None, str | None]:
-    logger = logging.getLogger(__name__)
-
     scene_id = j["scene_id"]
     file_id = j["file_id"]
     announce_url = j["announce_url"]
@@ -65,7 +67,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     include_gallery = j["gallery"]
     tracker = j["tracker"]  # 'EMP', 'PB', 'FC', 'HF' or 'ENT'
     include_screens = tracker == 'FC'  # TODO user customization
-    img_host = "imgbox" if tracker == 'HF' else "jerking"
+    img_host = "imgbox" if tracker == 'HF' else "hamster"
 
     yield info("Starting generation")
 
@@ -478,14 +480,14 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
             img_host,
-            default=imagehandler.PERFORMER_DEFAULT_IMAGE,
+            default=imagehandler.DEFAULT_IMAGES["performer"][img_host],
         )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            performers[performer_name]["image_remote_url"] = imagehandler.PERFORMER_DEFAULT_IMAGE
+            performers[performer_name]["image_remote_url"] = imagehandler.DEFAULT_IMAGES["performer"][img_host]
             logger.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+    logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
         logo_url = images.get_url(
@@ -495,7 +497,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             img_host,
         )[0]
         if logo_url is None:
-            logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+            logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
             logger.warning("Unable to upload studio image")
 
     if image_temp:
@@ -554,17 +556,20 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         "image_count": image_count,
         "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
+        "pad":  imagehandler.DEFAULT_IMAGES["pad"][img_host],
     }
 
     preview_url = None
     if config.get("backend", "use_preview", False):
         preview_proc.join(timeout=60)
-        preview_proc.close()
         try:
+            preview_proc.close()
             preview_send.close()
             preview_url = preview_recv.recv()
         except EOFError:
             error("Unable to upload preview GIF")
+        except ValueError:
+            error("Unable to generate preview GIF (too long)")
         template_context["preview"] = preview_url
 
     for key in tmp_tag_lists:
@@ -611,7 +616,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     if len(tag_suggestions) > 0:
         result["data"]["suggestions"] = dict(tag_suggestions)
 
-    yield json.dumps(result)
+    yield json.dumps(result) + '\n'
 
     for client in config.torrent_clients:
         try:
@@ -621,18 +626,19 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.error(f"Error attempting to add torrent to {client.name}")
             logger.debug(e)
 
-    logger.info("Done")
+    logger.success("Done")
 
 
 def gen_torrent(
         pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
 ) -> list[str] | None:
-    logger = logging.getLogger(__name__)
-    piece_size = int(math.log(stash_file["size"] / 2 ** 10, 2))
+    torrent_path = stash_file["path"]
+    max_piece_size = int(math.log(8 * 1024 * 1024, 2)) # = 23, corresponding to 8MB (2^23 bytes)
+    piece_size = min(int(math.log(stash_file["size"] / 2 ** 10, 2)), max_piece_size)
     tempdir = tempfile.TemporaryDirectory()
     basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
 
-    target = directory if directory else stash_file["path"]
+    target = directory if directory else torrent_path
 
     temp_path = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(d, stash_file["basename"] + ".torrent") for d in config.torrent_dirs]
@@ -651,6 +657,7 @@ def gen_torrent(
         temp_path,
         target,
     ]
+    logger.debug(f"Executing: {' '.join(cmd)}")
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     logger.debug(f"mktorrent output:\n{process.stdout}")
     if process.returncode != 0:

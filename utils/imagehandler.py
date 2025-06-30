@@ -1,12 +1,9 @@
 import asyncio
 import hashlib
-import logging
 import os
-import re
 import shutil
 import subprocess
 import tempfile
-import time
 import uuid
 from multiprocessing import Pool
 from multiprocessing.connection import Connection
@@ -15,26 +12,49 @@ from typing import Any, Optional, Sequence
 import pyimgbox
 import requests
 from PIL import Image, ImageSequence
+from loguru import logger
+from requests import JSONDecodeError
 
 from utils.confighandler import ConfigHandler, stash_headers
 from utils.packs import prep_dir
 
-logger = logging.getLogger(__name__)
-use_redis = False
 try:
     import redis
-
-    use_redis = True
 except ImportError:
+    redis = None
     logger.info("Redis module not found, using local caching only")
 
 CHUNK_SIZE = 5000
-PERFORMER_DEFAULT_IMAGE = "https://jerking.empornium.ph/images/2023/10/10/image.png"
-STUDIO_DEFAULT_LOGO = "https://jerking.empornium.ph/images/2022/02/21/stash41c25080a3611b50.png"
+DEFAULT_IMAGES = {
+    "pad": {
+        "hamster": "https://hamster.is/images/2025/06/21/pad.png",
+        "imgbox": "https://images2.imgbox.com/a4/e9/jPRwPkY8_o.png",
+    },
+    "performer": {
+        "hamster": "https://hamster.is/images/2025/06/21/image1e1b5be84a2d086f.png",
+        "imgbox": "https://images2.imgbox.com/8d/3b/RryYOgLG_o.png",
+    },
+    "studio": {
+        "hamster": "https://hamster.is/images/2025/06/21/stash41c25080a3611b50.png",
+        "imgbox": "https://images2.imgbox.com/be/38/pohu1oLT_o.png",
+    }
+}
 PREFIX = "stash-empornium"
 HASH_PREFIX = f"{PREFIX}-file"
 
 conf = ConfigHandler()
+
+
+def save_failed_upload(path: str) -> None:
+    dir_name: str | None = conf.get("backend", "save_images")
+    if dir_name is not None:
+        prep_dir(dir_name)
+        filename = os.path.basename(path)
+        output = os.path.join(dir_name, filename)
+        logger.info(f"Saving failed upload to {output}")
+        with open(path, "rb") as f:
+            with open(output, "wb") as out:
+                out.write(f.read())
 
 
 class ImageHandler:
@@ -44,9 +64,8 @@ class ImageHandler:
     overwrite: bool = False
 
     def __init__(self) -> None:
-        self.urls: dict[str, dict[str, str]] = {"jerking": {}, "imgbox": {}}
+        self.urls: dict[str, dict[str, str]] = {"hamster": {}, "imgbox": {}}
         self.configure_cache()
-        self.img_host_token, self.cookies = connection_init()
 
     def configure_cache(self) -> None:
         redis_host: str = conf.get("redis", "host", "")  # type: ignore
@@ -58,7 +77,7 @@ class ImageHandler:
         overwrite = conf.args.overwrite
         flush = conf.args.flush
 
-        enable = use_redis and not conf.get("redis", "disable", False)
+        enable = redis is not None and not conf.get("redis", "disable", False)
         self.overwrite = overwrite
         self.no_cache = no_cache
         if not no_cache and redis_host is not None and enable and self.redis is None:
@@ -92,20 +111,13 @@ class ImageHandler:
     def get(self, key: str, host: str) -> Optional[str]:
         if self.no_cache or self.overwrite:
             return None
-        print(self.urls)
         if key in self.urls[host]:
             return self.urls[host][key]
         elif self.redis is not None:
             value = self.redis.get(f"{PREFIX}:{host}:{key}")
             if value is not None:
-                self.urls[key] = str(value)
+                self.urls[host][key] = str(value)
                 return str(value)
-            elif host == "jerking":
-                value = self.redis.get(f"{PREFIX}:{key}")
-                if value is not None:
-                    self.urls[key] = str(value)
-                    self.redis.rename(f"{PREFIX}:{key}", f"{PREFIX}:jerking:{key}")
-                    return str(value)
         return None
 
     def get_images(self, scene_id: str, key: str, host: str) -> list[Optional[str]]:
@@ -113,9 +125,13 @@ class ImageHandler:
         Get all URLs of a given image type for a scene.
         :param scene_id: The ID of the scene to look up
         :param key: The type of image: `contact`, `screens`, `preview`, or `cover`
-        :param host: The image host: `jerking` or `imgbox`
+        :param host: The image host: `hamster` or `imgbox`
         :return: A list of strings representing the URLs if found
         """
+
+        if host == "hamster" and key == "preview":
+            key = "webp"
+
         if self.no_cache or self.overwrite:
             logger.debug("Skipping cache check")
             return [None]
@@ -130,8 +146,14 @@ class ImageHandler:
                     self.digests[scene_id] = {}
                 self.digests[scene_id][key] = str(digests).split(":")
                 urls = [self.get(digest, host) for digest in str(digests).split(":")]
-                logger.debug(f"Got {len(urls)} urls of type {key} for file {scene_id} from remote cache")
-                return urls
+
+                # Messy cleanup for bug where `None` sometimes gets cached as a URL
+                if urls != [None]:
+                    logger.debug(f"Got {len(urls)} urls of type {key} for file {scene_id} from remote cache")
+                    logger.debug(f"URLs: {urls}")
+                    return urls
+                else:
+                    self.redis.hdel(f"{HASH_PREFIX}:{scene_id}", key)
         logger.debug(f"No images found in cache for file {scene_id}")
         return [None]
 
@@ -140,8 +162,27 @@ class ImageHandler:
         preview_url = self.get_images(scene["files"][0]["id"], "preview", host)[0]
         if preview_url:
             pipe.send(preview_url)
+            pipe.close()
             return
 
+        if host == "hamster":
+            # hamster (hamster) host supports webp, so try that first
+            preview = requests.get(scene["paths"]["webp"], headers=stash_headers) if scene["paths"]["webp"] else None
+            if preview:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    output = os.path.join(tmpdir, "preview.webp")
+                    logger.debug(f"Writing preview image to {output}")
+                    with open(output, "wb") as f:
+                        f.write(preview.content)
+                    preview_url, digest = self.get_url(output, "image/webp", "webp", host, default=None)
+                    if digest:
+                        for file in scene["files"]:
+                            self.set_images(file["id"], "preview", [digest], host)
+                    if preview_url:
+                        pipe.send(preview_url)
+                        pipe.close()
+                        return
+        # If not using webp-compatible host, or if webp was not found, try mp4 preview
         preview = requests.get(scene["paths"]["preview"], headers=stash_headers) if scene["paths"]["preview"] else None
         if preview:
             with tempfile.TemporaryDirectory() as tempdir:
@@ -157,6 +198,7 @@ class ImageHandler:
                 if proc.returncode:
                     logger.error("Error generating preview GIF")
                     pipe.send(None)
+                    pipe.close()
                     return
                 width = 310
                 while os.path.getsize(output) > 5000000:
@@ -166,15 +208,18 @@ class ImageHandler:
                     if proc.returncode:
                         logger.error("Error generating preview GIF")
                         pipe.send(None)
+                        pipe.close()
                         return
                     width -= 10
                 preview_url, digest = self.get_url(output, "image/gif", "gif", host, default=None)
                 if digest:
+                    # TODO properly index file based on user selection
                     for file in scene["files"]:
                         self.set_images(file["id"], "preview", [digest], host)
         else:
             logger.error(f"No preview found for scene {scene['id']}")
         pipe.send(preview_url)
+        pipe.close()
 
     def generate_contact_sheet(self, stash_file: dict[str, Any], host: str, screens_dir: str | None = None) -> Optional[
         str]:
@@ -183,7 +228,7 @@ class ImageHandler:
         and the image has been uploaded before, the existing URL will be returned without re-uploading the image.
         If `screens_dir` is provided, then the image will be copied to that directory with the filename
         contact_sheet.jpg.
-        :param host: The image host: ``jerking`` or ``imgbox``
+        :param host: The image host: ``hamster`` or ``imgbox``
         :param stash_file: The file from which to generate the contact sheet
         :type stash_file: dict
         :param screens_dir: Where to save images for inclusion in the torrent
@@ -193,23 +238,26 @@ class ImageHandler:
         """
         contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
         os.chmod(contact_sheet_file[1], 0o666)  # Ensures torrent client can read the file
-        cmd = ["vcsi", stash_file["path"], "-g", "3x10", "-o", contact_sheet_file[1]]
+
+        dimensions = conf.get("backend", "contact_sheet_layout", "3x6")
+
+        cmd = ["vcsi", stash_file["path"], "-g", dimensions, "-o", contact_sheet_file[1]]
         logger.info("Generating contact sheet")
         contact_sheet_remote_url = self.get_images(stash_file["id"], "contact", host)[0]
-        if contact_sheet_remote_url is None or screens_dir:
+        if contact_sheet_remote_url is None or screens_dir is not None:
             process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             logger.debug(f"vcsi output:\n{process.stdout}")
             if process.returncode != 0:
                 logger.error("Couldn't generate contact sheet")
                 return None
 
-            if screens_dir:
+            if screens_dir is not None:
                 prep_dir(screens_dir)  # Ensure directory exists
                 shutil.copy(contact_sheet_file[1], os.path.join(screens_dir, 'contact_sheet.jpg'))
 
             logger.info("Uploading contact sheet")
             if contact_sheet_remote_url is None:
-                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host)
+                contact_sheet_remote_url, digest = self.get_url(contact_sheet_file[1], "image/jpeg", "jpg", host, default=None)
                 if contact_sheet_remote_url is None:
                     logger.error("Failed to upload contact sheet")
                     return None
@@ -239,7 +287,7 @@ class ImageHandler:
         cmds.clear()
         for path in paths:
             digests.append(getDigest(path))
-            cmds.append((path, "image/jpeg", "jpg", self.img_host_token, self.cookies, "jerking", 5_000_000))
+            cmds.append((path, "image/jpeg", "jpg", host, 5_000_000))
         logger.debug(f"Digests: {digests}")
         with Pool() as p:
             screens = p.starmap(img_host_upload, cmds)
@@ -260,10 +308,9 @@ class ImageHandler:
             image_ext: str,
             host: str,
             width: int = 0,
-            default: str | None = STUDIO_DEFAULT_LOGO,
+            default: str | None = DEFAULT_IMAGES["studio"]["hamster"],
     ) -> tuple[str | None, str | None]:
         # Return cached url if available
-        digest = None
         if width > 0:
             with Image.open(img_path) as img:
                 img.thumbnail((width, img.height))
@@ -273,11 +320,16 @@ class ImageHandler:
         url = self.get(digest, host)
         if url is not None:
             logger.debug(f"Found url {url} in cache")
-            return url, digest
-        url = img_host_upload(img_path, img_mime_type, image_ext, self.img_host_token, self.cookies, host, 5_000_000)
-        if url:
+            # hamster image host has been phased out in favour of hamster:
+            if (host == "hamster" and "hamster.is" in url) or host != "hamster":
+                return url, digest
+            else:
+                print(f"Skipping url {url}")
+        url = img_host_upload(img_path, img_mime_type, image_ext, host, 5_000_000)
+        if url is not None:
             self.add(digest, host, url)
             return url, digest
+        save_failed_upload(img_path)
         return default, digest
 
     def set_images(self, scene_id: str, key: str, digests: list[str], host: str) -> None:
@@ -297,10 +349,11 @@ class ImageHandler:
         self.urls[host][key] = value
         if self.redis is not None:
             self.redis.set(f"{PREFIX}:{host}:{key}", value)
+        return None
 
     def clear(self) -> None:
         url_count = len(self.urls)
-        self.urls = {'jerking': {}, 'imgbox': {}}
+        self.urls = {'hamster': {}, 'imgbox': {}}
         if self.redis is not None:
             cursor = 0
             ns_keys = f"{PREFIX}*"
@@ -315,25 +368,10 @@ class ImageHandler:
             logger.debug(f"Cleared {url_count} local cache entries and {count} remote entries")
 
 
-def connection_init():
-    img_host_request = requests.get("https://jerking.empornium.ph/json")
-    m = re.search(r"config\.auth_token\s*=\s*[\"'](\w+)[\"']", img_host_request.text)
-    try:
-        assert m is not None
-    except:
-        logger.critical("Unable to get auth token for image host.")
-        raise
-    img_host_token = m.group(1)
-    cookies = img_host_request.cookies
-    cookies.set("AGREE_CONSENT", "1", domain="jerking.empornium.ph", path="/")
-    cookies.set("CHV_COOKIE_LAW_DISPLAY", "0", domain="jerking.empornium.ph", path="/")
-    return img_host_token, cookies
-
-
 def is_webp_animated(path: str):
     with Image.open(path) as img:
         count = 0
-        for frame in ImageSequence.Iterator(img):
+        for _frame in ImageSequence.Iterator(img):
             count += 1
         return count > 1
 
@@ -342,8 +380,6 @@ def img_host_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
-        img_host_token: str,
-        cookies,
         host: str,
         max_size: int = 5_000_000
 ) -> str | None:
@@ -356,7 +392,7 @@ def img_host_upload(
         return None
 
     # Convert animated webp to gif
-    if img_mime_type == "image/webp":
+    if img_mime_type == "image/webp" and host != "hamster":
         if is_webp_animated(img_path):
             with Image.open(img_path) as img:
                 img_path = img_path.strip(image_ext) + "gif"
@@ -373,6 +409,7 @@ def img_host_upload(
 
     # Quick and dirty resize for images above max filesize
     if os.path.getsize(img_path) > max_size:
+        logger.debug("Resizing image")
         CMD = ["ffmpeg", "-i", img_path, "-vf", "scale=iw:ih", "-y", img_path]
         proc = subprocess.run(CMD, stderr=subprocess.PIPE, stdout=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
@@ -383,18 +420,17 @@ def img_host_upload(
         logger.debug(f"Resized {img_path}")
 
     match host:
-        case "jerking":
-            return jerking_upload(img_path, img_mime_type, image_ext, img_host_token, cookies)
+        case "hamster":
+            return hamster_upload(img_path, img_mime_type, image_ext)
         case "imgbox":
-            return imgbox_upload(img_path, img_mime_type, image_ext)
+            return imgbox_upload(img_path)
+    return None
 
 
-def jerking_upload(
+def hamster_upload(
         img_path: str,
         img_mime_type: str,
         image_ext: str,
-        img_host_token: str,
-        cookies,
 ) -> str | None:
     files = {
         "source": (
@@ -404,43 +440,38 @@ def jerking_upload(
         )
     }
     request_body = {
-        "thumb_width": 160,
-        "thumb_height": 160,
-        "thumb_crop": False,
-        "medium_width": 800,
-        "medium_crop": "false",
         "type": "file",
         "action": "upload",
-        "timestamp": int(time.time() * 1e3),  # Time in milliseconds
-        "auth_token": img_host_token,
-        "nsfw": 0,
+        "nsfw": 1,
+        "format": "json",
     }
     headers = {
         "accept": "application/json",
-        "origin": "https://jerking.empornium.ph",
-        "referer": "https://jerking.empornium.ph/",
+        "X-API-Key": conf.get("hamster", "api_key", default=""),
     }
-    url = "https://jerking.empornium.ph/json"
-    response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
+
+    if headers["X-API-Key"] == "":
+        logger.error("No API key provided for hamster.is Please go to https://hamster.is/settings/api to get one")
+        return None
+
+    url = "https://hamster.is/api/1/upload"
+    response = requests.post(url, files=files, data=request_body, headers=headers)
     j = None
     try:
         j = response.json()
         assert "error" not in j
+        url: str = j["image"]["url"]
+        return url
     except AssertionError:
-        logger.debug("Error uploading image, retrying connection")
-        connection_init()
-        response = requests.post(url, files=files, data=request_body, cookies=cookies, headers=headers)
-        if j and "error" in j:
-            logger.error(f"Error uploading image: {response.json()['error']['message']}")
-            return None
-    url: str = response.json()["image"]["image"]["url"]
-    return url
+        logger.error("Error uploading image: " + j["error"]["message"])
+    except JSONDecodeError:
+        logger.error("Error uploading image, invalid JSON in response")
+        logger.debug(f"Response: {response.text}")
+    return None
 
 
 def imgbox_upload(
-        img_path: str,
-        img_mime_type: str,
-        image_ext: str):
+        img_path: str):
     async def upload(path: str):
         async with pyimgbox.Gallery(adult=True) as gallery:
             submission: pyimgbox.Submission = await gallery.upload(path)
@@ -468,8 +499,6 @@ def generate_screen(path: str, seek: str) -> str:
         screen_file[1],
     ]
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    # url, digest = self.jerking_upload(screen_file[1], "image/jpeg", "jpg")
-    # return jerking_upload(screen_file[1], "image/jpeg", "jpg", img_host_token, cookies)
     return screen_file[1]
 
 
@@ -488,7 +517,6 @@ def createContactSheet(files: list[str], target_width: int, row_height: int, out
     total_height = 0
 
     for file in files:
-        img = None
         try:
             with Image.open(file) as img:
                 w = img.width

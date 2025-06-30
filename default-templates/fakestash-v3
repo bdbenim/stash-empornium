@@ -1,4 +1,4 @@
-{# 20231112 -#}
+{# 20250620 -#}
 [bg=#202b33][color=#F5F8FA][font=Helvetica][table=nopad,nball,vat][tr][td=#202b33][/td]
 
 
@@ -7,15 +7,15 @@
 [center][img=100]{{ studio_logo }}[/img][/center]
 {% if date %}
 [size=4][font=Arial Black]{{title}}[/font][/size]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{date}}
+[imgnm]{{pad}}[/imgnm]{{date}}
 {% endif %}
 {% if details %}
 [b]Details[/b]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{details}}
+[imgnm]{{pad}}[/imgnm]{{details}}
 {% endif %}
 
 [b]Includes[/b]
-[imgnm]https://jerking.empornium.ph/images/2023/03/10/pad.png[/imgnm]{{sex_acts}}
+[imgnm]{{pad}}[/imgnm]{{sex_acts}}
 
 
 [b]Performers[/b][br]

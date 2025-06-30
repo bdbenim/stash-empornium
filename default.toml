@@ -9,9 +9,6 @@ torrent_directories = ["/torrents"]
 port = 9932
 ## jinja template for title
 ## see README.md for available variables
-## Uncomment this title for Whisparr compatibility
-#title_template = {{ studio|replace(' ', '')|replace('[^a-zA-Z0-9]', '') }} - {{ date.split('-')[0][-2:] }}.{{ date.split('-')[1] }}.{{ date.split('-')[2] }} - {{ title }} - {{performers|join(', ')}} - {{ codec }} - WEBDL - {{ resolution }}
-## Uncomment this title for Classic EMP template
 title_template = '{% if studio %}[{{studio}}] {% endif %}{{performers|join(", ")}}{% if performers %} - {% endif %}{{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]'
 # Date format for title release - https://strftime.org/ for reference
 date_format = "%Y-%m-%d"
@@ -25,6 +22,14 @@ move_method = 'copy'
 use_preview = false
 ## Use the preview GIF as the upload cover. Ignored if 'use_preview' is false
 animated_cover = true
+## Log level [DEBUG | INFO | WARNING | ERROR | CRITICAL]
+log_level = "INFO"
+## Dimensions of generated contact sheets
+contact_sheet_layout = "3x6"
+
+#[hamster]
+## This can be generated at https://hamster.is/settings/api
+#api_key = ""
 
 # [rtorrent]
 ## Hostname or IP address
