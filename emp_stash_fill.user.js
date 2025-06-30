@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
+// @version      1.2.0
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -30,6 +30,9 @@
 // ==/UserScript==
 
 // Changelog:
+// v1.2.0
+//  - Receive .torrent file separately from the rest of the submission to ensure template is always filled in
+//  - Fix a bug where the torrent is sometimes not started when submitting the upload form
 // v1.1.3
 //  - Add case for happyfappy.org as possible fix for wrong image host
 // v1.1.2
@@ -641,7 +644,6 @@ async function popJob() {
                                                 };
                                                 r.open("POST", new URL("/upload.php", window.location).href);
                                                 r.responseType = "text";
-                                                r.send(formdata);
 
                                                 GM_xmlhttpRequest({
                                                     method: "POST",
@@ -652,6 +654,7 @@ async function popJob() {
                                                         torrent_path: j.data.fill.torrent_path,
                                                     }),
                                                 });
+                                                r.send(formdata);
                                             });
                                         }
                                     } else if (j.status === "error") {
