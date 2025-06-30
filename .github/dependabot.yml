@@ -1,6 +1,6 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -12,4 +12,7 @@ updates:
       python-packages:
         patterns:
         - "*"
-      
+    ignore:
+      - dependency-name: "pillow"
+        # 11.0.0 seems to break vcsi
+        versions: ["11"]
