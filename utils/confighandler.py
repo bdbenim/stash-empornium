@@ -148,7 +148,7 @@ class ConfigHandler(Singleton):
 
     def update_file(self) -> None:
         with open(self.config_file, "w") as f:
-                        tomlkit.dump(self.conf, f)
+            tomlkit.dump(self.conf, f)
         with open(self.tag_config_file, "w") as f:
             tomlkit.dump(self.tag_conf, f)
 
