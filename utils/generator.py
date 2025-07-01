@@ -607,12 +607,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         },
     }
 
-    with open(torrent_paths[0], "rb") as f:
-        result["data"]["file"] = {
-            "name": os.path.basename(f.name),
-            "content": str(base64.b64encode(f.read()).decode("ascii")),
-        }
-
     logger.debug(f"Sending {len(tag_suggestions)} suggestions")
     if len(tag_suggestions) > 0:
         result["data"]["suggestions"] = dict(tag_suggestions)

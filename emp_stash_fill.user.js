@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
+// @version      1.2.0
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -30,6 +30,11 @@
 // ==/UserScript==
 
 // Changelog:
+// v1.2.0
+//  - Receive .torrent file separately from the rest of the submission to ensure upload form is always filled in
+//  - Make torrent downloadable after upload form is filled in
+//  - Fix a bug where the torrent is sometimes not started when submitting the upload form
+//  - Receiving .torrent file as base64-encoded text is deprecated and will be removed in next major release
 // v1.1.3
 //  - Add case for happyfappy.org as possible fix for wrong image host
 // v1.1.2
@@ -111,6 +116,24 @@ var graphql = {
 
 if (STASH_API_KEY !== null) {
     graphql.headers.apiKey = STASH_API_KEY;
+}
+
+const textToBlob = (content, contentType = "", sliceSize = 512) => {
+    const byteArrays = [];
+
+    for (let offset = 0; offset < content.length; offset += sliceSize) {
+        const slice = content.slice(offset, offset + sliceSize);
+
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+    }
+
+    return new Blob(byteArrays, { type: contentType });
 }
 
 const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
@@ -212,16 +235,49 @@ async function popJob() {
     return job;
 }
 
+function attachFile(blob, filename, submitBtn) {
+    // Temporary for debugging. Replace the button each time
+    // so that we don't add multiple copies of the listener
+    // function to the same button.
+    let newBtn = submitBtn.cloneNode();
+    newBtn.disabled = false;
+    submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+    newBtn.addEventListener("click", () => {
+        newBtn.disabled = true;
+        let formel = document.getElementById("upload_table");
+        let formdata = new FormData(formel);
+        formdata.set("file_input", blob, filename);
+        console.debug(formdata);
+        const r = new XMLHttpRequest();
+        r.onreadystatechange = function () {
+            if (r.readyState === XMLHttpRequest.DONE) {
+                document.open();
+                document.write(r.responseText);
+                document.close();
+            }
+        };
+        r.open("POST", new URL("/upload.php", window.location).href);
+        r.responseType = "text";
+
+        GM_xmlhttpRequest({
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            url: new URL("/submit", BACKEND).href,
+            responseType: "json",
+            data: JSON.stringify({
+                torrent_path: j.data.fill.torrent_path,
+            }),
+        });
+        r.send(formdata);
+    });
+}
+
 
 (function () {
     "use strict";
 
-    // Migrate to allow storing announce URLs of other trackers
-    let old_key = GM_getValue("announceURL", null);
-    if (old_key) {
-        GM_deleteValue("announceURL");
-        GM_setValue("EMP_URL", old_key);
-    }
+    let scriptInfo = GM_info;
+    console.log("emp_stash_fill.user.js version " + scriptInfo.script.version);
 
     // if (location.hostname === "www.empornium.is" || location.hostname === "www.empornium.sx") {
     if (unsafeWindow.TRACKERS.includes(location.hostname)) {
@@ -374,10 +430,19 @@ async function popJob() {
                                             this.context.tags.value = j.data.fill.tags;
                                             this.context.cover.value = j.data.fill.cover;
                                             this.context.title.value = j.data.fill.title;
+
+                                            let torrentPath = j.data.fill.torrent_path;
+                                            let torrentName = torrentPath.split("/");
+                                            torrentName = torrentName[torrentName.length - 1];
+                                            if (!torrentPath.startsWith("/")) {
+                                                torrentPath = "/" + torrentPath;
+                                            }
+                                            let torrentUrl = new URL("/torrent" + torrentPath, BACKEND).href;
+
                                             let instructions = "";
                                             instructions += "Instructions:<ol>";
                                             instructions += "<li>Set a category for the upload and double-check everything for correctness</li>";
-                                            instructions += '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><input type="text" value="' + j.data.fill.torrent_path + '" disabled></div></li>';
+                                            instructions += '<li>Make sure the generated torrent is in your torrent client, and attach it to the upload form manually as usual:<div><a href="' + torrentUrl + '">' + j.data.fill.torrent_path + '</a></div></li>';
                                             instructions += '<li>Make sure the media file is in the torrents path of your torrent client:<div><input type="text" value="' + j.data.fill.file_path + '" disabled></div></li>';
                                             instructions += "</ol>";
                                             this.context.instructions.innerHTML = instructions;
@@ -397,44 +462,6 @@ async function popJob() {
                                                     }
                                                 }
                                             }
-
-                                            if ("file" in j.data) {
-                                                // Temporary for debugging. Replace the button each time
-                                                // so that we don't add multiple copies of the listener
-                                                // function to the same button.
-                                                let newBtn = submitBtn.cloneNode();
-                                                newBtn.disabled = false;
-                                                submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-                                                newBtn.addEventListener("click", () => {
-                                                    newBtn.disabled = true;
-                                                    let formel = document.getElementById("upload_table");
-                                                    let formdata = new FormData(formel);
-                                                    formdata.set("file_input", b64toBlob(j.data.file.content, "application/x-bittorrent"), j.data.file.name);
-                                                    console.debug(formdata);
-                                                    const r = new XMLHttpRequest();
-                                                    r.onreadystatechange = function () {
-                                                        if (r.readyState === XMLHttpRequest.DONE) {
-                                                            document.open();
-                                                            document.write(r.responseText);
-                                                            document.close();
-                                                        }
-                                                    };
-                                                    r.open("POST", new URL("/upload.php", window.location).href);
-                                                    r.responseType = "text";
-                                                    r.send(formdata);
-
-                                                    GM_xmlhttpRequest({
-                                                        method: "POST",
-                                                        headers: {"Content-Type": "application/json"},
-                                                        url: new URL("/submit", BACKEND).href,
-                                                        responseType: "json",
-                                                        data: JSON.stringify({
-                                                            torrent_path: j.data.fill.torrent_path,
-                                                        }),
-                                                    });
-                                                });
-                                            }
-
                                             if ("suggestions" in j.data) {
                                                 let parent = document.getElementsByClassName("thin")[0];
 
@@ -655,6 +682,28 @@ async function popJob() {
                                                 parent.insertBefore(body, parent.children[7]);
                                                 parent.insertBefore(head, body);
                                             }
+
+                                            // Download the torrent file:
+                                            GM_xmlhttpRequest({
+                                                method: "GET",
+                                                url: torrentUrl,
+                                                fetch: true,
+                                                onreadystatechange: function (response) {
+                                                    if (response.readyState === XMLHttpRequest.DONE) {
+                                                        if (response.status === 200) {
+                                                            let content = response.responseText;
+                                                            let blob = textToBlob(content, "application/x-bittorrent");
+                                                            attachFile(blob, torrentName, submitBtn);
+                                                        }
+                                                    }
+                                                }
+                                            })
+
+                                        }
+                                        if ("file" in j.data) {
+                                            // Deprecated. Maintains compatibility with stash-empornium v
+                                            let blob = b64toBlob(j.data.file.content, "application/x-bittorrent");
+                                            attachFile(blob, j.data.file.name, submitBtn);
                                         }
                                     } else if (j.status === "error") {
                                         this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
