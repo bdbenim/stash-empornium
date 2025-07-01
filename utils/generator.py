@@ -591,7 +591,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     result = {
         "status": "success",
         "data": {
-            "message": "Almost done",
+            "message": "Done",
             "fill": {
                 "title": title,
                 "cover": preview_url
@@ -610,23 +610,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     if len(tag_suggestions) > 0:
         result["data"]["suggestions"] = dict(tag_suggestions)
 
-    yield json.dumps(result) + '\n'
-
-    result = {
-        "status": "success",
-        "data": {
-            "message": "Done",
-            "file": {}
-        }
-    }
-
-    with open(torrent_paths[0], "rb") as f:
-        result["data"]["file"] = {
-            "name": os.path.basename(f.name),
-            "content": str(base64.b64encode(f.read()).decode("ascii")),
-        }
-
-    logger.debug(f"Sending torrent file {torrent_paths[0]}")
     yield json.dumps(result) + '\n'
 
     for client in config.torrent_clients:

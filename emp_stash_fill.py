@@ -13,7 +13,7 @@ from concurrent.futures import Future
 
 # external
 from flask import (Flask, Response, redirect, request, stream_with_context,
-                   url_for)
+                   url_for, send_from_directory)
 from flask_bootstrap import Bootstrap5
 from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
@@ -127,6 +127,14 @@ def submit_job():
     j = request.get_json()
     job_id = generator.add_job(j)
     return json.dumps({"id": job_id})
+
+@app.route("/torrent/<path:filename>", methods=["GET"])
+@csrf.exempt
+def get_torrent(filename: str):
+    logger.debug(f"Got filename {filename}")
+    torrent_name = os.path.basename(filename)
+    logger.info(f"Serving {torrent_name}")
+    return send_from_directory(config.torrent_dirs[0], torrent_name, as_attachment=True)
 
 
 @app.route("/templates")
