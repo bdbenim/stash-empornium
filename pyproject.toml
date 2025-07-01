@@ -16,6 +16,7 @@ dependencies = [
     "redis[hiredis]==6.2.*",
     "requests==2.32.*",
     "tomlkit==0.13.*",
+    "transmission-rpc>=7.0.11",
     "vcsi==7.0.*",
     "waitress==3.0.*",
 ]

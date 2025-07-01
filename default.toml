@@ -79,6 +79,25 @@ contact_sheet_layout = "3x6"
 # [qbittorrent.pathmaps]
 # "/stash-empornium/path" = "/qbittorrent/path"
 
+# [transmission]
+## Hostname or IP address
+#host = "127.0.0.1"
+## Port number
+#port = 9091
+## Set to true for https
+#ssl = false
+## API path
+#path = "/transmission/rpc"
+## Username for API
+#username = "admin"
+## Password for API
+#password = "adminadmin"
+## Equivalent to QBittorrent "category"
+#label = "stash-empornium"
+
+# [transmission.pathmaps]
+#"/stash-empornium/path" = "/transmission/path"
+
 #[redis]
 #host = "localhost"
 #port = 6379
