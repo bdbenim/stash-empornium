@@ -236,6 +236,19 @@ def settings(page):
                 ssl=conf.get(page, "ssl", False),
                 maps=conf.get(page, "pathmaps", {})
             )
+        case "transmission":
+            template_context["settings_option"] = "your Transmission client"
+            form = RTorrentSettings(
+                enable_form=enable,
+                host=conf.get(page, "host", ""),
+                port=conf.get(page, "port", ""),
+                username=conf.get(page, "username", ""),
+                password=conf.get(page, "password", ""),
+                path=conf.get(page, "path", "/transmission/rpc"),
+                label=conf.get(page, "label", ""),
+                ssl=conf.get(page, "ssl", False),
+                maps=conf.get(page, "pathmaps", {})
+            )
         case "files":
             template_context["settings_option"] = "stash path mappings"
             form = FileMapForm(maps=conf.get("file", "maps"))
@@ -300,7 +313,7 @@ def settings(page):
                 else:
                     if page in conf:
                         conf.set(page, "disable", True)
-            case "rtorrent" | "deluge" | "qbittorrent":
+            case "rtorrent" | "deluge" | "qbittorrent" | "transmission":
                 assert isinstance(form, TorrentSettings)
                 path = form.update_self()
                 if path:
