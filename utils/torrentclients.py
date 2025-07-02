@@ -1,16 +1,20 @@
-from loguru import logger
-from utils.paths import mapPath
-from utils import bencoder
 import os
 from xmlrpc import client
+
 import requests
+from loguru import logger
+from transmission_rpc import Client as TransmissionClient, TransmissionConnectError
+from webencodings import labels
+
+from utils import bencoder
+from utils.paths import mapPath
 
 
 class TorrentClient:
     "Base torrent client class"
     pathmaps: dict[str, str] = {}
     hashes: dict[str, str] = {}
-    label: str = ""
+    label: str | None = None
     name: str = "Torrent Client"
 
     def __init__(self, settings: dict) -> None:
@@ -26,10 +30,10 @@ class TorrentClient:
 
     def start(self, torrent_path: str) -> None:
         raise NotImplementedError()
-    
+
     def resume(self, infohash: str):
         raise NotImplementedError()
-    
+
     def connected(self) -> bool:
         return True
 
@@ -44,7 +48,6 @@ class RTorrent(TorrentClient):
     def __init__(self, settings: dict) -> None:
         super().__init__(settings)
         userstring = ""
-        safe_userstring = ""
         if "username" in settings and len(settings["username"]) > 0:
             userstring = settings["username"]
             safe_userstring = userstring
@@ -83,10 +86,10 @@ class RTorrent(TorrentClient):
     def start(self, torrent_path: str) -> None:
         if torrent_path in RTorrent.hashes:
             self.resume(RTorrent.hashes[torrent_path])
-    
+
     def resume(self, infohash: str):
         self.server.d.start(infohash.upper())
-    
+
     def connected(self) -> bool:
         try:
             self.server.system.listMethods()
@@ -138,7 +141,7 @@ class Qbittorrent(TorrentClient):
         if len(self.label) > 0:
             options["category"] = self.label
         with open(torrent_path, "rb") as f:
-            files={"torrents": (torrent_name, f, "application/x-bittorrent")}
+            files = {"torrents": (torrent_name, f, "application/x-bittorrent")}
             r = self._post("/torrents/add", options, files=files, timeout=15)
         if r.ok and r.content.decode() != "Fails.":
             self.recheck(hash)
@@ -155,14 +158,14 @@ class Qbittorrent(TorrentClient):
         if not self.logged_in or torrent_path not in Qbittorrent.hashes:
             return
         self.resume(Qbittorrent.hashes[torrent_path])
-    
+
     def resume(self, infohash: str):
         self._post("/torrents/start", {"hashes": infohash})
-    
-    def _post(self, path: str, data: dict, files:dict|None = None, timeout: int = 5) -> requests.Response:
-        r = requests.post(self.url+path, data=data, cookies=self.cookies, timeout=timeout, files=files)
+
+    def _post(self, path: str, data: dict, files: dict | None = None, timeout: int = 5) -> requests.Response:
+        r = requests.post(self.url + path, data=data, cookies=self.cookies, timeout=timeout, files=files)
         return r
-    
+
     def connected(self) -> bool:
         return self.logged_in
 
@@ -281,3 +284,55 @@ class Deluge(TorrentClient):
     def start(self, torrent_path: str) -> None:
         if torrent_path in Deluge.hashes:
             self.resume(Deluge.hashes[torrent_path])
+
+
+class Transmission(TorrentClient):
+    """Uses Transmission's JSON-RPC protocol to
+    allow adding torrents"""
+
+    c: TransmissionClient
+    name = "Transmission"
+    torrents: dict[str, int] = {}
+
+    def __init__(self, settings: dict) -> None:
+        super().__init__(settings)
+        username = settings["username"] if "username" in settings else None
+        password = settings["password"] if "password" in settings else None
+        host = settings["host"]
+        ssl = settings["ssl"]
+        if "port" not in settings:
+            port = 443 if ssl else 9091
+        else:
+            port = settings["port"]
+        protocol = "https" if ssl else "http"
+        path = settings["path"] if "path" in settings else "/transmission/rpc"
+        logger.debug(f"Connecting to Transmission at '{host}:{port}'")
+        self.c = TransmissionClient(protocol=protocol, host=host, port=port, username=username, password=password,
+                                    path=path)
+
+    def add(self, torrent_path: str, file_path: str) -> None:
+        super().add(torrent_path, file_path)
+        file_path = mapPath(file_path, self.pathmaps)
+        directory = os.path.split(file_path)[0]
+
+        with open(torrent_path, "rb") as f:
+            logger.debug(f"Adding torrent {torrent_path} to directory {directory}")
+            torrent = self.c.add_torrent(f, download_dir=directory, paused=True, labels=[self.label] if self.label else None)
+            self.torrents[TorrentClient.hashes[torrent_path]] = torrent.id
+        logger.info("Torrent added to Transmission")
+        logger.debug(f"Torrent id: {torrent.id}")
+        self.c.verify_torrent(torrent.id)
+
+    def start(self, torrent_path: str) -> None:
+        if torrent_path in TorrentClient.hashes:
+            self.resume(TorrentClient.hashes[torrent_path])
+
+    def resume(self, infohash: str):
+        self.c.start_torrent(self.torrents[infohash])
+
+    def connected(self) -> bool:
+        try:
+            self.c.session_stats()
+            return True
+        except TransmissionConnectError:
+            return False

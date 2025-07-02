@@ -48,8 +48,8 @@ class TorrentConfig(BaseModel):
 
 class RTorrentConfig(TorrentConfig):
     path: str = "RPC2"
-    username: Optional[str] = "user"
-    password: Optional[str] = "password"
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 
 class DelugeConfig(TorrentConfig):
@@ -57,6 +57,11 @@ class DelugeConfig(TorrentConfig):
 
 class QBittorrentConfig(TorrentConfig):
     pass
+
+class TransmissionConfig(TorrentConfig):
+    path: str = "/transmission/rpc"
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 class RedisConfig(BaseModel):
     host: str = "localhost"
@@ -86,6 +91,7 @@ class Config(BaseModel):
     hamster: Optional[HamsterConfig] = None
     rtorrent: Optional[RTorrentConfig] = None
     deluge: Optional[DelugeConfig] = None
+    transmission: Optional[TransmissionConfig] = None
     redis: Optional[RedisConfig] = None
     metadata: MetadataConfig
     performers: PerformersConfig

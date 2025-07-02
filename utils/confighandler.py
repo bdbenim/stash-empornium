@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from utils.models import Config
 from utils.customtypes import CaseInsensitiveDict, Singleton
-from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent
+from utils.torrentclients import TorrentClient, Deluge, Qbittorrent, RTorrent, Transmission
 
 LOG_MESSAGE_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan> - <level>{message}</level>"
 DEBUG_MESSAGE_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
@@ -366,7 +366,7 @@ class ConfigHandler(Singleton):
 
     def configure_torrents(self) -> None:
         self.torrent_clients.clear()
-        clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent}
+        clients = {"rtorrent": RTorrent, "deluge": Deluge, "qbittorrent": Qbittorrent, "transmission": Transmission}
         for client, clientType in clients.items():
             assert issubclass(clientType, TorrentClient)
             try:
@@ -374,10 +374,13 @@ class ConfigHandler(Singleton):
                     settings = dict(self.conf[client])  # type: ignore
                     tc = clientType(settings)
                     if tc.connected():
+                        logger.debug(f"Connected to {client}")
                         self.torrent_clients.append(tc)
                     else:
                         logger.error(f"Could not connect to {client}")
-            except:
+            except Exception as e:
+                logger.error(f"Could not connect to {client}")
+                logger.debug(f"Exception: {e}")
                 pass
         logger.debug(f"Configured {len(self.torrent_clients)} torrent client(s)")
 
