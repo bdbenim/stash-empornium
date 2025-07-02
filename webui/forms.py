@@ -156,6 +156,10 @@ class DelugeSettings(TorrentSettings):
     path = None
 
 
+class TransmissionSettings(TorrentSettings):
+    pass
+
+
 class StashSettings(FlaskForm):
     url = URLField("URL", validators=[URL(require_tld=False), DataRequired()])
     api_key = PasswordField("API Key", validators=[Optional()])
@@ -328,6 +332,7 @@ class CategoryList(FlaskForm):
         self.__init__(formdata=None, **read_form_data)
         self.validate()  # the errors on validation are cancelled in the line above
         return category
+
 
 class HamsterForm(FlaskForm):
     api_key = StringField(
