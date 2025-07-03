@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.2.1
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -30,6 +30,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v1.2.1
+//  - Fix error when uploading torrent file from script
 // v1.2.0
 //  - Receive .torrent file separately from the rest of the submission to ensure upload form is always filled in
 //  - Make torrent downloadable after upload form is filled in
@@ -235,7 +237,7 @@ async function popJob() {
     return job;
 }
 
-function attachFile(blob, filename, submitBtn) {
+function attachFile(blob, filename, submitBtn, torrent_path) {
     // Temporary for debugging. Replace the button each time
     // so that we don't add multiple copies of the listener
     // function to the same button.
@@ -265,7 +267,7 @@ function attachFile(blob, filename, submitBtn) {
             url: new URL("/submit", BACKEND).href,
             responseType: "json",
             data: JSON.stringify({
-                torrent_path: j.data.fill.torrent_path,
+                torrent_path: filename,
             }),
         });
         r.send(formdata);
