@@ -237,10 +237,11 @@ async function popJob() {
     return job;
 }
 
-function attachFile(blob, filename, submitBtn, torrent_path) {
-    // Temporary for debugging. Replace the button each time
-    // so that we don't add multiple copies of the listener
-    // function to the same button.
+function attachFile(blob, filename) {
+    // Replace the button each time so that we don't
+    // add multiple copies of the listener function
+    // to the same button if the script is rerun.
+    let submitBtn = document.getElementById("autoupload");
     let newBtn = submitBtn.cloneNode();
     newBtn.disabled = false;
     submitBtn.parentNode.replaceChild(newBtn, submitBtn);
@@ -690,12 +691,12 @@ function attachFile(blob, filename, submitBtn, torrent_path) {
                                                 method: "GET",
                                                 url: torrentUrl,
                                                 fetch: true,
+                                                responseType: "blob",
                                                 onreadystatechange: function (response) {
                                                     if (response.readyState === XMLHttpRequest.DONE) {
                                                         if (response.status === 200) {
-                                                            let content = response.responseText;
-                                                            let blob = textToBlob(content, "application/x-bittorrent");
-                                                            attachFile(blob, torrentName, submitBtn);
+                                                            let blob = response.response;
+                                                            attachFile(blob, torrentName);
                                                         }
                                                     }
                                                 }
@@ -705,7 +706,7 @@ function attachFile(blob, filename, submitBtn, torrent_path) {
                                         if ("file" in j.data) {
                                             // Deprecated. Maintains compatibility with stash-empornium v
                                             let blob = b64toBlob(j.data.file.content, "application/x-bittorrent");
-                                            attachFile(blob, j.data.file.name, submitBtn);
+                                            attachFile(blob, j.data.file.name);
                                         }
                                     } else if (j.status === "error") {
                                         this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
