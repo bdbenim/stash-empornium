@@ -6,7 +6,6 @@ __version__ = "0.22.0"
 
 # built-in
 import json
-from loguru import logger
 import os
 import time
 from concurrent.futures import Future
@@ -17,6 +16,7 @@ from flask import (Flask, Response, redirect, request, stream_with_context,
 from flask_bootstrap import Bootstrap5
 from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
+from loguru import logger
 
 # included
 from utils import db, generator, taghandler
@@ -31,7 +31,6 @@ ODBL_NOTICE = ("Contains information from https://github.com/mledoze/countries w
                "Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE")
 
 config = ConfigHandler()
-# logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
@@ -127,6 +126,7 @@ def submit_job():
     j = request.get_json()
     job_id = generator.add_job(j)
     return json.dumps({"id": job_id})
+
 
 @app.route("/torrent/<path:filename>", methods=["GET"])
 @csrf.exempt
