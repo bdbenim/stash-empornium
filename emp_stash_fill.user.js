@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Stash upload helper
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.2.1
 // @description  This script helps create an upload for empornium based on a scene from your local stash instance.
 // @author       bdbenim
 // @match        https://www.empornium.sx/upload.php*
@@ -30,6 +30,8 @@
 // ==/UserScript==
 
 // Changelog:
+// v1.2.1
+//  - Fix error when uploading torrent file from script
 // v1.2.0
 //  - Receive .torrent file separately from the rest of the submission to ensure upload form is always filled in
 //  - Make torrent downloadable after upload form is filled in
@@ -235,10 +237,11 @@ async function popJob() {
     return job;
 }
 
-function attachFile(blob, filename, submitBtn) {
-    // Temporary for debugging. Replace the button each time
-    // so that we don't add multiple copies of the listener
-    // function to the same button.
+function attachFile(blob, filename) {
+    // Replace the button each time so that we don't
+    // add multiple copies of the listener function
+    // to the same button if the script is rerun.
+    let submitBtn = document.getElementById("autoupload");
     let newBtn = submitBtn.cloneNode();
     newBtn.disabled = false;
     submitBtn.parentNode.replaceChild(newBtn, submitBtn);
@@ -265,7 +268,7 @@ function attachFile(blob, filename, submitBtn) {
             url: new URL("/submit", BACKEND).href,
             responseType: "json",
             data: JSON.stringify({
-                torrent_path: j.data.fill.torrent_path,
+                torrent_path: filename,
             }),
         });
         r.send(formdata);
@@ -688,12 +691,12 @@ function attachFile(blob, filename, submitBtn) {
                                                 method: "GET",
                                                 url: torrentUrl,
                                                 fetch: true,
+                                                responseType: "blob",
                                                 onreadystatechange: function (response) {
                                                     if (response.readyState === XMLHttpRequest.DONE) {
                                                         if (response.status === 200) {
-                                                            let content = response.responseText;
-                                                            let blob = textToBlob(content, "application/x-bittorrent");
-                                                            attachFile(blob, torrentName, submitBtn);
+                                                            let blob = response.response;
+                                                            attachFile(blob, torrentName);
                                                         }
                                                     }
                                                 }
@@ -703,7 +706,7 @@ function attachFile(blob, filename, submitBtn) {
                                         if ("file" in j.data) {
                                             // Deprecated. Maintains compatibility with stash-empornium v
                                             let blob = b64toBlob(j.data.file.content, "application/x-bittorrent");
-                                            attachFile(blob, j.data.file.name, submitBtn);
+                                            attachFile(blob, j.data.file.name);
                                         }
                                     } else if (j.status === "error") {
                                         this.context.statusArea.innerHTML = "<span style='color: red;'>" + j.message + "</span>";
