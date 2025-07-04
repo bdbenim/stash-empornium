@@ -9,7 +9,7 @@ torrent_directories = ["/torrents"]
 port = 9932
 ## jinja template for title
 ## see README.md for available variables
-title_template = '{% if studio %}[{{studio}}] {% endif %}{{performers|join(", ")}}{% if performers %} - {% endif %}{{title}} {% if date %}({{date}}){% endif %}[{{resolution}}]'
+title_template = "{% if studio %}[{{studio}}] {% endif %}{{ (performers|length == 0 and '' or performers|length == 1 and performers[0] or performers|length == 2 and performers[0] ~ ' & ' ~ performers[1] or performers[:-1]|join(', ') ~ ' & ' ~ performers[-1]) | safe }}{% if performers %} - {% endif %}{{title}} {% if date %}({{date}}) {% endif %}[{{resolution}}]"
 # Date format for title release - https://strftime.org/ for reference
 date_format = "%Y-%m-%d"
 ## Set to 'true' to enable anonymous uploading
@@ -17,7 +17,7 @@ anon = false
 ## Where to save media for torrents with more than one file:
 # media_directory = "/torrents"
 ## How to move files to media_directory. Must be 'copy', 'hardlink', or 'symlink'
-move_method = 'copy'
+move_method = "copy"
 ## Upload a GIF preview of the scene
 use_preview = false
 ## Use the preview GIF as the upload cover. Ignored if 'use_preview' is false
@@ -31,55 +31,55 @@ contact_sheet_layout = "3x6"
 ## This can be generated at https://hamster.is/settings/api
 #api_key = ""
 
-# [rtorrent]
+#[rtorrent]
 ## Hostname or IP address
-# host = "localhost"
+#host = "localhost"
 ## Port number
-# port = 8080
+#port = 8080
 ## Set to true for https
-# ssl = false
+#ssl = false
 ## API path, typically "XMLRPC" or "RPC2"
-# path = "RPC2"
+#path = "RPC2"
 ## Username for XMLRPC if applicable (may be different from webui)
-# username = "user"
+#username = "user"
 ## Password for XMLRPC if applicable (may be different from webui)
-# password = "password"
-# label = "stash-empornium"
+#password = "password"
+#label = "stash-empornium"
 
-# [rtorrent.pathmaps]
-# "/stash-empornium/path" = "/rtorrent/path"
+#[rtorrent.pathmaps]
+#"/stash-empornium/path" = "/rtorrent/path"
 
-# [deluge]
+#[deluge]
 ## Hostname or IP address
-# host = "127.0.0.1"
+#host = "127.0.0.1"
 ## Port number
-# port = 8112
+#port = 8112
 ## Set to true for https
-# ssl = false
+#ssl = false
 ## Password for API
-# password = "deluge"
+#password = "deluge"
 
-# [deluge.pathmaps]
-# "/stash-empornium/path" = "/deluge/path"
+#[deluge.pathmaps]
+#"/stash-empornium/path" = "/deluge/path"
 
-# [qbittorrent]
+#[qbittorrent]
 ## Hostname or IP address
-# host = "127.0.0.1"
+#host = "127.0.0.1"
 ## Port number
-# port = 8080
+#port = 8080
 ## Set to true for https
-# ssl = false
+#ssl = false
 ## Username for API
-# username = "admin"
+#username = "admin"
 ## Password for API
-# password = "adminadmin"
+#password = "adminadmin"
 ## Equivalent to QBittorrent "category"
-# label = "stash-empornium"
+#label = "stash-empornium"
 
-# [qbittorrent.pathmaps]
-# "/stash-empornium/path" = "/qbittorrent/path"
+#[qbittorrent.pathmaps]
+#"/stash-empornium/path" = "/qbittorrent/path"
 
-# [transmission]
+#[transmission]
 ## Hostname or IP address
 #host = "127.0.0.1"
 ## Port number
@@ -95,7 +95,7 @@ contact_sheet_layout = "3x6"
 ## Equivalent to QBittorrent "category"
 #label = "stash-empornium"
 
-# [transmission.pathmaps]
+#[transmission.pathmaps]
 #"/stash-empornium/path" = "/transmission/path"
 
 #[redis]
@@ -120,14 +120,14 @@ tag_ethnicity = false
 tag_hair_color = false
 tag_eye_color = false
 
-# [performers.cup_sizes]
+#[performers.cup_sizes]
 ## Map EMP tags to cup sizes. Add a '-' to match sizes less than or equal to the specified
 ## size, or a '+' to match sizes greater or equal. Add neither for exact matches only.
-# "tiny.tits" = "A-"
-# "small.tits" = "B-"
-# "big.tits" = "D+"
-# "huge.tits" = "DD+"
-# "a.cup" = "A"
+#"tiny.tits" = "A-"
+#"small.tits" = "B-"
+#"big.tits" = "D+"
+#"huge.tits" = "DD+"
+#"a.cup" = "A"
 
 [templates]
 fakestash-v3 = "Stash / Fake video player v3 (by warblcoffin)"
