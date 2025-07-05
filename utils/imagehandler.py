@@ -509,8 +509,6 @@ def generate_screen(path: str, seek: str) -> str:
         path,
         "-frames:v",
         "1",
-        "-vf",
-        "scale=960:-2",
         screen_file[1],
     ]
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
