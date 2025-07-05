@@ -187,7 +187,7 @@ def settings(page):
                 tag_resolution = conf.get("metadata", "tag_resolution", False),
             )
         case "images":
-            template_context["settings_option"] = "your image"
+            template_context["settings_option"] = "your images"
             form = ImageSettings(
                 upload_gif=conf.get(page, "use_preview", False),
                 use_gif=conf.get(page, "animated_cover", False),

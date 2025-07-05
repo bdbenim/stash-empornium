@@ -11,7 +11,7 @@ from wtforms import (
     URLField,
     SelectMultipleField, IntegerField,
 )
-from wtforms.validators import URL, DataRequired, Optional
+from wtforms.validators import URL, DataRequired, Optional, NumberRange
 from wtforms.widgets import Input, PasswordInput
 
 from utils.db import StashTag, Category
@@ -82,7 +82,7 @@ class ImageSettings(FlaskForm):
     upload_gif = SwitchField("Upload Preview GIF")
     use_gif = SwitchField("Use GIF as Cover")
     contact_sheet_layout = StringField()
-    num_screens = IntegerField()
+    num_screens = IntegerField(validators=[NumberRange(min=1.0)])
     save = SubmitField()
 
 class RedisSettings(FlaskForm):
