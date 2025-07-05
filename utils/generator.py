@@ -381,7 +381,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     if gen_screens:
         screens_urls = images.generate_screens(stash_file=stash_file,
-                                               host=img_host)  # TODO customize number of screens from config
+                                               host=img_host)
         if screens_urls is None or None in screens_urls:
             yield error("Failed to generate screens")
             return
