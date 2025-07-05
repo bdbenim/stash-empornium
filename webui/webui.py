@@ -14,7 +14,7 @@ from webui.forms import (
     SearchForm,
     FileMapForm,
     TorrentSettings,
-    DBImportExport, HamsterForm
+    DBImportExport, HamsterForm, ImageSettings
 )
 
 from utils.confighandler import ConfigHandler
@@ -181,12 +181,18 @@ def settings(page):
                 move_method=conf.get(page, "move_method", "copy"),
                 anon=conf.get(page, "anon", False),
                 choices=[opt for opt in conf["templates"]],  # type: ignore
-                upload_gif=conf.get(page, "use_preview", False),
-                use_gif=conf.get(page, "animated_cover", False),
                 tag_codec = conf.get("metadata", "tag_codec", False),
                 tag_date = conf.get("metadata", "tag_date", False),
                 tag_framerate = conf.get("metadata", "tag_framerate", False),
                 tag_resolution = conf.get("metadata", "tag_resolution", False),
+            )
+        case "images":
+            template_context["settings_option"] = "your image"
+            form = ImageSettings(
+                upload_gif=conf.get(page, "use_preview", False),
+                use_gif=conf.get(page, "animated_cover", False),
+                contact_sheet_layout=conf.get(page, "contact_sheet_layout", ""),
+                num_screens=conf.get(page, "num_screens", 10),
             )
         case "stash":
             template_context["settings_option"] = "your stash server"
@@ -290,6 +296,11 @@ def settings(page):
                 conf.set(page, "anon", form.data["anon"])
                 # Show updated title example:
                 form.title_example.data = render_template_string(form.title_template.data, **DUMMY_CONTEXT)
+            case "images":
+                conf.set(page, "upload_gif", form.data["upload_gif"])
+                conf.set(page, "use_gif", form.data["use_gif"])
+                conf.set(page, "contact_sheet_layout", form.data["contact_sheet_layout"])
+                conf.set(page, "num_screens", form.data["num_screens"])
             case "stash":
                 conf.set(page, "url", form.data["url"])
                 if form.data["api_key"]:

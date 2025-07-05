@@ -47,7 +47,7 @@ conf = ConfigHandler()
 
 
 def save_failed_upload(path: str) -> None:
-    dir_name: str | None = conf.get("backend", "save_images")
+    dir_name: str | None = conf.get("images", "save_images")
     if dir_name is not None:
         prep_dir(dir_name)
         filename = os.path.basename(path)

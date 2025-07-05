@@ -450,6 +450,7 @@ class ConfigHandler(Singleton):
             "backend.contact_sheet_layout" : "images.contact_sheet_layout",
             "backend.use_preview": "images.use_preview",
             "backend.animated_cover": "images.animated_cover",
+            "backend.save_images": "images.save_images",
         }
         for key in renamed_settings.keys():
             logger.debug(f"Migrating {key} to {renamed_settings[key]}")
@@ -461,5 +462,4 @@ class ConfigHandler(Singleton):
                 self.conf[new_section][new_setting] = self.conf[section][setting]
                 self.delete(section, setting)
                 logger.warning("Migrated setting {} to {}".format(key, renamed_settings[key]))
-        self.update_file()
 
