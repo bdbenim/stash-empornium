@@ -291,7 +291,7 @@ class ImageHandler:
         cmds.clear()
         for path in paths:
             digests.append(getDigest(path))
-            cmds.append((path, "image/jpeg", "jpg", host, 5_000_000))
+            cmds.append((path, "image/jpeg", "jpg", host))
         logger.debug(f"Digests: {digests}")
         with Pool() as p:
             screens = p.starmap(img_host_upload, cmds)
@@ -331,7 +331,7 @@ class ImageHandler:
                 return url, digest
             else:
                 print(f"Skipping url {url}")
-        url = img_host_upload(img_path, img_mime_type, image_ext, host, 5_000_000)
+        url = img_host_upload(img_path, img_mime_type, image_ext, host)
         if url is not None:
             self.add(digest, host, url)
             return url, digest
@@ -387,11 +387,20 @@ def img_host_upload(
         img_mime_type: str,
         image_ext: str,
         host: str,
-        max_size: int = 5_000_000
+        max_size: int = 0
 ) -> str | None:
     """Upload an image and return the URL, or None if there is an error. Optionally takes
     a width, and scales the image down to that width if it is larger."""
     logger.debug(f"Uploading image from {img_path}")
+
+    if max_size == 0:
+        match host:
+            case "hamster":
+                max_size = 10_000_000
+            case "imgbox":
+                max_size = 5_000_000
+            case _:
+                max_size = 5_000_000
 
     # Return default image if unknown
     if image_ext == "unk":
@@ -500,8 +509,6 @@ def generate_screen(path: str, seek: str) -> str:
         path,
         "-frames:v",
         "1",
-        "-vf",
-        "scale=960:-2",
         screen_file[1],
     ]
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
