@@ -297,7 +297,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     preview_send: Connection
     preview_recv, preview_send = mp.Pipe(False)
     preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene, img_host))
-    if config.get("backend", "use_preview", False):
+    if config.get("images", "use_preview", False):
         preview_proc.start()
     # del preview_send  # Ensures connection can be automatically closed if garbage collected
 
@@ -381,7 +381,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     if gen_screens:
         screens_urls = images.generate_screens(stash_file=stash_file,
-                                               host=img_host)  # TODO customize number of screens from config
+                                               host=img_host)
         if screens_urls is None or None in screens_urls:
             yield error("Failed to generate screens")
             return
@@ -561,7 +561,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     }
 
     preview_url = None
-    if config.get("backend", "use_preview", False):
+    if config.get("images", "use_preview", False):
         preview_proc.join(timeout=60)
         try:
             preview_proc.close()
@@ -596,7 +596,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             "fill": {
                 "title": title,
                 "cover": preview_url
-                if preview_url and config.get("backend", "animated_cover", False)
+                if preview_url and config.get("images", "animated_cover", False)
                 else cover_remote_url,
                 "tags": " ".join(tags.tags),
                 "description": description,

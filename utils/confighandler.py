@@ -227,6 +227,7 @@ class ConfigHandler(Singleton):
             try:
                 with open(self.config_file) as f:
                     self.conf = tomlkit.load(f)
+                    self.migrate()
             except Exception as e:
                 logger.critical(f"Failed to read config file: {e}")
                 exit(1)
@@ -285,6 +286,7 @@ class ConfigHandler(Singleton):
         except Exception as e:
             logger.error(f"Failed to read tag config file: {e}")
         try:
+            # TODO warn about extra settings
             Config.model_validate(self.conf)
             self.backup_config()
             self.update_file()
@@ -442,3 +444,22 @@ class ConfigHandler(Singleton):
 
     def __getitem__(self, key: str):
         return self.conf.__getitem__(key) if self.conf.__contains__(key) else self.tag_conf.__getitem__(key)
+
+    def migrate(self):
+        renamed_settings = {
+            "backend.contact_sheet_layout" : "images.contact_sheet_layout",
+            "backend.use_preview": "images.use_preview",
+            "backend.animated_cover": "images.animated_cover",
+            "backend.save_images": "images.save_images",
+        }
+        for key in renamed_settings.keys():
+            logger.debug(f"Migrating {key} to {renamed_settings[key]}")
+            section, setting = key.split(".", 1)
+            new_section, new_setting = renamed_settings[key].split(".", 1)
+            if section in self.conf and setting in self.conf[section]:
+                if new_section not in self.conf:
+                    self.conf[new_section] = tomlkit.table()
+                self.conf[new_section][new_setting] = self.conf[section][setting]
+                self.delete(section, setting)
+                logger.warning("Migrated setting {} to {}".format(key, renamed_settings[key]))
+

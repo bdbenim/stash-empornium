@@ -1,7 +1,8 @@
 import re
 from typing import Optional, Literal, Annotated, TypeAlias
 
-from pydantic import BaseModel, Field, model_validator, BeforeValidator, AfterValidator
+from pydantic import BaseModel, Field, model_validator, BeforeValidator, AfterValidator, PositiveInt
+
 
 def not_empty(s: str) -> str:
     if s.strip() == "":
@@ -28,11 +29,14 @@ class BackendConfig(BaseModel):
     anon: bool = False
     media_directory: Optional[str] = None
     move_method: MoveMethod = "copy"
+    log_level: LogLevel = "INFO"
+    save_images: Optional[str] = None
+
+class ImageConfig(BaseModel):
     use_preview: bool = False
     animated_cover: bool = True
-    log_level: LogLevel = "INFO"
-    contact_sheet_layout: Annotated[str, AfterValidator(validate_layout_str)] = "3x6"
-    save_images: Optional[str] = None
+    widthcontact_sheet_layout: Annotated[str, AfterValidator(validate_layout_str)] = "3x6"
+    num_screens: PositiveInt
 
 class HamsterConfig(BaseModel):
     api_key: ApiKey
@@ -88,6 +92,7 @@ class StashConfig(BaseModel):
 
 class Config(BaseModel):
     backend: BackendConfig
+    images: ImageConfig
     hamster: Optional[HamsterConfig] = None
     rtorrent: Optional[RTorrentConfig] = None
     deluge: Optional[DelugeConfig] = None

@@ -47,7 +47,7 @@ conf = ConfigHandler()
 
 
 def save_failed_upload(path: str) -> None:
-    dir_name: str | None = conf.get("backend", "save_images")
+    dir_name: str | None = conf.get("images", "save_images")
     if dir_name is not None:
         prep_dir(dir_name)
         filename = os.path.basename(path)
@@ -240,7 +240,7 @@ class ImageHandler:
         contact_sheet_file = tempfile.mkstemp(suffix="-contact.jpg")
         os.chmod(contact_sheet_file[1], 0o666)  # Ensures torrent client can read the file
 
-        dimensions = conf.get("backend", "contact_sheet_layout", "3x6")
+        dimensions = conf.get("images", "contact_sheet_layout", "3x6")
 
         cmd = ["vcsi", stash_file["path"], "-g", dimensions, "-o", contact_sheet_file[1]]
         logger.info("Generating contact sheet")
@@ -270,7 +270,10 @@ class ImageHandler:
         delete_temp_file(contact_sheet_file[1])
         return contact_sheet_remote_url
 
-    def generate_screens(self, stash_file: dict[str, Any], host: str, num_frames: int = 10) -> Sequence[Optional[str]]:
+    def generate_screens(self, stash_file: dict[str, Any], host: str, num_frames: int = 0) -> Sequence[Optional[str]]:
+        if num_frames == 0:
+            num_frames = conf.get("images", "num_screens", 10)
+
         screens = self.get_images(stash_file["id"], "screens", host)
         if len(screens) > 0 and None not in screens:
             return screens

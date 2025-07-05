@@ -9,9 +9,9 @@ from wtforms import (
     StringField,
     SubmitField,
     URLField,
-    SelectMultipleField,
+    SelectMultipleField, IntegerField,
 )
-from wtforms.validators import URL, DataRequired, Optional
+from wtforms.validators import URL, DataRequired, Optional, NumberRange
 from wtforms.widgets import Input, PasswordInput
 
 from utils.db import StashTag, Category
@@ -72,14 +72,18 @@ class BackendSettings(FlaskForm):
         render_kw={"data-toggle": "tooltip", "title": "Where to save data for multi-file torrents"},
     )
     move_method = SelectField(choices=["copy", "hardlink", "symlink"])  # type: ignore
-    upload_gif = SwitchField("Upload Preview GIF")
-    use_gif = SwitchField("Use GIF as Cover")
     tag_codec = SwitchField()
     tag_date = SwitchField()
     tag_framerate = SwitchField()
     tag_resolution = SwitchField()
     save = SubmitField()
 
+class ImageSettings(FlaskForm):
+    upload_gif = SwitchField("Upload Preview GIF")
+    use_gif = SwitchField("Use GIF as Cover")
+    contact_sheet_layout = StringField()
+    num_screens = IntegerField(validators=[NumberRange(min=1.0)])
+    save = SubmitField()
 
 class RedisSettings(FlaskForm):
     enable_form = SwitchField("Use Redis")
