@@ -448,6 +448,8 @@ class ConfigHandler(Singleton):
     def migrate(self):
         renamed_settings = {
             "backend.contact_sheet_layout" : "images.contact_sheet_layout",
+            "backend.use_preview": "images.use_preview",
+            "backend.animated_cover": "images.animated_cover",
         }
         for key in renamed_settings.keys():
             logger.debug(f"Migrating {key} to {renamed_settings[key]}")
