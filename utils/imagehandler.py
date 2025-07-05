@@ -270,7 +270,10 @@ class ImageHandler:
         delete_temp_file(contact_sheet_file[1])
         return contact_sheet_remote_url
 
-    def generate_screens(self, stash_file: dict[str, Any], host: str, num_frames: int = 10) -> Sequence[Optional[str]]:
+    def generate_screens(self, stash_file: dict[str, Any], host: str, num_frames: int = 0) -> Sequence[Optional[str]]:
+        if num_frames == 0:
+            num_frames = conf.get("images", "num_screens", 10)
+
         screens = self.get_images(stash_file["id"], "screens", host)
         if len(screens) > 0 and None not in screens:
             return screens

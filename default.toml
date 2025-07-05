@@ -28,6 +28,7 @@ log_level = "INFO"
 [images]
 ## Dimensions of generated contact sheets
 contact_sheet_layout = "3x6"
+num_screens = 10
 
 #[hamster]
 ## This can be generated at https://hamster.is/settings/api
