@@ -24,6 +24,8 @@ use_preview = false
 animated_cover = true
 ## Log level [DEBUG | INFO | WARNING | ERROR | CRITICAL]
 log_level = "INFO"
+
+[images]
 ## Dimensions of generated contact sheets
 contact_sheet_layout = "3x6"
 
