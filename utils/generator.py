@@ -144,9 +144,10 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
             stash_file = f
-            maps = config.items("file.maps")
-            if not maps:
-                maps = config.get("file", "maps", {})
+            maps = config.get("stash", "pathmaps", {})
+            # maps = config.items("file.maps")
+            # if not maps:
+            #     maps = config.get("file", "maps", {})
             stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
             break
 
