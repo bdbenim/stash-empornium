@@ -257,7 +257,7 @@ def settings(page):
             )
         case "files":
             template_context["settings_option"] = "stash path mappings"
-            form = FileMapForm(maps=conf.get("file", "maps"))
+            form = FileMapForm(maps=conf.get("stash", "maps"))
             for field in form.file_maps.entries:
                 field["remote_path"].render_kw = {
                     "data-toggle": "tooltip",
@@ -365,13 +365,13 @@ def settings(page):
                 assert isinstance(form, FileMapForm)
                 map = form.update_self()
                 if map:
-                    conf.delete_subkey("file", "maps", map)
+                    conf.delete_subkey("stash", "maps", map)
                 elif form.submit.data:
                     template_context["message"] = "Settings saved"
-                    if "file" in conf.conf and "maps" in conf.conf["file"]:
-                        conf.conf["file"]["maps"].clear()  # type: ignore
+                    if "stash" in conf.conf and "maps" in conf.conf["stash"]:
+                        conf.conf["stash"]["maps"].clear()  # type: ignore
                     for map in form.file_maps:
-                        conf.set_subkey("file", "maps", map.data["remote_path"], map.data["local_path"])
+                        conf.set_subkey("stash", "maps", map.data["remote_path"], map.data["local_path"])
             case "hamster":
                 assert isinstance(form, HamsterForm)
                 if form.submit.data:
