@@ -21,7 +21,7 @@ from flask import render_template, render_template_string
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
 from utils.packs import link, read_gallery, get_torrent_directory
-from utils.paths import mapPath, delete_temp_file
+from utils.paths import remap_path, delete_temp_file
 
 MEDIA_INFO = shutil.which("mediainfo")
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
@@ -144,10 +144,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
             stash_file = f
-            maps = config.items("file.maps")
-            if not maps:
-                maps = config.get("file", "maps", {})
-            stash_file["path"] = mapPath(stash_file["path"], maps)  # type: ignore
+            maps = config.get("stash", "pathmaps", {})
+            # maps = config.items("file.maps")
+            # if not maps:
+            #     maps = config.get("file", "maps", {})
+            stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
             break
 
     if stash_file is None:
@@ -159,7 +160,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         maps = config.items("file.maps")
         if not maps:
             maps = config.get("file", "maps", {})
-        stash_file["path"] = mapPath(stash_file["path"], maps)  # type: ignore
+        stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
         logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
         yield error(f"Couldn't find file {stash_file['path']}")

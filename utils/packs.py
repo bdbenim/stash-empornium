@@ -5,7 +5,7 @@ from typing import Any
 from zipfile import ZipFile
 
 from utils.confighandler import ConfigHandler
-from utils.paths import mapPath
+from utils.paths import remap_path
 
 conf = ConfigHandler()
 filetypes = tuple(s if s.startswith(".") else "." + s for s in
@@ -104,13 +104,13 @@ def read_gallery(scene: dict[str, Any]) -> tuple[str, str, bool] | None:
     temp = False
     gallery = scene["galleries"][0]
     if gallery["folder"]:
-        source_dir = mapPath(gallery["folder"]["path"], conf.items("file.maps"))
+        source_dir = remap_path(gallery["folder"]["path"], conf.items("file.maps"))
         os.makedirs(image_dir, exist_ok=True)
         for file in os.listdir(source_dir):
             link(os.path.join(source_dir, file), image_dir)
     elif gallery["files"]:
         temp = True
-        zip_file = mapPath(gallery["files"][0]["path"], conf.items("file.maps"))
+        zip_file = remap_path(gallery["files"][0]["path"], conf.items("file.maps"))
         source_dir = tempfile.mkdtemp()
         files = unzip(zip_file, source_dir)
         for file in files:

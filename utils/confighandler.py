@@ -451,6 +451,7 @@ class ConfigHandler(Singleton):
             "backend.use_preview": "images.use_preview",
             "backend.animated_cover": "images.animated_cover",
             "backend.save_images": "images.save_images",
+            "file.maps" : "stash.pathmaps",
         }
         for key in renamed_settings.keys():
             logger.debug(f"Migrating {key} to {renamed_settings[key]}")
