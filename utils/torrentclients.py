@@ -7,7 +7,7 @@ from transmission_rpc import Client as TransmissionClient, TransmissionConnectEr
 from webencodings import labels
 
 from utils import bencoder
-from utils.paths import mapPath
+from utils.paths import remap_path
 
 
 class TorrentClient:
@@ -70,7 +70,7 @@ class RTorrent(TorrentClient):
 
     def add(self, torrent_path: str, file_path: str) -> None:
         super().add(torrent_path, file_path)
-        file_path = mapPath(file_path, self.pathmaps)
+        file_path = remap_path(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
         logger.debug(f"Adding torrent {torrent_path} to directory {dir}")
         with open(torrent_path, "rb") as torrent:
@@ -134,7 +134,7 @@ class Qbittorrent(TorrentClient):
             return
         with open(torrent_path, "rb") as f:
             hash = bencoder.infohash(f.read())
-        file_path = mapPath(file_path, self.pathmaps)
+        file_path = remap_path(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
         torrent_name = os.path.basename(torrent_path)
         options = {"paused": "true", "savepath": dir}
@@ -232,7 +232,7 @@ class Deluge(TorrentClient):
 
     def add(self, torrent_path: str, file_path: str) -> None:
         super().add(torrent_path, file_path)
-        file_path = mapPath(file_path, self.pathmaps)
+        file_path = remap_path(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
         torrent_name = os.path.basename(torrent_path)
 
@@ -312,7 +312,7 @@ class Transmission(TorrentClient):
 
     def add(self, torrent_path: str, file_path: str) -> None:
         super().add(torrent_path, file_path)
-        file_path = mapPath(file_path, self.pathmaps)
+        file_path = remap_path(file_path, self.pathmaps)
         directory = os.path.split(file_path)[0]
 
         with open(torrent_path, "rb") as f:
