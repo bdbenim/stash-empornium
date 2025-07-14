@@ -40,6 +40,17 @@
                      href="{{ url_for('settings_page.settings', page='files') }}">Files</a>
                 </li>
                 <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='images') }}">Images</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider" />
+                </li>
+                  <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='hamster') }}">Hamster</a>
+                </li>
+                <li>
                   <hr class="dropdown-divider" />
                 </li>
                 <li>
@@ -60,6 +71,10 @@
                 <li>
                   <a class="dropdown-item"
                      href="{{ url_for('settings_page.settings', page='qbittorrent') }}">qBittorrent</a>
+                </li>
+                <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('settings_page.settings', page='transmission') }}">Transmission</a>
                 </li>
               </ul>
             </li>

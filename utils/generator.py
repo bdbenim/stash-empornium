@@ -1,7 +1,7 @@
 import base64
 import datetime
 import json
-import logging
+from loguru import logger
 import math
 import multiprocessing as mp
 import os
@@ -21,7 +21,7 @@ from flask import render_template, render_template_string
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler
 from utils.packs import link, read_gallery, get_torrent_directory
-from utils.paths import mapPath, get_dir_size
+from utils.paths import remap_path, get_dir_size, delete_temp_file
 from utils.stash import stash_headers, find_scene, find_scenes_by_tag
 
 MEDIA_INFO = shutil.which("mediainfo")
@@ -45,18 +45,22 @@ def add_job(j: dict, pack: bool = False) -> int:
 
 
 def error(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).error(message)
-    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
+    logger.error(message)
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message}) + '\n'
 
 
 def warning(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).warning(message)
-    return json.dumps({"status": "error", "message": alt_message if alt_message else message})
+    logger.warning(message)
+    return json.dumps({"status": "error", "message": alt_message if alt_message else message}) + '\n'
 
 
 def info(message: str, alt_message: str | None = None) -> str:
-    logging.getLogger(__name__).info(message)
-    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}})
+    logger.info(message)
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
+
+def success(message: str, alt_message: str | None = None) -> str:
+    logger.success(message)
+    return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
 
 
 def generate_pack(j: dict):
@@ -377,8 +381,6 @@ def generate_pack(j: dict):
 
 
 def generate(j: dict) -> Generator[str, None, str | None]:
-    logger = logging.getLogger(__name__)
-
     scene_id = j["scene_id"]
     file_id = j["file_id"]
     announce_url = j["announce_url"]
@@ -386,7 +388,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     include_gallery = j["gallery"]
     tracker = j["tracker"]  # 'EMP', 'PB', 'FC', 'HF' or 'ENT'
     include_screens = tracker == 'FC'  # TODO user customization
-    img_host = "imgbox" if tracker == 'HF' else "jerking"
+    img_host = "imgbox" if tracker == 'HF' else "hamster"
 
     yield info("Starting generation")
 
@@ -456,10 +458,8 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         logger.debug(f"Checking path {f['path']}")
         if f["id"] == file_id:
             stash_file = f
-            maps = config.items("file.maps")
-            if not maps:
-                maps = config.get("file", "maps", {})
-            stash_file["path"] = mapPath(stash_file["path"], maps)  # type: ignore
+            maps = config.get("stash", "pathmaps", {})
+            stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
             break
 
     if stash_file is None:
@@ -471,7 +471,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         maps = config.items("file.maps")
         if not maps:
             maps = config.get("file", "maps", {})
-        stash_file["path"] = mapPath(stash_file["path"], maps)  # type: ignore
+        stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
         logger.debug(f"No exact file match, using {stash_file['path']}")
     elif not os.path.isfile(stash_file["path"]):
         yield error(f"Couldn't find file {stash_file['path']}")
@@ -520,7 +520,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     logger.debug(f'Downloaded cover from {scene["paths"]["screenshot"]} with mime type {cover_mime_type}')
     cover_ext, cover_file, cover_mime_type = get_cover(cover_mime_type, cover_response, screens_dir, stash_file["path"])
 
-    # yield info("Making torrent")
+    ###########
+    # TORRENT #
+    ###########
+
+    yield info("Making torrent")
     receive_pipe: Connection
     send_pipe: Connection
     receive_pipe, send_pipe = mp.Pipe(False)
@@ -541,7 +545,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     preview_send: Connection
     preview_recv, preview_send = mp.Pipe(False)
     preview_proc = mp.Process(target=images.process_preview, args=(preview_send, scene, img_host))
-    if config.get("backend", "use_preview", False):
+    if config.get("images", "use_preview", False):
         preview_proc.start()
 
     ###############
@@ -562,7 +566,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     if gen_screens:
         screens_urls = images.generate_screens(stash_file=stash_file,
-                                               host=img_host)  # TODO customize number of screens from config
+                                               host=img_host)
         if screens_urls is None or None in screens_urls:
             yield error("Failed to generate screens")
             return
@@ -635,14 +639,14 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             performers[performer_name]["image_mime_type"],
             performers[performer_name]["image_ext"],
             img_host,
-            default=imagehandler.PERFORMER_DEFAULT_IMAGE,
+            default=imagehandler.DEFAULT_IMAGES["performer"][img_host],
         )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
-            performers[performer_name]["image_remote_url"] = imagehandler.PERFORMER_DEFAULT_IMAGE
+            performers[performer_name]["image_remote_url"] = imagehandler.DEFAULT_IMAGES["performer"][img_host]
             logger.warning(f"Unable to upload image for performer {performer_name}")
 
-    logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+    logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
         logo_url = images.get_url(
@@ -652,8 +656,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             img_host,
         )[0]
         if logo_url is None:
-            logo_url = imagehandler.STUDIO_DEFAULT_LOGO
+            logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
             logger.warning("Unable to upload studio image")
+        delete_temp_file(studio_img_file[1])
 
     if image_temp:
         shutil.rmtree(image_dir)  # type: ignore
@@ -711,17 +716,20 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         "image_count": image_count,
         "gallery_contact": gallery_contact_url,
         "media_info": mediainfo,
+        "pad":  imagehandler.DEFAULT_IMAGES["pad"][img_host],
     }
 
     preview_url = None
-    if config.get("backend", "use_preview", False):
+    if config.get("images", "use_preview", False):
         preview_proc.join(timeout=60)
-        preview_proc.close()
         try:
+            preview_proc.close()
             preview_send.close()
             preview_url = preview_recv.recv()
         except EOFError:
             error("Unable to upload preview GIF")
+        except ValueError:
+            error("Unable to generate preview GIF (too long)")
         template_context["preview"] = preview_url
 
     for key in tmp_tag_lists:
@@ -747,7 +755,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             "fill": {
                 "title": title,
                 "cover": preview_url
-                if preview_url and config.get("backend", "animated_cover", False)
+                if preview_url and config.get("images", "animated_cover", False)
                 else cover_remote_url,
                 "tags": " ".join(tags.tags),
                 "description": description,
@@ -758,17 +766,11 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         },
     }
 
-    with open(torrent_paths[0], "rb") as f:
-        result["data"]["file"] = {
-            "name": os.path.basename(f.name),
-            "content": str(base64.b64encode(f.read()).decode("ascii")),
-        }
-
     logger.debug(f"Sending {len(tag_suggestions)} suggestions")
     if len(tag_suggestions) > 0:
         result["data"]["suggestions"] = dict(tag_suggestions)
 
-    yield json.dumps(result)
+    yield json.dumps(result) + '\n'
 
     for client in config.torrent_clients:
         try:
@@ -778,7 +780,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.error(f"Error attempting to add torrent to {client.name}")
             logger.debug(e)
 
-    logger.info("Done")
+    logger.success("Done")
 
 
 def process_scene_tags(scene, stash_file, tags, tracker):
@@ -809,7 +811,6 @@ def process_scene_tags(scene, stash_file, tags, tracker):
 
 
 def process_scene_performers(performers, scene, tags, tracker):
-    logger = logging.getLogger(__name__)
     for performer in scene["performers"]:
         if performer["name"] in performers:
             if "anchor" in scene:
@@ -851,7 +852,6 @@ def process_scene_performers(performers, scene, tags, tracker):
 
 
 def get_studio_logo(scene):
-    logger = logging.getLogger(__name__)
     studio_img_ext = ""
     studio_img_mime_type = ""
     studio_img_file = None
@@ -890,7 +890,6 @@ def get_studio_logo(scene):
 
 
 def get_cover(cover_mime_type, cover_response, screens_dir, path):
-    logger = logging.getLogger(__name__)
     cover_gen = False
     match cover_mime_type:
         case "image/jpeg":
@@ -967,15 +966,14 @@ def get_resolution(ht):
 def gen_torrent(
         pipe: Connection, stash_file: dict | None, announce_url: str, directory: str | None = None
 ) -> list[str] | None:
-    logger = logging.getLogger(__name__)
-
     if stash_file is None and directory is None:
         logger.error("Can't generate torrent: no file or directory supplied")
         pipe.send([])
         return
 
     size = get_dir_size(directory) if directory else stash_file["size"]
-    piece_size = int(math.log(size / 2 ** 10, 2))
+    max_piece_size = int(math.log(8 * 1024 * 1024, 2)) # = 23, corresponding to 8MB (2^23 bytes)
+    piece_size = min(int(math.log(size / 2 ** 10, 2)), max_piece_size)
     tempdir = tempfile.TemporaryDirectory()
     basename = directory if directory else "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
 
@@ -998,6 +996,7 @@ def gen_torrent(
         temp_path,
         target,
     ]
+    logger.debug(f"Executing: {' '.join(cmd)}")
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     logger.debug(f"mktorrent output:\n{process.stdout}")
     if process.returncode != 0:

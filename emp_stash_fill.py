@@ -2,21 +2,21 @@
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.18.1"
+__version__ = "0.24.0"
 
 # built-in
 import json
-import logging
 import os
 import time
 from concurrent.futures import Future
 
 # external
 from flask import (Flask, Response, redirect, request, stream_with_context,
-                   url_for)
+                   url_for, send_from_directory)
 from flask_bootstrap import Bootstrap5
 from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
+from loguru import logger
 
 # included
 from utils import db, generator, taghandler
@@ -31,7 +31,6 @@ ODBL_NOTICE = ("Contains information from https://github.com/mledoze/countries w
                "Open Database License (ODbL), available at https://github.com/mledoze/countries/blob/master/LICENSE")
 
 config = ConfigHandler()
-logger = logging.getLogger(__name__)
 logger.info(f"stash-empornium version {__version__}.")
 logger.info(f"Release notes: https://github.com/bdbenim/stash-empornium/releases/tag/v{__version__}")
 logger.info(ODBL_NOTICE)
@@ -111,6 +110,7 @@ def process_suggestions():
         for tag in j["ignore"]:
             ignored_tags.append(tag)
     taghandler.accept_suggestions(accepted_tags, j["tracker"])
+    taghandler.reject_suggestions(ignored_tags)
     return json.dumps({"status": "success", "data": {"message": "Tags saved"}})
 
 
@@ -126,6 +126,15 @@ def submit_job():
     j = request.get_json()
     job_id = generator.add_job(j, "pack" in j and j["pack"])
     return json.dumps({"id": job_id})
+
+
+@app.route("/torrent/<path:filename>", methods=["GET"])
+@csrf.exempt
+def get_torrent(filename: str):
+    logger.debug(f"Got filename {filename}")
+    torrent_name = os.path.basename(filename)
+    logger.info(f"Serving {torrent_name}")
+    return send_from_directory(config.torrent_dirs[0], torrent_name, as_attachment=True)
 
 
 @app.route("/templates")

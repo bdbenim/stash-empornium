@@ -1,6 +1,6 @@
 import json
 import tempfile
-from flask import Blueprint, abort, redirect, render_template, url_for, request, send_file
+from flask import Blueprint, abort, redirect, render_template, url_for, request, send_file, render_template_string
 from webui.forms import (
     TagMapForm,
     BackendSettings,
@@ -14,13 +14,24 @@ from webui.forms import (
     SearchForm,
     FileMapForm,
     TorrentSettings,
-    DBImportExport
+    DBImportExport, HamsterForm, ImageSettings
 )
 
 from utils.confighandler import ConfigHandler
 from utils.taghandler import query_maps
 from utils.db import get_or_create, StashTag, GazelleTag, db, get_or_create_no_commit, Category, from_dict, to_dict
 from werkzeug.exceptions import HTTPException
+
+DUMMY_CONTEXT = {
+    "title": "Big Buck Bunny",
+    "date": "2008-05-20",
+    "studio": "Blender Foundation",
+    "performers": ["Big Buck Bunny", "Frank", "Rinky", "Gimera"],
+    "resolution": "1080p",
+    "codec": "h264",
+    "duration": "10:00",
+    "framerate": "24"
+}
 
 conf = ConfigHandler()
 
@@ -158,22 +169,30 @@ def settings(page):
     match page:
         case "backend":
             template_context["settings_option"] = "your stash-empornium backend"
+            title_template = conf.get(page, "title_template", "")
             form = BackendSettings(
                 default_template=conf.get(page, "default_template", ""),
                 torrent_directories=", ".join(conf.get(page, "torrent_directories", "")),  # type: ignore
                 port=conf.get(page, "port", ""),
                 date_format=conf.get(page, "date_format", ""),
-                title_template=conf.get(page, "title_template", ""),
+                title_template=title_template,
+                title_example = render_template_string(title_template, **DUMMY_CONTEXT),
                 media_directory=conf.get(page, "media_directory", ""),
                 move_method=conf.get(page, "move_method", "copy"),
                 anon=conf.get(page, "anon", False),
                 choices=[opt for opt in conf["templates"]],  # type: ignore
-                upload_gif=conf.get(page, "use_preview", False),
-                use_gif=conf.get(page, "animated_cover", False),
                 tag_codec = conf.get("metadata", "tag_codec", False),
                 tag_date = conf.get("metadata", "tag_date", False),
                 tag_framerate = conf.get("metadata", "tag_framerate", False),
                 tag_resolution = conf.get("metadata", "tag_resolution", False),
+            )
+        case "images":
+            template_context["settings_option"] = "your images"
+            form = ImageSettings(
+                upload_gif=conf.get(page, "use_preview", False),
+                use_gif=conf.get(page, "animated_cover", False),
+                contact_sheet_layout=conf.get(page, "contact_sheet_layout", ""),
+                num_screens=conf.get(page, "num_screens", 10),
             )
         case "stash":
             template_context["settings_option"] = "your stash server"
@@ -223,14 +242,30 @@ def settings(page):
                 ssl=conf.get(page, "ssl", False),
                 maps=conf.get(page, "pathmaps", {})
             )
+        case "transmission":
+            template_context["settings_option"] = "your Transmission client"
+            form = RTorrentSettings(
+                enable_form=enable,
+                host=conf.get(page, "host", ""),
+                port=conf.get(page, "port", ""),
+                username=conf.get(page, "username", ""),
+                password=conf.get(page, "password", ""),
+                path=conf.get(page, "path", "/transmission/rpc"),
+                label=conf.get(page, "label", ""),
+                ssl=conf.get(page, "ssl", False),
+                maps=conf.get(page, "pathmaps", {})
+            )
         case "files":
             template_context["settings_option"] = "stash path mappings"
-            form = FileMapForm(maps=conf.items("file.maps"))
+            form = FileMapForm(maps=conf.get("stash", "maps"))
             for field in form.file_maps.entries:
                 field["remote_path"].render_kw = {
                     "data-toggle": "tooltip",
                     "title": "This is the path as stash sees it",
                 }
+        case "hamster":
+            template_context["settings_option"] = "your hamster account"
+            form = HamsterForm(api_key=conf.get(page, "api_key", ""))
         case "tags":
             return redirect(url_for(".tag_settings", page="maps"))
         case "database":
@@ -259,6 +294,13 @@ def settings(page):
                     conf.set(page, "media_directory", form.data["media_directory"])
                 conf.set(page, "move_method", form.data["move_method"])
                 conf.set(page, "anon", form.data["anon"])
+                # Show updated title example:
+                form.title_example.data = render_template_string(form.title_template.data, **DUMMY_CONTEXT)
+            case "images":
+                conf.set(page, "upload_gif", form.data["upload_gif"])
+                conf.set(page, "use_gif", form.data["use_gif"])
+                conf.set(page, "contact_sheet_layout", form.data["contact_sheet_layout"])
+                conf.set(page, "num_screens", form.data["num_screens"])
             case "stash":
                 conf.set(page, "url", form.data["url"])
                 if form.data["api_key"]:
@@ -282,7 +324,7 @@ def settings(page):
                 else:
                     if page in conf:
                         conf.set(page, "disable", True)
-            case "rtorrent" | "deluge" | "qbittorrent":
+            case "rtorrent" | "deluge" | "qbittorrent" | "transmission":
                 assert isinstance(form, TorrentSettings)
                 path = form.update_self()
                 if path:
@@ -317,18 +359,24 @@ def settings(page):
                             maps[field["local_path"].data] = field["remote_path"].data
                     if len(maps) > 0:
                         conf.set(page, "pathmaps", maps)
-                conf.configureTorrents()
+                conf.configure_torrents()
             case "files":
                 del template_context["message"]
                 assert isinstance(form, FileMapForm)
                 map = form.update_self()
                 if map:
-                    conf.delete("file.maps", map)
+                    conf.delete_subkey("stash", "maps", map)
                 elif form.submit.data:
                     template_context["message"] = "Settings saved"
-                    conf.conf["file.maps"].clear()  # type: ignore
+                    if "stash" in conf.conf and "maps" in conf.conf["stash"]:
+                        conf.conf["stash"]["maps"].clear()  # type: ignore
                     for map in form.file_maps:
-                        conf.set("file.maps", map.data["local_path"], map.data["remote_path"])
+                        conf.set_subkey("stash", "maps", map.data["remote_path"], map.data["local_path"])
+            case "hamster":
+                assert isinstance(form, HamsterForm)
+                if form.submit.data:
+                    template_context["message"] = "Settings saved"
+                    conf.set(page, "api_key", form.data["api_key"])
             case "database":
                 del template_context["message"]
                 assert isinstance(form, DBImportExport)

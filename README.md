@@ -139,8 +139,16 @@ two exceptions:
 
 This software has been tested with qBittorrent `v4.6.0`. The same configuration options are supported as with rTorrent.
 
-Currently there is one limitation with the qBittorrent API integration which prevents the backend from triggering a
+Currently, there is one limitation with the qBittorrent API integration which prevents the backend from triggering a
 recheck of downloaded files when adding a `.torrent`. This is planned for a future release.
+
+### Transmission
+
+This software has been tested with Transmission `v4.0.6`. The same configuration options are supported as with rTorrent.
+Stash-empornium uses [transmission-rpc][4] which claims to support `2.40` (released 2011-10-05) through `4.1.0-beta.2`
+(released 2025-05-12), but this has not been tested.
+
+[4]: https://github.com/trim21/transmission-rpc
 
 ## Usage
 
@@ -152,11 +160,12 @@ recheck of downloaded files when adding a `.torrent`. This is planned for a futu
 5. Click "fill from" and wait as the tedious parts of the upload process are done for you. Status messages should appear
    and instructions for final steps. Performer tags like `pamela.anderson` will be generated for you, along with
    resolution tags and url tags of the studio, e.g. `1080p` and `brazzers.com`
-6. You still need to load the torrent file (the location on your filesystem will be given to you) into the form, set a
-   category, optionally check for dupes if you didn't do so manually. Also load the torrent file into your client (you
-   can configure the torrent output directory to be a watch dir for your torrent client) and make sure the media file is
-   visible to your torrent client
-7. When you're satisfied everything is ready, upload
+6. You still need to set a category, optionally check for dupes if you didn't do so manually. 
+7. If you configured your torrent client's details, the torrent file will automatically be added into your client (you
+   can also configure the torrent output directory to be a watch dir for your torrent client), so make sure the media 
+   file is visible to your torrent client
+8. When you're satisfied everything is ready, click `Upload with File` which will automatically submit your upload
+   along with your torrent file and start the torrent in your client for you
 
 ### Within Stash
 

@@ -9,9 +9,9 @@ from wtforms import (
     StringField,
     SubmitField,
     URLField,
-    SelectMultipleField,
+    SelectMultipleField, IntegerField,
 )
-from wtforms.validators import URL, DataRequired, Optional
+from wtforms.validators import URL, DataRequired, Optional, NumberRange
 from wtforms.widgets import Input, PasswordInput
 
 from utils.db import StashTag, Category
@@ -63,22 +63,27 @@ class BackendSettings(FlaskForm):
     torrent_directories = StringField("Torrent Directories", render_kw={"placeholder": ""})
     port = StringField("Port", validators=[PortRange(1024), DataRequired()])
     date_format = StringField()
-    example = StringField("Date Example:", render_kw={"readonly": True})
+    date_example = StringField("Date Example", render_kw={"readonly": True})
     title_template = StringField()
+    title_example = StringField("Title Example", render_kw={"readonly": True})
     anon = SwitchField("Upload Anonymously")
     media_directory = StringField(
         validators=[Directory()],
         render_kw={"data-toggle": "tooltip", "title": "Where to save data for multi-file torrents"},
     )
     move_method = SelectField(choices=["copy", "hardlink", "symlink"])  # type: ignore
-    upload_gif = SwitchField("Upload Preview GIF")
-    use_gif = SwitchField("Use GIF as Cover")
     tag_codec = SwitchField()
     tag_date = SwitchField()
     tag_framerate = SwitchField()
     tag_resolution = SwitchField()
     save = SubmitField()
 
+class ImageSettings(FlaskForm):
+    upload_gif = SwitchField("Upload Preview GIF")
+    use_gif = SwitchField("Use GIF as Cover")
+    contact_sheet_layout = StringField()
+    num_screens = IntegerField(validators=[NumberRange(min=1.0)])
+    save = SubmitField()
 
 class RedisSettings(FlaskForm):
     enable_form = SwitchField("Use Redis")
@@ -153,6 +158,10 @@ class DelugeSettings(TorrentSettings):
     username = None
     label = None
     path = None
+
+
+class TransmissionSettings(TorrentSettings):
+    pass
 
 
 class StashSettings(FlaskForm):
@@ -329,6 +338,13 @@ class CategoryList(FlaskForm):
         return category
 
 
+class HamsterForm(FlaskForm):
+    api_key = StringField(
+        "API Key"
+    )
+    submit = SubmitField()
+
+
 class SearchResult(Form):
     stash_tag = StringField(render_kw={"readonly": True})
     emp_tag = StringField("EMP Tag", render_kw={"readonly": True})
@@ -355,7 +371,7 @@ class FileMapForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         maps = []
-        if "maps" in kwargs:
+        if "maps" in kwargs and kwargs["maps"] is not None:
             for remote, local in kwargs["maps"].items():
                 maps.append({"local_path": local, "remote_path": remote})
             kwargs["file_maps"] = maps

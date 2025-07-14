@@ -9,9 +9,12 @@ RUN apt-get update && \
     apt-get install -y ffmpeg mktorrent mediainfo build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy files and install Python dependencies
+# Copy pyproject.toml and install Python dependencies
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
+
+# Copy remaining files
 COPY . .
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Remove build-essential as it is only needed during pip install
 RUN apt-get remove -y build-essential
