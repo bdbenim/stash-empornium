@@ -64,7 +64,6 @@ def success(message: str, alt_message: str | None = None) -> str:
 
 
 def generate_pack(j: dict):
-    logger = logging.getLogger(__name__)
     announce_url = j["announce_url"]
     tracker = j["tracker"]  # 'EMP', 'PB', 'FC', 'HF' or 'ENT'
     img_host = "imgbox" if tracker == 'HF' else "jerking"
