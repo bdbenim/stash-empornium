@@ -145,9 +145,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         if f["id"] == file_id:
             stash_file = f
             maps = config.get("stash", "pathmaps", {})
-            # maps = config.items("file.maps")
-            # if not maps:
-            #     maps = config.get("file", "maps", {})
             stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
             break
 
@@ -162,7 +159,8 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             maps = config.get("file", "maps", {})
         stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
         logger.debug(f"No exact file match, using {stash_file['path']}")
-    elif not os.path.isfile(stash_file["path"]):
+
+    if not os.path.isfile(stash_file["path"]):
         yield error(f"Couldn't find file {stash_file['path']}")
         return
 
