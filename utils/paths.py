@@ -39,7 +39,7 @@ def delete_temp_file(path: str | Path) -> None:
 
 def verify_scene(stash_file: dict) -> tuple[bool, str]:
     if not os.path.isfile(stash_file["path"]):
-        return False, "Couldn't find file {stash_file['path']}"
+        return False, f"Couldn't find file {stash_file['path']}"
 
     try:
         with open(stash_file["path"], "r") as f:
