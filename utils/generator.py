@@ -21,7 +21,7 @@ from flask import render_template, render_template_string
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
 from utils.packs import link, read_gallery, get_torrent_directory
-from utils.paths import remap_path, delete_temp_file
+from utils.paths import remap_path, delete_temp_file, verify_scene
 
 MEDIA_INFO = shutil.which("mediainfo")
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
@@ -145,9 +145,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         if f["id"] == file_id:
             stash_file = f
             maps = config.get("stash", "pathmaps", {})
-            # maps = config.items("file.maps")
-            # if not maps:
-            #     maps = config.get("file", "maps", {})
             stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
             break
 
@@ -162,9 +159,16 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             maps = config.get("file", "maps", {})
         stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
         logger.debug(f"No exact file match, using {stash_file['path']}")
-    elif not os.path.isfile(stash_file["path"]):
-        yield error(f"Couldn't find file {stash_file['path']}")
+
+    verified, err = verify_scene(stash_file)
+    if not verified:
+        yield error(err)
         return
+
+    # Warn user if file size reported by stash doesn't match actual file size
+    file_size = os.path.getsize(stash_file["path"])
+    if file_size != stash_file["size"]:
+        logger.warning(f"File size mismatch: {file_size} != {stash_file['size']}")
 
     if new_dir:
         link(stash_file["path"], new_dir)
