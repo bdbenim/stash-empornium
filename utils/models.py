@@ -31,6 +31,7 @@ class BackendConfig(BaseModel):
     move_method: MoveMethod = "copy"
     log_level: LogLevel = "INFO"
     save_images: Optional[str] = None
+    sanitize_logs: bool = True
 
 class ImageConfig(BaseModel):
     use_preview: bool = False
