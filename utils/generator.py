@@ -571,7 +571,8 @@ def gen_torrent(pipe: Connection, stash_file: dict, announce_url: str, directory
     logger.debug(f"Saving torrent to {temp_path}")
     cmd = ["mktorrent", "-l", str(piece_size), "-s", source_for_announce(announce_url), "-a", announce_url, "-p", "-v",
            "-o", temp_path, target, ]
-    logger.debug(f"Executing: {' '.join(cmd)}")
+    clean_command = " ".join(cmd).replace(announce_url, sanitize_announce_url(announce_url))
+    logger.debug(f"Executing: {clean_command}")
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     output = process.stdout
     if config.get("backend", "sanitize_logs", False):
