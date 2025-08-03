@@ -643,20 +643,36 @@ def gen_torrent(
     temp_path = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(d, stash_file["basename"] + ".torrent") for d in config.torrent_dirs]
     logger.debug(f"Saving torrent to {temp_path}")
-    cmd = [
-        "mktorrent",
-        "-l",
-        str(piece_size),
-        "-s",
-        source_for_announce(announce_url),
-        "-a",
-        announce_url,
-        "-p",
-        "-v",
-        "-o",
-        temp_path,
-        target,
-    ]
+    if shutil.which("mkbrr") is None:
+        cmd = [
+            "mktorrent",
+            "-l",
+            str(piece_size),
+            "-s",
+            source_for_announce(announce_url),
+            "-a",
+            announce_url,
+            "-p",
+            "-v",
+            "-o",
+            temp_path,
+            target,
+        ]
+    else:
+        cmd = [
+            "mkbrr",
+            "create",
+            "-l",
+            str(piece_size),
+            "-s",
+            source_for_announce(announce_url),
+            "-t",
+            announce_url,
+            "-v",
+            "-o",
+            temp_path,
+            target,
+        ]
     logger.debug(f"Executing: {' '.join(cmd)}")
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     output = process.stdout
