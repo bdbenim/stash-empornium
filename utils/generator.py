@@ -648,7 +648,7 @@ def gen_torrent(
         "-l",
         str(piece_size),
         "-s",
-        "Emp",
+        source_for_announce(announce_url),
         "-a",
         announce_url,
         "-p",
@@ -674,3 +674,18 @@ def gen_torrent(
 def gen_media_info(pipe: Connection, path: str) -> None:
     cmd = [MEDIA_INFO, path]
     pipe.send(subprocess.check_output(cmd, text=True))
+
+def source_for_announce(announce_url: str) -> str:
+    announce_url = announce_url.lower()
+    if "empornium" in announce_url:
+        return "Emp"
+    if "enthralled" in announce_url:
+        return "Ent"
+    if "femdomcult" in announce_url:
+        return "FDC"
+    if "happyfappy" in announce_url:
+        return "HF"
+    if "kufirc" in announce_url:
+        return "Kufirc"
+    if "pornbay" in announce_url:
+        return "PBay"
