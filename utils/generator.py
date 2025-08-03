@@ -656,6 +656,8 @@ def gen_torrent(
     logger.debug(f"Executing: {' '.join(cmd)}")
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     output = process.stdout
+    if config.get("backend", "sanitize_logs", False):
+        output = output.replace(announce_url, sanitize_announce_url(announce_url))
     logger.debug(f"mktorrent output:\n{output}")
     if process.returncode != 0:
         tempdir.cleanup()
@@ -671,3 +673,10 @@ def gen_torrent(
 def gen_media_info(pipe: Connection, path: str) -> None:
     cmd = [MEDIA_INFO, path]
     pipe.send(subprocess.check_output(cmd, text=True))
+
+
+def sanitize_announce_url(announce_url: str) -> str:
+    sanitized_announce = announce_url.split("/")
+    sanitized_announce[-2] = "x" * 32
+    sanitized_announce = "/".join(sanitized_announce)
+    return sanitized_announce
