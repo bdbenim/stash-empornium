@@ -52,6 +52,15 @@ class FileMap(Form):
     remote_path = StringField()
     delete = SubmitField()
 
+class MetadataSettings(Form):
+    tag_codec = SwitchField()
+    tag_date = SwitchField()
+    tag_framerate = SwitchField()
+    tag_resolution = SwitchField()
+
+class LogSettings(Form):
+    log_level = SelectField("Log Level (Requires Restart)", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    sanitize_logs = SwitchField("Sanitize Logs")
 
 class BackendSettings(FlaskForm):
     def __init__(self, **kwargs):
@@ -72,10 +81,8 @@ class BackendSettings(FlaskForm):
         render_kw={"data-toggle": "tooltip", "title": "Where to save data for multi-file torrents"},
     )
     move_method = SelectField(choices=["copy", "hardlink", "symlink"])  # type: ignore
-    tag_codec = SwitchField()
-    tag_date = SwitchField()
-    tag_framerate = SwitchField()
-    tag_resolution = SwitchField()
+    metadata_settings = FormField(MetadataSettings)
+    log_settings = FormField(LogSettings)
     save = SubmitField()
 
 class ImageSettings(FlaskForm):

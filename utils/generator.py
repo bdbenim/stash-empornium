@@ -655,7 +655,8 @@ def gen_torrent(
     ]
     logger.debug(f"Executing: {' '.join(cmd)}")
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    logger.debug(f"mktorrent output:\n{process.stdout}")
+    output = process.stdout
+    logger.debug(f"mktorrent output:\n{output}")
     if process.returncode != 0:
         tempdir.cleanup()
         logger.error("mktorrent failed, command: " + " ".join(cmd), "Couldn't generate torrent")
