@@ -35,3 +35,21 @@ def delete_temp_file(path: str | Path) -> None:
         pass
     except PermissionError:
         logger.error(f"Could not delete temporary file {path}: Permission denied")
+
+
+def verify_scene(stash_file: dict) -> tuple[bool, str]:
+    if not os.path.isfile(stash_file["path"]):
+        return False, "Couldn't find file {stash_file['path']}"
+
+    try:
+        with open(stash_file["path"], "r") as f:
+            pass
+    except PermissionError:
+        return False, f"Permission denied: {stash_file['path']}"
+
+    # Warn user if file size reported by stash doesn't match actual file size
+    file_size = os.path.getsize(stash_file["path"])
+    if file_size != stash_file["size"]:
+        logger.warning(f"File size mismatch: {file_size} != {stash_file['size']}")
+
+    return True, "Success"

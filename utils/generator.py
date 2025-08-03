@@ -21,7 +21,7 @@ from flask import render_template, render_template_string
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
 from utils.packs import link, read_gallery, get_torrent_directory
-from utils.paths import remap_path, delete_temp_file
+from utils.paths import remap_path, delete_temp_file, verify_scene
 
 MEDIA_INFO = shutil.which("mediainfo")
 FILENAME_VALID_CHARS = "-_.() %s%s" % (string.ascii_letters, string.digits)
@@ -145,9 +145,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         if f["id"] == file_id:
             stash_file = f
             maps = config.get("stash", "pathmaps", {})
-            # maps = config.items("file.maps")
-            # if not maps:
-            #     maps = config.get("file", "maps", {})
             stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
             break
 
@@ -162,9 +159,16 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             maps = config.get("file", "maps", {})
         stash_file["path"] = remap_path(stash_file["path"], maps)  # type: ignore
         logger.debug(f"No exact file match, using {stash_file['path']}")
-    elif not os.path.isfile(stash_file["path"]):
-        yield error(f"Couldn't find file {stash_file['path']}")
+
+    verified, err = verify_scene(stash_file)
+    if not verified:
+        yield error(err)
         return
+
+    # Warn user if file size reported by stash doesn't match actual file size
+    file_size = os.path.getsize(stash_file["path"])
+    if file_size != stash_file["size"]:
+        logger.warning(f"File size mismatch: {file_size} != {stash_file['size']}")
 
     if new_dir:
         link(stash_file["path"], new_dir)
@@ -401,7 +405,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-        audio_bitrate = f"{int(proc.stdout) // 1000} kbps"
+        audio_bitrate = f"{int(proc.stdout.split('|')[0].strip()) // 1000} kbps"
 
     except subprocess.CalledProcessError:
         logger.warning("Unable to determine audio bitrate")
@@ -644,7 +648,7 @@ def gen_torrent(
         "-l",
         str(piece_size),
         "-s",
-        "Emp",
+        source_for_announce(announce_url),
         "-a",
         announce_url,
         "-p",
@@ -674,6 +678,20 @@ def gen_media_info(pipe: Connection, path: str) -> None:
     cmd = [MEDIA_INFO, path]
     pipe.send(subprocess.check_output(cmd, text=True))
 
+def source_for_announce(announce_url: str) -> str:
+    announce_url = announce_url.lower()
+    if "empornium" in announce_url:
+        return "Emp"
+    if "enthralled" in announce_url:
+        return "Ent"
+    if "femdomcult" in announce_url:
+        return "FDC"
+    if "happyfappy" in announce_url:
+        return "HF"
+    if "kufirc" in announce_url:
+        return "Kufirc"
+    if "pornbay" in announce_url:
+        return "PBay"
 
 def sanitize_announce_url(announce_url: str) -> str:
     sanitized_announce = announce_url.split("/")
