@@ -20,6 +20,8 @@ anon = false
 move_method = "copy"
 ## Log level [DEBUG | INFO | WARNING | ERROR | CRITICAL]
 log_level = "INFO"
+## Hide personal data such as announce URLs in logs
+sanitize_logs = true
 
 [images]
 ## Dimensions of generated contact sheets

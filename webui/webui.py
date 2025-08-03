@@ -14,7 +14,7 @@ from webui.forms import (
     SearchForm,
     FileMapForm,
     TorrentSettings,
-    DBImportExport, HamsterForm, ImageSettings
+    DBImportExport, HamsterForm, ImageSettings, MetadataSettings, LogSettings
 )
 
 from utils.confighandler import ConfigHandler
@@ -179,12 +179,18 @@ def settings(page):
                 title_example = render_template_string(title_template, **DUMMY_CONTEXT),
                 media_directory=conf.get(page, "media_directory", ""),
                 move_method=conf.get(page, "move_method", "copy"),
+                log_settings={
+                    "log_level": conf.get(page, "log_level", "INFO"),
+                    "sanitize_logs": conf.get(page, "sanitize_logs", True),
+                },
                 anon=conf.get(page, "anon", False),
                 choices=[opt for opt in conf["templates"]],  # type: ignore
-                tag_codec = conf.get("metadata", "tag_codec", False),
-                tag_date = conf.get("metadata", "tag_date", False),
-                tag_framerate = conf.get("metadata", "tag_framerate", False),
-                tag_resolution = conf.get("metadata", "tag_resolution", False),
+                metadata_settings={
+                    "tag_codec": conf.get("metadata", "tag_codec", False),
+                    "tag_date": conf.get("metadata", "tag_date", False),
+                    "tag_framerate": conf.get("metadata", "tag_framerate", False),
+                    "tag_resolution": conf.get("metadata", "tag_resolution", False),
+                },
             )
         case "images":
             template_context["settings_option"] = "your images"
@@ -284,15 +290,15 @@ def settings(page):
                 conf.set(page, "port", int(form.data["port"]))
                 conf.set(page, "title_template", form.data["title_template"])
                 conf.set(page, "date_format", form.data["date_format"])
-                conf.set(page, "use_preview", form.upload_gif.data)
-                conf.set(page, "animated_cover", form.use_gif.data)
-                conf.set("metadata", "tag_codec", form.tag_codec.data)
-                conf.set("metadata", "tag_date", form.tag_date.data)
-                conf.set("metadata", "tag_framerate", form.tag_framerate.data)
-                conf.set("metadata", "tag_resolution", form.tag_resolution.data)
+                conf.set("metadata", "tag_codec", form.data["metadata_settings"]["tag_codec"])
+                conf.set("metadata", "tag_date", form.data["metadata_settings"]["tag_date"])
+                conf.set("metadata", "tag_framerate", form.data["metadata_settings"]["tag_framerate"])
+                conf.set("metadata", "tag_resolution", form.data["metadata_settings"]["tag_resolution"])
                 if form.data["media_directory"]:
                     conf.set(page, "media_directory", form.data["media_directory"])
                 conf.set(page, "move_method", form.data["move_method"])
+                conf.set(page, "log_level", form.data["log_settings"]["log_level"])
+                conf.set(page, "sanitize_logs", form.data["log_settings"]["sanitize_logs"])
                 conf.set(page, "anon", form.data["anon"])
                 # Show updated title example:
                 form.title_example.data = render_template_string(form.title_template.data, **DUMMY_CONTEXT)
