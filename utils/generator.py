@@ -1,6 +1,5 @@
 import datetime
 import json
-from loguru import logger
 import math
 import multiprocessing as mp
 import os
@@ -16,6 +15,7 @@ from multiprocessing.connection import Connection
 import requests
 from cairosvg import svg2png
 from flask import render_template, render_template_string
+from loguru import logger
 
 from utils import imagehandler, taghandler
 from utils.confighandler import ConfigHandler, stash_headers, stash_query
@@ -53,6 +53,7 @@ def info(message: str, alt_message: str | None = None) -> str:
     logger.info(message)
     return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
 
+
 def success(message: str, alt_message: str | None = None) -> str:
     logger.success(message)
     return json.dumps({"status": "success", "data": {"message": alt_message if alt_message else message}}) + '\n'
@@ -71,15 +72,10 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     yield info("Starting generation")
 
     logger.info(
-        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{
-        ' and including gallery' if include_gallery else ''}."
-    )
+        f"Generating submission for scene ID {j['scene_id']} {'in' if gen_screens else 'ex'}cluding screens{' and including gallery' if include_gallery else ''}.")
 
-    template = (
-        j["template"]
-        if "template" in j and j["template"] in config.template_names
-        else config.get("backend", "default_template")
-    )
+    template = (j["template"] if "template" in j and j["template"] in config.template_names else config.get("backend",
+                                                                                                            "default_template"))
     assert template is not None
 
     performers = {}
@@ -327,9 +323,8 @@ def generate(j: dict) -> Generator[str, None, str | None]:
                 studio_img_ext = "webp"
             case _:
                 studio_img_ext = "unk"
-                yield (warning(
-                    f"Unknown studio logo file type: {studio_img_mime_type}", "Unrecognized studio image file type"
-                ))
+                yield (warning(f"Unknown studio logo file type: {studio_img_mime_type}",
+                               "Unrecognized studio image file type"))
         studio_img_file = tempfile.mkstemp(suffix="-studio." + studio_img_ext)
         with open(studio_img_file[1], "wb") as fp:
             fp.write(studio_img_response.content)
@@ -361,10 +356,8 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             case "image/webp":
                 performer_image_ext = "webp"
             case _:
-                yield (error(
-                    f"Unrecognized performer image mime type: {performer_image_mime_type}",
-                    "Unrecognized performer image format",
-                ))
+                yield (error(f"Unrecognized performer image mime type: {performer_image_mime_type}",
+                             "Unrecognized performer image format", ))
                 return
         performer_image_file = tempfile.mkstemp(suffix="-performer." + performer_image_ext)
         with open(performer_image_file[1], "wb") as fp:
@@ -384,8 +377,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     ###########
 
     if gen_screens:
-        screens_urls = images.generate_screens(stash_file=stash_file,
-                                               host=img_host)
+        screens_urls = images.generate_screens(stash_file=stash_file, host=img_host)
         if screens_urls is None or None in screens_urls:
             yield error("Failed to generate screens")
             return
@@ -422,7 +414,6 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         info_recv, info_send = mp.Pipe(False)
         info_proc = mp.Process(target=gen_media_info, args=(info_send, stash_file["path"]))
         info_proc.start()
-        # del info_send  # Ensures connection can be automatically closed if garbage collected
 
     #########
     # TITLE #
@@ -466,11 +457,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     if scene["studio"] and scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
         tags.add(studio_tag)
-    if (
-            scene["studio"] is not None
-            and scene["studio"]["parent_studio"] is not None
-            and scene["studio"]["parent_studio"]["url"] is not None
-    ):
+    if (scene["studio"] is not None
+        and scene["studio"]["parent_studio"] is not None
+        and scene["studio"]["parent_studio"]["url"] is not None):
         tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
 
     ##########
@@ -494,12 +483,7 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
     if studio_img_file is not None and studio_img_ext != "":
         logger.info("Uploading studio logo")
-        logo_url = images.get_url(
-            studio_img_file[1],
-            studio_img_mime_type,
-            studio_img_ext,
-            img_host,
-        )[0]
+        logo_url = images.get_url(studio_img_file[1], studio_img_mime_type, studio_img_ext, img_host, )[0]
         if logo_url is None:
             logo_url = imagehandler.DEFAULT_IMAGES["studio"][img_host]
             logger.warning("Unable to upload studio image")
@@ -632,7 +616,7 @@ def gen_torrent(
         pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
 ) -> list[str] | None:
     torrent_path = stash_file["path"]
-    max_piece_size = int(math.log(8 * 1024 * 1024, 2)) # = 23, corresponding to 8MB (2^23 bytes)
+    max_piece_size = int(math.log(8 * 1024 * 1024, 2))  # = 23, corresponding to 8MB (2^23 bytes)
     piece_size = min(int(math.log(stash_file["size"] / 2 ** 10, 2)), max_piece_size)
     tempdir = tempfile.TemporaryDirectory()
     basename = "".join(c for c in stash_file["basename"] if c in FILENAME_VALID_CHARS)
@@ -696,6 +680,7 @@ def gen_media_info(pipe: Connection, path: str) -> None:
     cmd = [MEDIA_INFO, path]
     pipe.send(subprocess.check_output(cmd, text=True))
 
+
 def source_for_announce(announce_url: str) -> str:
     announce_url = announce_url.lower()
     if "empornium" in announce_url:
@@ -710,6 +695,7 @@ def source_for_announce(announce_url: str) -> str:
         return "Kufirc"
     if "pornbay" in announce_url:
         return "PBay"
+
 
 def sanitize_announce_url(announce_url: str) -> str:
     sanitized_announce = announce_url.split("/")
