@@ -1,4 +1,3 @@
-import base64
 import datetime
 import json
 from loguru import logger
@@ -643,6 +642,7 @@ def gen_torrent(
     temp_path = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(d, stash_file["basename"] + ".torrent") for d in config.torrent_dirs]
     logger.debug(f"Saving torrent to {temp_path}")
+
     if shutil.which("mkbrr") is None:
         cmd = [
             "mktorrent",
@@ -673,11 +673,13 @@ def gen_torrent(
             temp_path,
             target,
         ]
-    logger.debug(f"Executing: {' '.join(cmd)}")
-    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    output = process.stdout
+    sanitized = sanitize_announce_url(announce_url)
+    logger.debug(f"Executing: {' '.join(cmd).replace(announce_url, sanitized)}")
+
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, text=False)
+    output = process.stdout.decode("utf-8") # decoding bytes vs setting text=True preserves carriage returns
     if config.get("backend", "sanitize_logs", False):
-        output = output.replace(announce_url, sanitize_announce_url(announce_url))
+        output = output.replace(announce_url, sanitized)
     logger.debug(f"mktorrent output:\n{output}")
     if process.returncode != 0:
         tempdir.cleanup()
