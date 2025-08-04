@@ -6,8 +6,12 @@ WORKDIR /emp_stash_fill
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y ffmpeg mktorrent mediainfo build-essential && \
+    apt-get install -y wget ffmpeg mediainfo build-essential && \
     rm -rf /var/lib/apt/lists/*
+
+RUN wget https://github.com/autobrr/mkbrr/releases/download/v1.14.0/mkbrr_1.14.0_linux_amd64.deb && \
+    apt-get install -y ./mkbrr_1.14.0_linux_amd64.deb && \
+    rm mkbrr_1.14.0_linux_amd64.deb
 
 # Copy pyproject.toml and install Python dependencies
 COPY pyproject.toml .
