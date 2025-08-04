@@ -92,7 +92,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     stash_request_body = {"query": "{" + stash_query.format(scene_id) + "}"}
     stash_response = requests.post(
         urllib.parse.urljoin(config.get("stash", "url", "http://localhost:9999"), "/graphql"),  # type: ignore
-        json=stash_request_body, headers=stash_headers, )
+        json=stash_request_body,
+        headers=stash_headers,
+    )
 
     stash_response_body = stash_response.json()
     scene = stash_response_body["data"]["findScene"]
@@ -248,8 +250,19 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             logger.warning(f"Unrecognized cover format")  # TODO return warnings to client
     cover_file = tempfile.mkstemp(suffix="-cover." + cover_ext)
     if cover_gen:
-        cmd = ["ffmpeg", "-ss", "30", "-i", stash_file["path"], "-vf", "thumbnail=300", "-frames:v", "1", cover_file[1],
-               "-y", ]
+        cmd = [
+            "ffmpeg",
+            "-ss",
+            "30",
+            "-i",
+            stash_file["path"],
+            "-vf",
+            "thumbnail=300",
+            "-frames:v",
+            "1",
+            cover_file[1],
+            "-y",
+        ]
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         logger.debug(f"ffmpeg output:\n{proc.stdout}")
     else:
@@ -351,9 +364,13 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             fp.write(performer_image_response.content)
 
         # store data
-        performers[performer["name"]] = {"image_path": performer_image_file[1],
-                                         "image_mime_type": performer_image_mime_type, "image_ext": performer_image_ext,
-                                         "image_remote_url": None, "tag": performer_tag, }
+        performers[performer["name"]] = {
+            "image_path": performer_image_file[1],
+            "image_mime_type": performer_image_mime_type,
+            "image_ext": performer_image_ext,
+            "image_remote_url": None,
+            "tag": performer_tag,
+        }
 
     ###########
     # SCREENS #
@@ -365,8 +382,18 @@ def generate(j: dict) -> Generator[str, None, str | None]:
             yield error("Failed to generate screens")
             return
 
-    cmd = ["ffprobe", "-v", "0", "-select_streams", "a:0", "-show_entries", "stream=bit_rate", "-of",
-           "compact=p=0:nk=1", stash_file["path"], ]
+    cmd = [
+        "ffprobe",
+        "-v",
+        "0",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=bit_rate",
+        "-of",
+        "compact=p=0:nk=1",
+        stash_file["path"],
+    ]
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
         audio_bitrate = f"{int(proc.stdout.split('|')[0].strip()) // 1000} kbps"
@@ -386,19 +413,25 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     if MEDIA_INFO:
         info_recv, info_send = mp.Pipe(False)
         info_proc = mp.Process(target=gen_media_info, args=(info_send, stash_file["path"]))
-        info_proc.start()  # del info_send  # Ensures connection can be automatically closed if garbage collected
+        info_proc.start()
 
     #########
     # TITLE #
     #########
 
-    title = render_template_string(config.get("backend", "title_template", ""),  # type: ignore
-                                   **{"studio": scene["studio"]["name"] if scene["studio"] else "",
-                                      "performers": [p["name"] for p in scene["performers"]], "title": scene["title"],
-                                      "date": scene["date"], "resolution": resolution if resolution is not None else "",
-                                      "codec": stash_file["video_codec"], "duration": str(
-                                           datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-                                      "framerate": stash_file["frame_rate"], }, )
+    title = render_template_string(
+        config.get("backend", "title_template", ""),  # type: ignore
+        **{
+            "studio": scene["studio"]["name"] if scene["studio"] else "",
+            "performers": [p["name"] for p in scene["performers"]],
+            "title": scene["title"],
+            "date": scene["date"],
+            "resolution": resolution if resolution is not None else "",
+            "codec": stash_file["video_codec"],
+            "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+            "framerate": stash_file["frame_rate"],
+        },
+    )
 
     ########
     # TAGS #
@@ -424,8 +457,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     if scene["studio"] and scene["studio"]["url"] is not None:
         studio_tag = urllib.parse.urlparse(scene["studio"]["url"]).netloc.removeprefix("www.")
         tags.add(studio_tag)
-    if (scene["studio"] is not None and scene["studio"]["parent_studio"] is not None and
-            scene["studio"]["parent_studio"]["url"] is not None):
+    if (scene["studio"] is not None
+        and scene["studio"]["parent_studio"] is not None
+        and scene["studio"]["parent_studio"]["url"] is not None):
         tags.add(urllib.parse.urlparse(scene["studio"]["parent_studio"]["url"]).netloc.removeprefix("www."))
 
     ##########
@@ -434,10 +468,13 @@ def generate(j: dict) -> Generator[str, None, str | None]:
 
     logger.info("Uploading performer images")
     for performer_name in performers:
-        performers[performer_name]["image_remote_url"] = \
-            images.get_url(performers[performer_name]["image_path"], performers[performer_name]["image_mime_type"],
-                           performers[performer_name]["image_ext"], img_host,
-                           default=imagehandler.DEFAULT_IMAGES["performer"][img_host], )[0]
+        performers[performer_name]["image_remote_url"] = images.get_url(
+            performers[performer_name]["image_path"],
+            performers[performer_name]["image_mime_type"],
+            performers[performer_name]["image_ext"],
+            img_host,
+            default=imagehandler.DEFAULT_IMAGES["performer"][img_host],
+        )[0]
         os.remove(performers[performer_name]["image_path"])
         if performers[performer_name]["image_remote_url"] is None:
             performers[performer_name]["image_remote_url"] = imagehandler.DEFAULT_IMAGES["performer"][img_host]
@@ -485,19 +522,31 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         except EOFError:
             error("Failed to generate media info")
 
-    template_context = {"studio": scene["studio"]["name"] if scene["studio"] else "", "studio_logo": logo_url,
-                        "studiotag": studio_tag, "director": scene["director"], "title": scene["title"], "date": date,
-                        "details": scene["details"] if scene["details"] != "" else None,
-                        "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
-                        "container": stash_file["format"], "video_codec": stash_file["video_codec"],
-                        "audio_codec": stash_file["audio_codec"], "audio_bitrate": audio_bitrate,
-                        "resolution": "{}×{}".format(stash_file["width"], stash_file["height"]),
-                        "bitrate": "{:.2f} Mb/s".format(stash_file["bit_rate"] / 2 ** 20),
-                        "framerate": "{} fps".format(stash_file["frame_rate"]),
-                        "screens": screens_urls if len(screens_urls) else None,
-                        "contact_sheet": contact_sheet_remote_url, "performers": performers, "cover": cover_resized_url,
-                        "image_count": image_count, "gallery_contact": gallery_contact_url, "media_info": mediainfo,
-                        "pad": imagehandler.DEFAULT_IMAGES["pad"][img_host], }
+    template_context = {
+        "studio": scene["studio"]["name"] if scene["studio"] else "",
+        "studio_logo": logo_url,
+        "studiotag": studio_tag,
+        "director": scene["director"],
+        "title": scene["title"],
+        "date": date,
+        "details": scene["details"] if scene["details"] != "" else None,
+        "duration": str(datetime.timedelta(seconds=int(stash_file["duration"]))).removeprefix("0:"),
+        "container": stash_file["format"],
+        "video_codec": stash_file["video_codec"],
+        "audio_codec": stash_file["audio_codec"],
+        "audio_bitrate": audio_bitrate,
+        "resolution": "{}×{}".format(stash_file["width"], stash_file["height"]),
+        "bitrate": "{:.2f} Mb/s".format(stash_file["bit_rate"] / 2 ** 20),
+        "framerate": "{} fps".format(stash_file["frame_rate"]),
+        "screens": screens_urls if len(screens_urls) else None,
+        "contact_sheet": contact_sheet_remote_url,
+        "performers": performers,
+        "cover": cover_resized_url,
+        "image_count": image_count,
+        "gallery_contact": gallery_contact_url,
+        "media_info": mediainfo,
+        "pad":  imagehandler.DEFAULT_IMAGES["pad"][img_host],
+    }
 
     preview_url = None
     if config.get("images", "use_preview", False):
@@ -528,16 +577,23 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         yield error("Failed to save torrent")
         return
 
-    result = {"status": "success", "data": {"message": "Done", "fill": {"title": title,
-                                                                        "cover": preview_url if preview_url and config.get(
-                                                                            "images", "animated_cover",
-                                                                            False) else cover_remote_url,
-                                                                        "tags": " ".join(tags.tags),
-                                                                        "description": description,
-                                                                        "torrent_path": torrent_paths[0],
-                                                                        "file_path": stash_file["path"],
-                                                                        "anon": config.get("backend", "anon",
-                                                                                           False), }, }, }
+    result = {
+        "status": "success",
+        "data": {
+            "message": "Done",
+            "fill": {
+                "title": title,
+                "cover": preview_url
+                if preview_url and config.get("images", "animated_cover", False)
+                else cover_remote_url,
+                "tags": " ".join(tags.tags),
+                "description": description,
+                "torrent_path": torrent_paths[0],
+                "file_path": stash_file["path"],
+                "anon": config.get("backend", "anon", False),
+            },
+        },
+    }
 
     logger.debug(f"Sending {len(tag_suggestions)} suggestions")
     if len(tag_suggestions) > 0:
@@ -556,8 +612,9 @@ def generate(j: dict) -> Generator[str, None, str | None]:
     logger.success("Done")
 
 
-def gen_torrent(pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None) -> list[
-                                                                                                            str] | None:
+def gen_torrent(
+        pipe: Connection, stash_file: dict, announce_url: str, directory: str | None = None
+) -> list[str] | None:
     torrent_path = stash_file["path"]
     max_piece_size = int(math.log(8 * 1024 * 1024, 2))  # = 23, corresponding to 8MB (2^23 bytes)
     piece_size = min(int(math.log(stash_file["size"] / 2 ** 10, 2)), max_piece_size)
@@ -569,13 +626,44 @@ def gen_torrent(pipe: Connection, stash_file: dict, announce_url: str, directory
     temp_path = os.path.join(tempdir.name, basename + ".torrent")
     torrent_paths = [os.path.join(d, stash_file["basename"] + ".torrent") for d in config.torrent_dirs]
     logger.debug(f"Saving torrent to {temp_path}")
-    cmd = ["mktorrent", "-l", str(piece_size), "-s", source_for_announce(announce_url), "-a", announce_url, "-p", "-v",
-           "-o", temp_path, target, ]
-    logger.debug(f"Executing: {' '.join(cmd)}")
-    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    output = process.stdout
+
+    if shutil.which("mkbrr") is None:
+        cmd = [
+            "mktorrent",
+            "-l",
+            str(piece_size),
+            "-s",
+            source_for_announce(announce_url),
+            "-a",
+            announce_url,
+            "-p",
+            "-v",
+            "-o",
+            temp_path,
+            target,
+        ]
+    else:
+        cmd = [
+            "mkbrr",
+            "create",
+            "-l",
+            str(piece_size),
+            "-s",
+            source_for_announce(announce_url),
+            "-t",
+            announce_url,
+            "-v",
+            "-o",
+            temp_path,
+            target,
+        ]
+    sanitized = sanitize_announce_url(announce_url)
+    logger.debug(f"Executing: {' '.join(cmd).replace(announce_url, sanitized)}")
+
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, text=False)
+    output = process.stdout.decode("utf-8") # decoding bytes vs setting text=True preserves carriage returns
     if config.get("backend", "sanitize_logs", False):
-        output = output.replace(announce_url, sanitize_announce_url(announce_url))
+        output = output.replace(announce_url, sanitized)
     logger.debug(f"mktorrent output:\n{output}")
     if process.returncode != 0:
         tempdir.cleanup()
