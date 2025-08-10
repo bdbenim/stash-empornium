@@ -86,8 +86,7 @@ def submit():
     logger.debug(f"Torrent submitted: {j}")
     for client in config.torrent_clients:
         try:
-            if not client.start(j["torrent_path"]):
-                raise Exception(f"client.start({j['torrent_path']}) returned False")
+            client.start(j["torrent_path"])
         except Exception as e:
             logger.error(f"Error attempting to start torrent in {client.name}")
             logger.debug(e)

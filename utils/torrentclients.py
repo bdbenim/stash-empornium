@@ -28,13 +28,12 @@ class TorrentClient:
             with open(torrent_path, "rb") as f:
                 TorrentClient.hashes[torrent_file] = bencoder.infohash(f.read())
 
-    def start(self, torrent_path: str) -> bool:
+    def start(self, torrent_path: str) -> None:
         torrent_file = os.path.basename(torrent_path)
         if torrent_file in self.hashes:
             self.resume(TorrentClient.hashes[torrent_file])
-            return True
         else:
-            return False
+            logger.error(f"Error starting '{torrent_file}' in {self.name}")
 
     def resume(self, infohash: str):
         raise NotImplementedError()
@@ -151,10 +150,11 @@ class Qbittorrent(TorrentClient):
             return
         self._post("/torrents/recheck", {"hashes": infohash})
 
-    def start(self, torrent_path: str) -> bool:
+    def start(self, torrent_path: str) -> None:
         if not self.logged_in:
-            return False
-        return super().start(torrent_path)
+            logger.error(f"Error starting '{torrent_path}' in {self.name}: not logged in")
+            return
+        super().start(torrent_path)
 
     def resume(self, infohash: str):
         self._post("/torrents/start", {"hashes": infohash})
