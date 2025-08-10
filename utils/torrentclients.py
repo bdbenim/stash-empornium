@@ -23,14 +23,14 @@ class TorrentClient:
             self.label = settings["label"]
 
     def add(self, torrent_path: str, file_path: str) -> None:
-        torrent_file = os.path.basename(file_path)
+        torrent_file = os.path.basename(torrent_path)
         if torrent_file not in TorrentClient.hashes:
             with open(torrent_path, "rb") as f:
                 TorrentClient.hashes[torrent_file] = bencoder.infohash(f.read())
 
     def start(self, torrent_path: str) -> None:
         torrent_file = os.path.basename(torrent_path)
-        if torrent_file in self.hashes:
+        if torrent_file in TorrentClient.hashes:
             self.resume(TorrentClient.hashes[torrent_file])
         else:
             logger.error(f"Error starting '{torrent_file}' in {self.name}")
@@ -76,6 +76,8 @@ class RTorrent(TorrentClient):
         super().add(torrent_path, file_path)
         file_path = remap_path(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
+        dir = dir.replace(" ", "\\ ")
+        dir = os.path.normpath(dir)
         logger.debug(f"Adding torrent {torrent_path} to directory {dir}")
         with open(torrent_path, "rb") as torrent:
             self.server.load.raw_verbose("", client.Binary(torrent.read()), f"d.directory.set={dir}",
