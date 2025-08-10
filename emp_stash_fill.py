@@ -2,7 +2,7 @@
 
 __author__ = "An EMP user"
 __license__ = "unlicense"
-__version__ = "0.24.1"
+__version__ = "0.25.0"
 
 # built-in
 import json
