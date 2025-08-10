@@ -4,7 +4,6 @@ from xmlrpc import client
 import requests
 from loguru import logger
 from transmission_rpc import Client as TransmissionClient, TransmissionConnectError
-from webencodings import labels
 
 from utils import bencoder
 from utils.paths import remap_path
@@ -24,12 +23,17 @@ class TorrentClient:
             self.label = settings["label"]
 
     def add(self, torrent_path: str, file_path: str) -> None:
-        if torrent_path not in TorrentClient.hashes:
+        torrent_file = os.path.basename(torrent_path)
+        if torrent_file not in TorrentClient.hashes:
             with open(torrent_path, "rb") as f:
-                TorrentClient.hashes[torrent_path] = bencoder.infohash(f.read())
+                TorrentClient.hashes[torrent_file] = bencoder.infohash(f.read())
 
     def start(self, torrent_path: str) -> None:
-        raise NotImplementedError()
+        torrent_file = os.path.basename(torrent_path)
+        if torrent_file in TorrentClient.hashes:
+            self.resume(TorrentClient.hashes[torrent_file])
+        else:
+            logger.error(f"Error starting '{torrent_file}' in {self.name}")
 
     def resume(self, infohash: str):
         raise NotImplementedError()
@@ -72,23 +76,17 @@ class RTorrent(TorrentClient):
         super().add(torrent_path, file_path)
         file_path = remap_path(file_path, self.pathmaps)
         dir = os.path.split(file_path)[0]
+        dir = dir.replace(" ", "\\ ")
+        dir = os.path.normpath(dir)
         logger.debug(f"Adding torrent {torrent_path} to directory {dir}")
         with open(torrent_path, "rb") as torrent:
-            self.server.load.raw_verbose(
-                "",
-                client.Binary(torrent.read()),
-                f"d.directory.set={dir}",
-                f"d.custom1.set={self.label}",
-                "d.check_hash=",
-            )
+            self.server.load.raw_verbose("", client.Binary(torrent.read()), f"d.directory.set={dir}",
+                                         f"d.custom1.set={self.label}", "d.check_hash=", )
         logger.info("Torrent added to rTorrent")
 
-    def start(self, torrent_path: str) -> None:
-        if torrent_path in RTorrent.hashes:
-            self.resume(RTorrent.hashes[torrent_path])
-
     def resume(self, infohash: str):
-        self.server.d.start(infohash.upper())
+        res = self.server.d.start(infohash.upper())
+        logger.debug(f"Rtorrent output {res}")
 
     def connected(self) -> bool:
         try:
@@ -155,9 +153,10 @@ class Qbittorrent(TorrentClient):
         self._post("/torrents/recheck", {"hashes": infohash})
 
     def start(self, torrent_path: str) -> None:
-        if not self.logged_in or torrent_path not in Qbittorrent.hashes:
+        if not self.logged_in:
+            logger.error(f"Error starting '{torrent_path}' in {self.name}: not logged in")
             return
-        self.resume(Qbittorrent.hashes[torrent_path])
+        super().start(torrent_path)
 
     def resume(self, infohash: str):
         self._post("/torrents/start", {"hashes": infohash})
@@ -191,22 +190,14 @@ class Deluge(TorrentClient):
 
     def __connect(self):
         self.__login()
-        result = requests.post(
-            self.url,
-            json={"method": "web.get_host_status", "params": [self.host], "id": 1},
-            cookies=self.cookies,
-            timeout=5,
-        )
+        result = requests.post(self.url, json={"method": "web.get_host_status", "params": [self.host], "id": 1},
+                               cookies=self.cookies, timeout=5, )
         j = result.json()
         if "result" in j:
             connected = j["result"] is not None and j["result"][1] == "Connected"
             if not connected:
-                requests.post(
-                    self.url,
-                    json={"method": "web.connect", "params": [self.host], "id": 1},
-                    cookies=self.cookies,
-                    timeout=5,
-                )
+                requests.post(self.url, json={"method": "web.connect", "params": [self.host], "id": 1},
+                              cookies=self.cookies, timeout=5, )
 
     def __login(self):
         if not self.connected():
@@ -215,15 +206,13 @@ class Deluge(TorrentClient):
             self.cookies = r.cookies
 
     def connected(self) -> bool:
-        result = requests.post(
-            self.url, json={"method": "web.connected", "params": [], "id": 1}, cookies=self.cookies, timeout=5
-        )
+        result = requests.post(self.url, json={"method": "web.connected", "params": [], "id": 1}, cookies=self.cookies,
+                               timeout=5)
         j = result.json()
         if "result" in j and j["result"]:
             if len(self.host) == 0:
-                result = requests.post(
-                    self.url, json={"method": "web.get_hosts", "params": [], "id": 1}, cookies=self.cookies, timeout=5
-                )
+                result = requests.post(self.url, json={"method": "web.get_hosts", "params": [], "id": 1},
+                                       cookies=self.cookies, timeout=5)
                 j = result.json()
                 if "result" in j:
                     self.host = j["result"][0][0]
@@ -237,21 +226,16 @@ class Deluge(TorrentClient):
         torrent_name = os.path.basename(torrent_path)
 
         with open(torrent_path, "rb") as f:
-            r = requests.post(
-                self.url.replace("/json", "/upload"),
-                files={"file": (torrent_name, f, "application/x-bittorrent")},
-                cookies=self.cookies,
-                timeout=30,
-            )
+            r = requests.post(self.url.replace("/json", "/upload"),
+                              files={"file": (torrent_name, f, "application/x-bittorrent")}, cookies=self.cookies,
+                              timeout=30, )
         j = r.json()
         logger.debug(f"Deluge response: {j}")
         if "success" in j and j["success"]:
             torrent_path = j["files"][0]
-            body = {
-                "method": "web.add_torrents",
-                "params": [[{"path": torrent_path, "options": {"download_location": dir, "add_paused": True}}]],
-                "id": 1,
-            }
+            body = {"method": "web.add_torrents",
+                    "params": [[{"path": torrent_path, "options": {"download_location": dir, "add_paused": True}}]],
+                    "id": 1, }
             try:
                 result = requests.post(self.url, json=body, cookies=self.cookies, timeout=5)
                 j = result.json()
@@ -262,8 +246,7 @@ class Deluge(TorrentClient):
                     logger.info("Torrent added to deluge")
                 else:
                     logger.error(
-                        f"Torrent uploaded to Deluge but failed to add: {j['error'] if 'error' in j and j['error'] else 'Unknown error'}"
-                    )
+                        f"Torrent uploaded to Deluge but failed to add: {j['error'] if 'error' in j and j['error'] else 'Unknown error'}")
             except requests.ReadTimeout:
                 logger.error("Failed to add torrent to Deluge (does it already exist?)")
         else:
@@ -274,16 +257,8 @@ class Deluge(TorrentClient):
         requests.post(self.url, json=body, cookies=self.cookies, timeout=5)
 
     def resume(self, infohash: str) -> None:
-        body = {
-            "method": "core.resume_torrent",
-            "params": [[infohash]],
-            "id": 1
-        }
+        body = {"method": "core.resume_torrent", "params": [[infohash]], "id": 1}
         requests.post(self.url, json=body, cookies=self.cookies, timeout=5)
-
-    def start(self, torrent_path: str) -> None:
-        if torrent_path in Deluge.hashes:
-            self.resume(Deluge.hashes[torrent_path])
 
 
 class Transmission(TorrentClient):
@@ -317,15 +292,12 @@ class Transmission(TorrentClient):
 
         with open(torrent_path, "rb") as f:
             logger.debug(f"Adding torrent {torrent_path} to directory {directory}")
-            torrent = self.c.add_torrent(f, download_dir=directory, paused=True, labels=[self.label] if self.label else None)
+            torrent = self.c.add_torrent(f, download_dir=directory, paused=True,
+                                         labels=[self.label] if self.label else None)
             self.torrents[TorrentClient.hashes[torrent_path]] = torrent.id
         logger.info("Torrent added to Transmission")
         logger.debug(f"Torrent id: {torrent.id}")
         self.c.verify_torrent(torrent.id)
-
-    def start(self, torrent_path: str) -> None:
-        if torrent_path in TorrentClient.hashes:
-            self.resume(TorrentClient.hashes[torrent_path])
 
     def resume(self, infohash: str):
         self.c.start_torrent(self.torrents[infohash])
