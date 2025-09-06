@@ -10,7 +10,7 @@
 [tr][td=nopad][align=center] [img]{{cover}}[/img] [/align][/td][/tr]
 [/table]
 [table=95%,nball]
-[tr][td=nopad,10%] [img]https://jerking.empornium.ph/images/2022/08/30/bitmap.png[/img]  [/td][td=vat] [color=#FFFFFF][size=5][b][font=Impact]  {{title|upper}}[/font][/b][/size][/color]
+[tr][td=nopad,10%] [img]https://hamster.is/images/2025/09/06/bitmap.png[/img]  [/td][td=vat] [color=#FFFFFF][size=5][b][font=Impact]  {{title|upper}}[/font][/b][/size][/color]
 [font=Impact][size=1]
 {%- for name, details in performers.items() -%}
 [color=#0099FF][url=/torrents.php?taglist={{details["tag"]}}]   {{name.upper()}}[/url][/color]
@@ -31,11 +31,11 @@
 {% if sex_acts %}[tr][td][size=1][font=Helvetica][color=#FFFFFF][b]INCLUDES:[/b] {{sex_acts}}[/color][/font][/size][/td][/tr]{% endif %}
 [tr][td][hr][/td][/tr]
 [/table][table=97%,nball]
-[tr][td=nopad,1%][img]https://jerking.empornium.ph/images/2022/08/30/clock_grey.png[/img][/td]
+[tr][td=nopad,1%][img]https://hamster.is/images/2025/09/06/clock_grey.png[/img][/td]
 [td=5%][size=1][color=#999999][b][font=Helvetica]{{duration}}[/font][/b][/color][/size][/td]
-[td=nopad,1%][img]https://jerking.empornium.ph/images/2022/08/30/calendar_grey.png[/img][/td]
+[td=nopad,1%][img]https://hamster.is/images/2025/09/06/calendar_grey.png[/img][/td]
 [td=11%][size=1][color=#999999][b][font=Helvetica]{{date.upper()}}[/font][/b][/color][/size] [/td]
-[td=nopad,1%][img]https://jerking.empornium.ph/images/2022/08/30/pictures_grey.png[/img][/td]
+[td=nopad,1%][img]https://hamster.is/images/2025/09/06/pictures_grey.png[/img][/td]
 [td=5%][size=1][color=#999999][b][font=Helvetica]{{image_count}}[/font][/b][/color][/size][/td]
 [td=55%][/td]
 [/tr]
@@ -45,7 +45,7 @@
 
 [table=98%,nball]
 [tr]
-[td][img]https://jerking.empornium.ph/images/2022/08/31/down_final.png[/img][/td]
+[td][img]https://hamster.is/images/2025/09/06/down_final.png[/img][/td]
 
 [td][color=#FFFFFF][size=2][b]DIMENSIONS[/b][/size][/color]
 
