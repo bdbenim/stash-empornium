@@ -398,8 +398,8 @@ def generate(j: dict) -> Generator[str, None, str | None]:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
         audio_bitrate = f"{int(proc.stdout.split('|')[0].strip()) // 1000} kbps"
 
-    except subprocess.CalledProcessError:
-        logger.warning("Unable to determine audio bitrate")
+    except Exception as e:
+        logger.warning(f"Unable to determine audio bitrate {e}")
         audio_bitrate = "UNK"
 
     #############
