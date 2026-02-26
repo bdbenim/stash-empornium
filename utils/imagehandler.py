@@ -483,6 +483,7 @@ def hamster_upload(
             break
         except requests.exceptions.RequestException as e:
             logger.warning(f"Error uploading image to hamsterimg.net: {e}.")
+            logger.debug(f"Response: {e.response.text if e.response else 'No response'}")
             if i == retries - 1:
                 logger.error("Max retries reached. Failed to upload image.")
                 return None
