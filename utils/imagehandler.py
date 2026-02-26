@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from multiprocessing import Pool
 from multiprocessing.connection import Connection
@@ -473,7 +474,21 @@ def hamster_upload(
         return None
 
     url = "https://hamsterimg.net/api/1/upload"
-    response = requests.post(url, files=files, data=request_body, headers=headers)
+    # use retries with backoff in case of timeouts or rate limits
+    retries = 5
+    for i in range(retries):
+        try:
+            response = requests.post(url, files=files, data=request_body, headers=headers, timeout=10)
+            response.raise_for_status()
+            break
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Error uploading image to hamsterimg.net: {e}.")
+            if i == retries - 1:
+                logger.error("Max retries reached. Failed to upload image.")
+                return None
+            else:
+                logger.warning(f"Retrying in {2 ** i} seconds...")
+                time.sleep(2 ** i)
     j = None
     try:
         j = response.json()
