@@ -478,7 +478,7 @@ def hamster_upload(
     retries = 5
     for i in range(retries):
         try:
-            response = requests.post(url, files=files, data=request_body, headers=headers, timeout=10)
+            response = requests.post(url, files=files, data=request_body, headers=headers, timeout=30)
             response.raise_for_status()
             break
         except requests.exceptions.RequestException as e:
