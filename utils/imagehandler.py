@@ -451,13 +451,6 @@ def hamster_upload(
         img_mime_type: str,
         image_ext: str,
 ) -> str | None:
-    files = {
-        "source": (
-            str(uuid.uuid4()) + "." + image_ext,
-            open(img_path, "rb"),
-            img_mime_type,
-        )
-    }
     request_body = {
         "type": "file",
         "action": "upload",
@@ -478,9 +471,17 @@ def hamster_upload(
     retries = 5
     for i in range(retries):
         try:
-            response = requests.post(url, files=files, data=request_body, headers=headers, timeout=30)
-            response.raise_for_status()
-            break
+            with open(img_path, "rb") as f:
+                files = {
+                    "source": (
+                        str(uuid.uuid4()) + "." + image_ext,
+                        f,
+                        img_mime_type,
+                    )
+                }
+                response = requests.post(url, files=files, data=request_body, headers=headers, timeout=30)
+                response.raise_for_status()
+                break
         except requests.exceptions.RequestException as e:
             logger.warning(f"Error uploading image to hamsterimg.net: {e}.")
             logger.debug(f"Response: {e.response.text if e.response else 'No response'}")
