@@ -479,7 +479,9 @@ def hamster_upload(
                         img_mime_type,
                     )
                 }
-                response = requests.post(url, files=files, data=request_body, headers=headers, timeout=30)
+                timeout = 8 * (2 ** i)  # Exponential backoff
+                logger.debug(f"Uploading image to hamsterimg.net (attempt {i + 1}/{retries}, timeout {timeout}s)")
+                response = requests.post(url, files=files, data=request_body, headers=headers, timeout=timeout)
                 response.raise_for_status()
                 break
         except requests.exceptions.RequestException as e:
