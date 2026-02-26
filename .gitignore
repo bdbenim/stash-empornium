@@ -4,3 +4,6 @@ __pycache__/
 package*.json
 node_modules/
 !strftime-min.js
+.venv/
+build/
+stash_empornium.egg-info/

@@ -27,3 +27,8 @@ license = "Unlicense"
 Repository = "https://github.com/bdbenim/stash-empornium"
 Issues = "https://github.com/bdbenim/stash-empornium/issues"
 Docker = "https://hub.docker.com/r/bdbenim/stash-empornium"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["default-templates", "migrations", "tests", "utils", "webui"] 
+exclude = ["static", "resources", ]
