@@ -80,11 +80,13 @@ const BACKEND_DEFAULT = "http://localhost:9932";
 const STASH_DEFAULT = "http://localhost:9999";
 const STASH_API_KEY_DEFAULT = null;
 const EMPORNIUM_DEFAULT = "https://emparadise.rs";
+const HF_DEFAULT = "https://www.happyfappy.net";
 
 const BACKEND = GM_getValue("backend_url", BACKEND_DEFAULT);
 const STASH = GM_getValue("stash_url", STASH_DEFAULT);
 const STASH_API_KEY = GM_getValue("stash_api_key", STASH_API_KEY_DEFAULT);
 const EMPORNIUM = GM_getValue("empornium", EMPORNIUM_DEFAULT);
+const HAPPYFAPPY = GM_getValue("happyfappy", HF_DEFAULT);
 
 function store(key, prompt_text, default_value) {
     let old_value = GM_getValue(key, default_value);
@@ -865,7 +867,7 @@ function attachFile(blob, filename) {
             Logger,
         } = unsafeWindow.stash;
 
-        async function trackerUpload(tracker = "EMP", tracker_URL = EMPORNIUM) {
+        async function trackerUploadEmp(tracker = "EMP", tracker_URL = EMPORNIUM) {
             // Store
             const announceURL = GM_getValue(tracker + "_URL", null);
             if (announceURL == null) {
@@ -889,22 +891,104 @@ function attachFile(blob, filename) {
             }
         }
 
+        async function trackerUploadHF(tracker = "HF", tracker_URL = HAPPYFAPPY) {
+            // Store
+            const announceURL = GM_getValue(tracker + "_URL", null);
+            if (announceURL == null) {
+                alert("Getting announce URL from upload.php. Please go back after the page loads and then try again");
+                window.location = new URL("/upload.php", tracker_URL).href;
+            } else {
+                let scene_id = window.location.href.split("/scenes/")[1].split('?')[0];
+                const data = await stash.callGQL({"query": "{findScene(id:" + scene_id + "){title files{id}}}"})
+                generate({
+                    scene_id: scene_id,
+                    file_id: data.data.findScene.files[0].id,
+                    announce_url: announceURL,
+                    tracker: tracker,
+                    // template: "",
+                    screens: true,
+                    gallery: false, // TODO actually get these values from the user
+                }, function (r) {
+                    pushJob(r.response.id);
+                    window.location = new URL("/upload.php", HAPPYFAPPY).href;
+                });
+            }
+        }
+
         stash.addEventListener("page:scene", function () {
-            // create_button(getTags);
-            waitForElementClass("ml-auto btn-group", function (className, element) {
-                // create_button(trackerUpload, element[0])
-                const grp = element[0];
+
+    const interval = setInterval(() => {
+        const operationMenu = document.getElementById("operation-menu");
+
+        if (!operationMenu) return;
+
+        // prevent duplicate injection
+        if (document.getElementById("emp-upload")) {
+            clearInterval(interval);
+            return;
+        }
+
+        clearInterval(interval);
+
+        const wrapper = operationMenu.closest("span");
+        const group = wrapper?.parentElement;
+
+        if (!group) return;
+
+        const btn = document.createElement("button");
+
+        btn.id = "emp-upload";
+        btn.title = "Upload to Empornium";
+        btn.type = "button";
+
+        btn.classList.add("btn", "btn-secondary", "minimal");
+
+        btn.innerHTML = '<?xml version="1.0" encoding="UTF-8"?> <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20px" height="20px" viewBox="0 0 20 20" version="1.1"> <g id="surface1"> <path style=" stroke:none;fill-rule:nonzero;fill:rgb(100%,100%,100%);fill-opacity:1;" d="M 16.605469 10.332031 L 9.222656 10.332031 L 10.277344 14.378906 C 10.5 15.226562 10.703125 15.773438 10.886719 16.015625 C 11.074219 16.261719 11.339844 16.382812 11.6875 16.382812 C 12.121094 16.382812 12.371094 16.21875 12.429688 15.894531 C 12.492188 15.570312 12.402344 14.945312 12.160156 14.011719 L 11.515625 11.542969 L 16.921875 11.542969 L 17.28125 12.925781 C 17.585938 14.082031 17.742188 14.972656 17.757812 15.59375 C 17.773438 16.214844 17.605469 16.875 17.253906 17.582031 C 16.898438 18.289062 16.359375 18.816406 15.625 19.167969 C 14.894531 19.519531 13.90625 19.699219 12.664062 19.699219 C 11.460938 19.699219 10.351562 19.523438 9.339844 19.175781 C 8.328125 18.828125 7.484375 18.351562 6.8125 17.742188 C 6.144531 17.136719 5.613281 16.46875 5.226562 15.742188 C 4.839844 15.011719 4.464844 13.953125 4.101562 12.558594 L 2.679688 7.101562 C 2.253906 5.464844 2.136719 4.175781 2.335938 3.230469 C 2.53125 2.285156 3.066406 1.558594 3.941406 1.058594 C 4.820312 0.554688 5.910156 0.300781 7.21875 0.300781 C 8.820312 0.300781 10.21875 0.605469 11.414062 1.210938 C 12.613281 1.820312 13.550781 2.621094 14.230469 3.625 C 14.910156 4.625 15.488281 6.035156 15.960938 7.847656 Z M 10.097656 7.285156 L 9.738281 5.917969 C 9.488281 4.949219 9.273438 4.324219 9.097656 4.039062 C 8.917969 3.757812 8.671875 3.617188 8.351562 3.617188 C 7.953125 3.617188 7.742188 3.738281 7.710938 3.976562 C 7.679688 4.214844 7.800781 4.863281 8.074219 5.917969 L 8.429688 7.285156 Z M 10.097656 7.285156 "/> </g> </svg>';
+
+        btn.addEventListener("click", function () {
+            trackerUploadEmp("EMP", EMPORNIUM);
+        });
+
+        group.insertBefore(btn, wrapper);
+
+    }, 250);
+});
+        stash.addEventListener("page:scene", function () {
+
+            const interval = setInterval(() => {
+                const operationMenu = document.getElementById("operation-menu");
+
+                if (!operationMenu) return;
+
+                if (document.getElementById("hf-upload")) {
+                    clearInterval(interval);
+                    return;
+                }
+
+                clearInterval(interval);
+
+                const wrapper = operationMenu.closest("span");
+                const group = wrapper?.parentElement;
+
+                if (!group) return;
+
                 const btn = document.createElement("button");
-                btn.setAttribute("id", "emp-upload");
-                btn.setAttribute("title", "Upload to Empornium");
+
+                btn.id = "hf-upload";
+                btn.title = "Upload to HappyFappy";
+                btn.type = "button";
+
                 btn.classList.add("btn", "btn-secondary", "minimal");
-                btn.innerHTML = '<?xml version="1.0" encoding="UTF-8"?> <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20px" height="20px" viewBox="0 0 20 20" version="1.1"> <g id="surface1"> <path style=" stroke:none;fill-rule:nonzero;fill:rgb(100%,100%,100%);fill-opacity:1;" d="M 16.605469 10.332031 L 9.222656 10.332031 L 10.277344 14.378906 C 10.5 15.226562 10.703125 15.773438 10.886719 16.015625 C 11.074219 16.261719 11.339844 16.382812 11.6875 16.382812 C 12.121094 16.382812 12.371094 16.21875 12.429688 15.894531 C 12.492188 15.570312 12.402344 14.945312 12.160156 14.011719 L 11.515625 11.542969 L 16.921875 11.542969 L 17.28125 12.925781 C 17.585938 14.082031 17.742188 14.972656 17.757812 15.59375 C 17.773438 16.214844 17.605469 16.875 17.253906 17.582031 C 16.898438 18.289062 16.359375 18.816406 15.625 19.167969 C 14.894531 19.519531 13.90625 19.699219 12.664062 19.699219 C 11.460938 19.699219 10.351562 19.523438 9.339844 19.175781 C 8.328125 18.828125 7.484375 18.351562 6.8125 17.742188 C 6.144531 17.136719 5.613281 16.46875 5.226562 15.742188 C 4.839844 15.011719 4.464844 13.953125 4.101562 12.558594 L 2.679688 7.101562 C 2.253906 5.464844 2.136719 4.175781 2.335938 3.230469 C 2.53125 2.285156 3.066406 1.558594 3.941406 1.058594 C 4.820312 0.554688 5.910156 0.300781 7.21875 0.300781 C 8.820312 0.300781 10.21875 0.605469 11.414062 1.210938 C 12.613281 1.820312 13.550781 2.621094 14.230469 3.625 C 14.910156 4.625 15.488281 6.035156 15.960938 7.847656 Z M 10.097656 7.285156 L 9.738281 5.917969 C 9.488281 4.949219 9.273438 4.324219 9.097656 4.039062 C 8.917969 3.757812 8.671875 3.617188 8.351562 3.617188 C 7.953125 3.617188 7.742188 3.738281 7.710938 3.976562 C 7.679688 4.214844 7.800781 4.863281 8.074219 5.917969 L 8.429688 7.285156 Z M 10.097656 7.285156 "/> </g> </svg>';
-                btn.onclick = function (ev) {
-                    trackerUpload("EMP", EMPORNIUM);
-                };
-                grp.insertBefore(btn, document.getElementById("operation-menu").parentElement.parentElement)
-                // grp.appendChild(btn);
-            });
+
+                btn.innerHTML = '<?xml version="1.0" encoding="UTF-8"?> <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20px" height="20px" viewBox="0 0 20 20" version="1.1"> <g id="surface1"> <path style=" stroke:none;fill-rule:nonzero;fill:rgb(100%,100%,100%);fill-opacity:1;" d="M4.364 18.545H0.382V0.364c1.222 0 2.426 0 3.807 0.17 0.177 2.436 0.177 4.703 0.177 6.977H9.818V0.364H20.364c0 1.091 0 2.186 -0.17 3.459 -2.201 0.177 -4.231 0.177 -6.299 0.177v3.638h3.797v3.372H13.818V18.545c-1.223 0 -2.444 0 -3.833 -0.17 -0.167 -2.557 -0.167 -4.944 -0.167 -7.34H4.364z"/> </g> </svg>';
+
+                btn.addEventListener("click", function () {
+                    trackerUploadHF("HF", HAPPYFAPPY);
+                });
+
+                group.insertBefore(btn, wrapper);
+
+            }, 250);
         });
     }
 })();

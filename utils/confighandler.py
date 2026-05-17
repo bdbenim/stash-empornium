@@ -143,6 +143,7 @@ class ConfigHandler(Singleton):
     config_file: str
     tag_config_file: str
     torrent_clients: list[TorrentClient] = []
+    hf_img_host: str
 
     def __init__(self):
         if not self.initialized:
